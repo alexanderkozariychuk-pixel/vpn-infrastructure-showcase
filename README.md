@@ -68,4 +68,14 @@ Implement proxy pool for failover
 See [docs/setup-tutorial.md](docs/setup-tutorial.md)
 
 ## Troubleshooting
-See [docs/troubleshooting.md](docs/troubleshooting.md)
+
+### Real-World Challenge
+
+During testing, I encountered mobile network restrictions where only whitelisted websites were accessible.
+
+This project includes troubleshooting and analysis of:
+- DPI filtering behavior
+- UDP traffic instability
+- VPN protocol blocking
+
+See details in [docs/troubleshooting.md](docs/troubleshooting.md)
