@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Ansible
+*.retry
+*.vault
+inventory/*.key
+
+# Environment variables
+.env
+*.env
+
+# Node Exporter / Prometheus
+*.db
+*.prom
+
+# IDE
+.vscode/
+.idea/
