@@ -1,7 +1,6 @@
-Troubleshooting
+# Troubleshooting
 
 ```markdown
-# Troubleshooting
 
 This document contains typical problems that have arisen during the deployment of VPN infrastructure, and ways to solve them.
 
