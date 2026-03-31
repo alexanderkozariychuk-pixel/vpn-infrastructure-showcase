@@ -53,16 +53,16 @@ graph LR
 ---
 
 ## Key Features
-DPI bypass via obfuscation layer
-Multi-client VPN configuration
-Observability with metrics and alerts
-Failover testing scripts
+- DPI bypass via obfuscation layer
+- Multi-client VPN configuration
+- Observability with metrics and alerts
+- Failover testing scripts
 
 ## Next Steps
-Add Relay Node in Germany
-Automate deployment via Terraform + Ansible
-Expand Grafana dashboards
-Implement proxy pool for failover
+- Add Relay Node in Germany
+- Automate deployment via Terraform + Ansible
+- Expand Grafana dashboards
+- Implement proxy pool for failover
 
 ## Setup
 See [docs/setup-tutorial.md](docs/setup-tutorial.md)
