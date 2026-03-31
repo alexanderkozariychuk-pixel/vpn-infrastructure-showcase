@@ -34,13 +34,13 @@ graph LR
 ---
 
 ## Current Status ✅
-VPS1 configured and running (Moldova)
-VPN tunnel (AmneziaWG) established
-Config files created for 4 clients
-Monitoring setup:
-Uptime Kuma + Telegram alerts
-Node Exporter + Prometheus (metrics)
-Custom script for AmneziaWG UDP:443 check
+- VPS1 configured and running (Moldova)
+- VPN tunnel (AmneziaWG) established
+- Config files created for 4 clients
+- Monitoring setup:
+    - Uptime Kuma + Telegram alerts
+    - Node Exporter + Prometheus (metrics)
+    - Custom script for AmneziaWG UDP:443 check
 
 ---
 
