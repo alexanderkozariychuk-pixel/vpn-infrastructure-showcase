@@ -45,10 +45,10 @@ graph LR
 ---
 
 ## Tech Stack
-Networking: WireGuard, AmneziaWG
-Infrastructure & Automation: Terraform (planned), Ansible (planned)
-Monitoring: Prometheus, Node Exporter, Uptime Kuma
-Scripting: Bash
+- **Networking**: WireGuard, AmneziaWG
+- **Infrastructure & Automation**: Terraform (planned), Ansible (planned)
+- **Monitoring**: Prometheus, Node Exporter, Uptime Kuma
+- **Scripting**: Bash
 
 ---
 
