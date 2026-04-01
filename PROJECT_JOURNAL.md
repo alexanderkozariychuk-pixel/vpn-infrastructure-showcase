@@ -44,21 +44,50 @@ This document logs the key milestones and decisions made during the development 
 
 - **Project journal started**  
   - Added this file to track progress and decisions.
+ 
+---
+
+  ## 2026-04-01
+
+- **Repository enrichment**  
+  - Added configuration examples (`configs/amneziawg/`, `configs/xray/`, `configs/monitoring/`) with placeholders.  
+  - Added utility scripts (`scripts/rotate-keys.sh`, `scripts/backup-configs.sh`, `scripts/healthcheck.sh`, `scripts/setup-new-vps.sh`, `scripts/check_awg.sh`, `scripts/install-amneziawg.sh`).  
+  - Prepared initial templates for automation (`ansible/`, `terraform/`) – structure created, content to be filled tomorrow.  
+  
+- **Infrastructure expansion**  
+  - Created two additional AmneziaWG clients.  
+  - Now total of 6 clients configured and active.
+
+- **Documentation**  
+  - Added a **Scripts** section to `README.md` describing all scripts.  
+  - Updated `PROJECT_JOURNAL.md` with today's work.
 
 ---
 
 ## Next steps (planned)
 
-- **2026-04-01**  
-  - Add configuration examples (`configs/`) with placeholders.  
-  - Create utility scripts (`scripts/rotate-keys.sh`, `scripts/healthcheck.sh`).  
-  - Set up basic Ansible role stubs (`ansible/roles/`).  
-  - Prepare Terraform template for VPS provisioning (`terraform/main.tf.example`).  
-  - Add `CONTRIBUTING.md` and `SECURITY.md` to show readiness for collaboration.  
- 
- ### Future Roadmap
-- Start live production on the exit node in Germany (second VPS) and document the process.
-- Automate deployment using Ansible + Terraform.
-- Add Grafana dashboards.
-- Implement a proxy pool for fault tolerance.
-- Write a custom metrics exporter for AmneziaWG.
+### Immediate (April 2, 2026)
+- **Complete automation templates**  
+  - Write basic Ansible playbook for AmneziaWG installation (`ansible/playbooks/deploy-awg.yml`).  
+  - Create Terraform example for VPS provisioning (`terraform/main.tf.example` with Timeweb provider).  
+  - Fill `terraform/terraform.tfvars.example` and `ansible/group_vars/all.yml.example` with placeholders.
+
+- **Add contributing and security guidelines**  
+  - Create `CONTRIBUTING.md` and `SECURITY.md` to show readiness for collaboration.
+
+- **Stability experiments**  
+  - Perform extended connectivity tests on the Moldova VPS: monitor uptime, handshake stability, and reconnect behaviour.  
+  - Simulate network disruptions (e.g., restarting the `awg-quick` service, changing client MTU, toggling firewall rules) and document results in `troubleshooting.md`.  
+  - Validate the effectiveness of the current monitoring scripts (`check_awg.sh`, Uptime Kuma) under different failure scenarios.
+
+- **Documentation**  
+  - Add a section in `troubleshooting.md` about stability testing and observed behaviour.  
+  - Ensure all new scripts and config examples are properly linked from `README.md`.
+
+
+### Future Roadmap
+- Rent a second VPS in Germany, install AmneziaWG, and establish an exit tunnel (entry → exit).  
+- Automate full deployment with Ansible + Terraform.  
+- Add a proxy pool for fault tolerance.  
+- Write a custom metrics exporter for AmneziaWG.  
+- Implement CI/CD (GitHub Actions) for automated testing.
