@@ -13,6 +13,7 @@
 - [Key Features](#key-features)
 - [Next Steps](#next-steps)
 - [Setup](#setup)
+- [Scripts](#scripts)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -66,6 +67,23 @@ graph LR
 
 ## Setup
 See [docs/setup-tutorial.md](docs/setup-tutorial.md)
+
+## Scripts
+
+Utility scripts to automate common tasks. All scripts are located in the [`scripts/`](scripts/) directory and require execution on the VPS with appropriate permissions.
+
+| Script | Description |
+|--------|-------------|
+| [`rotate-keys.sh`](scripts/rotate-keys.sh) | Generate new keys for an existing AmneziaWG client, update the server config, and restart the service. |
+| [`backup-configs.sh`](scripts/backup-configs.sh) | Create a timestamped archive of all critical configuration files (AmneziaWG, Xray, monitoring). |
+| [`install-monitoring.sh`](scripts/install-monitoring.sh) | Deploy the full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker on a fresh VPS. |
+| [`deploy-client.sh`](scripts/deploy-client.sh) | Wrapper around the AmneziaWG installer to create a new client and print its configuration. |
+| [`healthcheck.sh`](scripts/healthcheck.sh) | Verify the status of AmneziaWG, Xray, and essential ports. Returns exit code 0 if all healthy. |
+| [`setup-new-vps.sh`](scripts/setup-new-vps.sh) | Perform base setup on a new VPS: create a user, configure SSH keys, disable password authentication, set up firewall. |
+| [`check_awg.sh`](scripts/check_awg.sh) | Monitor AmneziaWG health and push status to Uptime Kuma (used in cron). |
+| [`install-amneziawg.sh`](scripts/install-amneziawg.sh) | One‑click installation of AmneziaWG on a fresh Ubuntu server (based on the official installer). |
+
+All scripts are provided as examples – adjust variables, paths, and placeholders to match your environment. Run them with `sudo` where required.
 
 ## Troubleshooting
 
