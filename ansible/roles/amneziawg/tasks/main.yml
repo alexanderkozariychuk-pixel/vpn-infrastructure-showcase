@@ -1,0 +1,62 @@
+---
+- name: Download AmneziaWG install script
+  get_url:
+    url: https://raw.githubusercontent.com/Varckin/amneziawg-install/main/amneziawg-install.sh
+    dest: /tmp/amneziawg-install.sh
+    mode: 0755
+
+- name: Install expect for non-interactive scripts
+  apt:
+    name: expect
+    state: present
+
+- name: Install AmneziaWG using expect
+  expect:
+    command: /tmp/amneziawg-install.sh
+    responses:
+      'Public IPv4 or IPv6 address or domain:': "{{ ansible_default_ipv4.address }}"
+      'Public interface:': "{{ ansible_default_ipv4.interface }}"
+      'AmneziaWG interface name:': "{{ awg_interface }}"
+      'Server AmneziaWG IPv4:': "{{ awg_server_ip }}/24"
+      'Server AmneziaWG port [1-65535]:': "{{ awg_port }}"
+      'First DNS resolver to use for the clients:': '1.1.1.1'
+      'Second DNS resolver to use for the clients (optional):': '1.0.0.1'
+      'Allowed IPs list for generated clients (leave default to route everything):': '0.0.0.0/0,::/0'
+      'Server AmneziaWG Jc [1-128]:': "{{ awg_jc }}"
+      'Server AmneziaWG Jmin [1-1280]:': "{{ awg_jmin }}"
+      'Server AmneziaWG Jmax [1-1280]:': "{{ awg_jmax }}"
+      'Server AmneziaWG S1 [15-150]:': "{{ awg_s1 }}"
+      'Server AmneziaWG S2 [15-150]:': "{{ awg_s2 }}"
+      'Server AmneziaWG H1 [5-2147483647]:': "{{ awg_h1 }}"
+      'Server AmneziaWG H2 [5-2147483647]:': "{{ awg_h2 }}"
+      'Server AmneziaWG H3 [5-2147483647]:': "{{ awg_h3 }}"
+      'Server AmneziaWG H4 [5-2147483647]:': "{{ awg_h4 }}"
+      'Do you want to add a new client?': 'n'
+    timeout: 300
+  when: awg_jc is defined
+
+- name: Start and enable AmneziaWG service
+  systemd:
+    name: awg-quick@awg0
+    state: started
+    enabled: yes
+
+- name: Ensure NAT rules are present in the config
+  lineinfile:
+    path: /etc/amneziawg/awg0.conf
+    regexp: '^PostUp ='
+    line: 'PostUp = iptables -A FORWARD -i awg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ ansible_default_ipv4.interface }} -j MASQUERADE'
+  notify: restart awg
+
+- name: Ensure PostDown rule
+  lineinfile:
+    path: /etc/amneziawg/awg0.conf
+    regexp: '^PostDown ='
+    line: 'PostDown = iptables -D FORWARD -i awg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ ansible_default_ipv4.interface }} -j MASQUERADE'
+  notify: restart awg
+
+handlers:
+  - name: restart awg
+    systemd:
+      name: awg-quick@awg0
+      state: restarted
