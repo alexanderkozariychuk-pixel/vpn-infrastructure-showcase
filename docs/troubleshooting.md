@@ -281,6 +281,40 @@ sudo systemctl enable x-ui
 sudo systemctl enable docker
 ```
 
+## 7. Stability tests (2026-04-02)
+
+These tests were performed on the Moldova entry node to validate recovery mechanisms and monitoring.
+
+### Test 1: Restarting AmneziaWG service
+- **Action**: `sudo systemctl restart awg-quick@awg0`
+- **Expected**: Clients automatically reconnect within 5‑10 seconds.
+- **Result** (Wi‑Fi clients): Reconnected immediately and automatically.
+- **Result** (Mobile clients): Did **not** reconnect automatically. Manual intervention (Airplane mode toggle) was required to restore connection.
+- **Conclusion**: Mobile networks are less tolerant to service disruptions. For mobile clients, consider implementing a keep‑alive mechanism or advising users to toggle network.
+
+### Test 2: Changing client MTU
+- **Action**: Modify client config from `MTU = 1280` to `1200`, then reconnect.
+- **Result**: No noticeable difference in performance or stability.
+- **Conclusion**: MTU = 1280 is safe; reducing further is unnecessary.
+
+### Test 3: Simulating server unreachable (temporary firewall block)
+- **Action**: On server: `sudo ufw deny 443/udp` for 30 seconds, then `sudo ufw delete deny 443/udp`.
+- **Expected**: Client loses connection, then automatically recovers after the block is lifted (handshake retry).
+- **Result**: Exactly as expected. Clients re‑established handshake within 30 seconds after the block was removed.
+- **Conclusion**: The VPN client handles temporary network outages correctly.
+
+### Test 4: Push monitor validation
+- **Action**: Stop AmneziaWG (`sudo systemctl stop awg-quick@awg0`), wait 2 minutes, then start again.
+- **Expected**: Uptime Kuma push monitor shows `down`, then `up`. Telegram alert fires.
+- **Result**: Exactly as expected. Alert received within 1 minute of service stop; recovery notification sent after restart.
+- **Conclusion**: The monitoring stack (`check_awg.sh` + Uptime Kuma + Telegram) is fully functional.
+
+### Summary of findings
+- Mobile networks are less robust to VPN service interruptions than Wi‑Fi.
+- The monitoring stack is reliable.
+- MTU adjustments are not critical for this setup.
+- The client can recover from temporary server‑side blocks.
+
 ## Notes
 
 - Run all commands that require root access via sudo.
