@@ -62,7 +62,9 @@ This document logs the key milestones and decisions made during the development 
   - Added a **Scripts** section to `README.md` describing all scripts.  
   - Updated `PROJECT_JOURNAL.md` with today's work.
 
-## 02.04.2026
+---
+
+## 2026-04-02
 
 - **Created a basic Ansible playbook for installing AmneziaWG**
 
@@ -81,6 +83,8 @@ Updated the PROJECT_JOURNAL.md file to reflect current progress.
 
 - **Plan Change**
 Terraform/Python integration for Aeza has been postponed until tomorrow. The focus remains on reliability and observability.
+
+---
 
 ### Future Roadmap
 - Rent a second VPS in France (Aeza), install AmneziaWG, and establish an exit tunnel (entry → exit).
