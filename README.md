@@ -15,7 +15,7 @@
 - [Setup](#setup)
 - [Scripts](#scripts)
 - [Troubleshooting](#troubleshooting)
-
+- [Automation](#automation)
 ---
 
 ## Project Overview
@@ -97,3 +97,11 @@ This project includes troubleshooting and analysis of:
 - VPN protocol blocking
 
 See details in [docs/troubleshooting.md](docs/troubleshooting.md)
+
+## Automation (planned)
+
+The project is migrating from Timeweb to **Aeza** for the exit node.  
+Because Aeza does not have an official Terraform provider, a custom Python script will be created to manage VPS lifecycle via their REST API.  
+The script will be placed in `scripts/` and documented in `terraform/README.md`.
+
+All server configuration (AmneziaWG, monitoring) will still be handled by **Ansible** (playbooks in `ansible/`).
