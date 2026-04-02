@@ -29,7 +29,7 @@ Multi-hop VPN infrastructure for stable, private connectivity, designed to bypas
 graph LR
     Clients["Clients: 4 devices"] --> Entry["VPS Moldova – Entry\nAmneziaWG + Xray + 3X-UI"]
     Entry --> Monitoring["Monitoring Node\nUptime Kuma\nNode Exporter\nPrometheus"]
-    Entry --> Future["Future Relay Node\nGermany – Routing & NAT"]
+    Entry --> Future["Future Relay Node\nFrance – Routing & NAT"]
     Future --> Proxy["Proxy Pool\nResidential IPs"]
 ```
 ---
@@ -47,9 +47,11 @@ graph LR
 
 ## Tech Stack
 - **Networking**: WireGuard, AmneziaWG
-- **Infrastructure & Automation**: Terraform (planned), Ansible (planned)
+- **Infrastructure & Automation**:
+  - **VPS lifecycle**: Python + Aeza REST API (custom script, planned)
+  - **Configuration management**: Ansible (planned)
 - **Monitoring**: Prometheus, Node Exporter, Uptime Kuma
-- **Scripting**: Bash
+- **Scripting**: Bash, Python
 
 ---
 
