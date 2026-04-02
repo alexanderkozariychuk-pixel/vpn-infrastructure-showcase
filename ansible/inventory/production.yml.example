@@ -1,0 +1,7 @@
+all:
+  children:
+    entry:
+      hosts:
+        vps-moldova:
+          ansible_host: <VPS_IP>
+          ansible_user: root  #temporarily, then we'll switch to the created user
