@@ -64,7 +64,7 @@ This document logs the key milestones and decisions made during the development 
 
 ## 02.04.2026
 
--**Created a basic Ansbile playbook for installing AmneziaWG**
+- **Created a basic Ansible playbook for installing AmneziaWG**
 
 - **Added project participation and security guidelines**
 Created the CONTRIBUTING.md and SECURITY.md files to encourage collaboration and responsible disclosure.
