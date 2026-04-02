@@ -1,0 +1,9 @@
+---
+- name: Deploy AmneziaWG VPN server
+  hosts: entry
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - common
+    - amneziawg
