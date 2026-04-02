@@ -62,10 +62,11 @@ graph LR
 - Failover testing scripts
 
 ## Next Steps
-- Add Relay Node in Germany
-- Automate deployment via Terraform + Ansible
-- Expand Grafana dashboards
-- Implement proxy pool for failover
+- Rent a second VPS in France (Aeza), install AmneziaWG, and establish an exit tunnel (entry → exit).
+- Automate VPS lifecycle: write a Python script to manage Aeza instances via their REST API.
+- Automate server configuration: write Ansible playbooks for AmneziaWG, Xray, and monitoring.
+- Expand Grafana dashboards for better observability.
+- Implement a proxy pool for fault tolerance (fallback exit IPs).
 
 ## Setup
 See [docs/setup-tutorial.md](docs/setup-tutorial.md)
