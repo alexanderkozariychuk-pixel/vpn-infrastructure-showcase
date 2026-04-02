@@ -62,32 +62,32 @@ This document logs the key milestones and decisions made during the development 
   - Added a **Scripts** section to `README.md` describing all scripts.  
   - Updated `PROJECT_JOURNAL.md` with today's work.
 
----
+## 02.04.2026
 
-## Next steps (planned)
+-**Created a basic Ansbile playbook for installing AmneziaWG**
 
-### Immediate (April 2, 2026)
-- **Complete automation templates**  
-  - Write basic Ansible playbook for AmneziaWG installation (`ansible/playbooks/deploy-awg.yml`).  
-  - Create Terraform example for VPS provisioning (`terraform/main.tf.example` with Timeweb provider).  
-  - Fill `terraform/terraform.tfvars.example` and `ansible/group_vars/all.yml.example` with placeholders.
+- **Added project participation and security guidelines**
+Created the CONTRIBUTING.md and SECURITY.md files to encourage collaboration and responsible disclosure.
 
-- **Add contributing and security guidelines**  
-  - Create `CONTRIBUTING.md` and `SECURITY.md` to show readiness for collaboration.
+- **Stability Experiments**
+Run four tests on the entry node in Moldova (service restart, MTU change, temporary firewall blocking, push monitoring).
+The results are documented in the troubleshooting.md file.
+Key finding: Mobile clients do not automatically reconnect after service restart (requires switching to airplane mode).
+Monitoring and recovery from temporary blocking work as expected.
 
-- **Stability experiments**  
-  - Perform extended connectivity tests on the Moldova VPS: monitor uptime, handshake stability, and reconnect behaviour.  
-  - Simulate network disruptions (e.g., restarting the `awg-quick` service, changing client MTU, toggling firewall rules) and document results in `troubleshooting.md`.  
-  - Validate the effectiveness of the current monitoring scripts (`check_awg.sh`, Uptime Kuma) under different failure scenarios.
+- **Documentation Updates**
+Revised the README.md file to reflect planned automation for Aeza (Python API script).
+Updated the PROJECT_JOURNAL.md file to reflect current progress.
 
-- **Documentation**  
-  - Add a section in `troubleshooting.md` about stability testing and observed behaviour.  
-  - Ensure all new scripts and config examples are properly linked from `README.md`.
-
+- **Plan Change**
+Terraform/Python integration for Aeza has been postponed until tomorrow. The focus remains on reliability and observability.
 
 ### Future Roadmap
-- Rent a second VPS in Germany, install AmneziaWG, and establish an exit tunnel (entry → exit).  
-- Automate full deployment with Ansible + Terraform.  
-- Add a proxy pool for fault tolerance.  
-- Write a custom metrics exporter for AmneziaWG.  
-- Implement CI/CD (GitHub Actions) for automated testing.
+- Rent a second VPS in France (Aeza), install AmneziaWG, and establish an exit tunnel (entry → exit).
+- Automate full deployment:
+  - **VPS lifecycle management**: Write a Python script that interacts with Aeza REST API (create, list, delete VPS). This replaces Terraform for this provider.
+  - **Configuration management**: Keep using Ansible playbooks for setting up AmneziaWG, Xray, and monitoring.
+- Add a proxy pool for fault tolerance.
+- Write a custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
+- Implement CI/CD (GitHub Actions) for automated testing of scripts and playbooks.
+- **Learning & portfolio**: Document the process of working with Aeza API, including Python scripting, error handling, and integration with Ansible.
