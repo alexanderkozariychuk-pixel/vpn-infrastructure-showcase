@@ -104,6 +104,49 @@ The VPN infrastructure itself is correctly configured; the issue is the network'
 > **Note**: This intermittent behaviour is a common characteristic of modern DPI‑based filtering. It demonstrates that the network does not permanently block our infrastructure but applies dynamic, short‑term restrictions. Our monitoring scripts (Uptime Kuma) can be used to track connectivity patterns and alert when the tunnel goes down for an extended period.
 ## 2. Errors in the installation and configuration of AmneziaWG
 
+### 1.4. VLESS + XHTTP fails under strict domain whitelist
+
+**Observation**:  
+Even with XHTTP transport (attempting to mimic allowed domains such as Microsoft.com), the connection fails on mobile networks enforcing strict domain/IP whitelisting.  
+
+On Wi-Fi networks (without strict filtering), VLESS + XHTTP works but shows lower performance compared to AmneziaWG.
+
+---
+
+**Analysis**:  
+The failure is not related to DPI, but to **strict whitelist enforcement at the network level**.
+
+Such filtering typically allows traffic only to:
+- specific domains (e.g., Yandex, VK)
+- or predefined IP ranges
+
+Technologies like VLESS, Reality, or XHTTP can disguise traffic patterns, but **cannot bypass restrictions based on destination IP/domain**, since:
+- DNS resolution and SNI still reveal the target
+- connections to non-whitelisted endpoints are blocked before protocol-level obfuscation becomes relevant
+
+---
+
+**Conclusion**:  
+In a strict whitelist environment, protocol-level obfuscation (Xray, VLESS, Reality, etc.) is ineffective.
+
+The only theoretical workaround would involve:
+- tunneling traffic through already whitelisted services (e.g., WebRTC-based platforms like VK Calls or Yandex Telemost)
+- or leveraging allowed infrastructure as a relay
+
+However, such approaches are:
+- highly complex
+- unstable
+- and out of scope for this project
+
+---
+
+**Recommendation**:  
+- Accept the limitation in strictly whitelisted mobile networks  
+- Use alternative networks/operators where possible  
+- For standard or DPI-based restrictions, AmneziaWG (UDP/443) remains the most reliable and performant solution
+
+
+
 ### 2.1. The installation script does not run or returns an error.
 
 **Reason**: the script is incompatible with the Ubuntu version, or there is no access to GitHub.
