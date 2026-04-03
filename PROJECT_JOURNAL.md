@@ -86,12 +86,37 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-### Future Roadmap
-- Rent a second VPS in France (Aeza), install AmneziaWG, and establish an exit tunnel (entry → exit).
-- Automate full deployment:
-  - **VPS lifecycle management**: Write a Python script that interacts with Aeza REST API (create, list, delete VPS). This replaces Terraform for this provider.
-  - **Configuration management**: Keep using Ansible playbooks for setting up AmneziaWG, Xray, and monitoring.
-- Add a proxy pool for fault tolerance.
-- Write a custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
-- Implement CI/CD (GitHub Actions) for automated testing of scripts and playbooks.
-- **Learning & portfolio**: Document the process of working with Aeza API, including Python scripting, error handling, and integration with Ansible.
+## 2026-04-03
+- **Aeza API script**: Added `scripts/aeza_create_vps.py` – Python script using official Aeza client to automate VPS creation (France exit node).
+- **New architectural decision**: Introduced a **Russian retranslator (bridge) node** with an IP from a subnet associated with whitelisted domains (VK, Yandex, etc.). This node will be the first hop for clients, masking the entire multi‑hop chain.
+- **Provider selection for RU node**: Preferred – **4VPS.SU** (small, low‑profile, unlimited traffic). Fallback – Aeza Moscow (unified API).
+- **Updated Future Roadmap** (see below).
+
+---
+
+## Future Roadmap (as of 2026-04-03)
+
+### Immediate (next 2–3 days)
+- Test Aeza API script and provision France exit node.
+- Manually order Russian VPS from 4VPS.SU (or automate if API becomes available).
+- Begin documenting setup for both nodes.
+- Configure Xray (VLESS+XHTTP) between Moldova (entry) and France (exit).
+
+### Short‑term (next week)
+- Deploy Russian retranslator (AmneziaWG for client → RU node, then Xray to Moldova).
+- Update client configs to point to the Russian node (seamless migration).
+- Validate full 3‑hop chain: client → RU → Moldova → France → Internet.
+- Add monitoring for all nodes (separate VPS or distributed exporters).
+
+### Long‑term (next month)
+- Automate full deployment with Ansible + custom Python scripts (Aeza, 4VPS.SU).
+- Add proxy pool for fault tolerance (fallback exit IPs).
+- Build Grafana dashboards for end‑to‑end observability.
+- Write custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
+- Implement CI/CD (GitHub Actions) for testing and deployment.
+
+---
+
+## Notes
+- The Russian retranslator is **not guaranteed** to work under a strict whitelist, but it significantly increases resilience.
+- If the RU node gets blocked, the architecture allows quick replacement with another provider.
