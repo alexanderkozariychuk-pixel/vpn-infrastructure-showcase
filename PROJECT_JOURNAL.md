@@ -94,26 +94,45 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## Future Roadmap (as of 2026-04-03)
+## 2026-04-04
 
-### Immediate (next 2–3 days)
-- Test Aeza API script and provision France exit node.
-- Manually order Russian VPS from 4VPS.SU (or automate if API becomes available).
-- Begin documenting setup for both nodes.
-- Configure Xray (VLESS+XHTTP) between Moldova (entry) and France (exit).
+- **API integration for 4VPS.SU**  
+  - Added official `FourVps` API client and discovery script.  
+  - Successfully tested the script (data centers, tariffs) but Russian locations were not returned by the public API.  
+  - Sent a support request asking for Russian DC and tariff IDs; waiting for reply.
 
-### Short‑term (next week)
-- Deploy Russian retranslator (AmneziaWG for client → RU node, then Xray to Moldova).
+- **Documentation and repository updates**  
+  - Updated `PROJECT_JOURNAL.md` with progress.  
+  - Created `configs/xray/chain-ru-to-moldova.json.example` – template for Xray chain (RU bridge → Moldova entry).  
+  - Refactored `README.md`:  
+    - Redesigned **Architecture** with mermaid diagram including Russian retranslator.  
+    - Merged `Scripts` and `Automation (planned)` into a single **Automation and Scripts** section.  
+    - Added links to provider scripts (`create_aeza_vps.py`, `create_vps.py`).  
+    - Fixed table of contents.
+
+- **Learning outcomes**  
+  - Gained hands‑on experience with Python virtual environments (`venv`), third‑party API integration, async debugging, and structuring automation scripts. 
+---
+
+## Future Roadmap (as of 2026-04-04)
+
+### Immediate (next actions, no fixed time)
+- Wait for 4VPS.SU support reply. If IDs are provided, finalise the RU VPS creation script and provision the Russian bridge node.
+- Provision the France exit node using the Aeza script (already ready).
+- Write Ansible role for the Russian bridge node (Xray setup, key generation, firewall).
+
+### Short‑term
+- Deploy the full 3‑hop chain: **client → RU bridge → Moldova entry → France exit**.
 - Update client configs to point to the Russian node (seamless migration).
-- Validate full 3‑hop chain: client → RU → Moldova → France → Internet.
-- Add monitoring for all nodes (separate VPS or distributed exporters).
+- Validate end‑to‑end connectivity and measure performance.
+- Move monitoring to a dedicated VPS (Netherlands) with Prometheus, Grafana, and Uptime Kuma.
 
-### Long‑term (next month)
-- Automate full deployment with Ansible + custom Python scripts (Aeza, 4VPS.SU).
-- Add proxy pool for fault tolerance (fallback exit IPs).
-- Build Grafana dashboards for end‑to‑end observability.
-- Write custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
-- Implement CI/CD (GitHub Actions) for testing and deployment.
+### Long‑term
+- Automate full deployment with Ansible + Python scripts (Aeza, 4VPS.SU or alternative).
+- Add a proxy pool for fault tolerance (fallback exit IPs).
+- Build advanced Grafana dashboards for observability.
+- Write a custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
+- Implement CI/CD (GitHub Actions) for automated testing and deployment.
 
 ---
 
