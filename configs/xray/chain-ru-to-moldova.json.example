@@ -1,0 +1,85 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "client-in",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "<UUID_FOR_CLIENT>",
+            "flow": "xtls-rprx-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "dest": "www.microsoft.com:443",
+          "serverNames": ["www.microsoft.com"],
+          "privateKey": "<PRIVATE_KEY_SERVER>",
+          "shortIds": ["<SHORT_ID>"],
+          "fingerprint": "chrome"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "chain-to-moldova",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "<IP_MOLDOVA_VPS>",
+            "port": 443,
+            "users": [
+              {
+                "id": "<UUID_MOLDOVA_CLIENT>",
+                "flow": "xtls-rprx-vision",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "reality",
+        "realitySettings": {
+          "fingerprint": "chrome",
+          "serverName": "www.microsoft.com",
+          "publicKey": "<PUBLIC_KEY_MOLDOVA_SERVER>",
+          "shortId": "<SHORT_ID_MOLDOVA_SERVER>"
+        },
+        "xhttpSettings": {
+          "mode": "packet-up"
+        }
+      }
+    },
+    {
+      "protocol": "freedom",
+      "tag": "DIRECT"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "DIRECT",
+        "domain": ["geosite:category-ru", "regexp:\\.ru$"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "chain-to-moldova",
+        "network": "tcp,udp"
+      }
+    ]
+  }
+}
