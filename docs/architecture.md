@@ -1,116 +1,120 @@
-# Architecture
+
+# Multi-Hop Obfuscated VPN Infrastructure Architecture
 
 ## 1. Introduction
 
-This document describes the architecture of the VPN infrastructure designed to provide stable, private internet access in environments with DPI (Deep Packet Inspection) and possible network restrictions.
+This document describes the architecture of a multi-hop VPN infrastructure designed to provide stable, private and censorship-resistant internet access in environments with Deep Packet Inspection (DPI) and potential whitelist-based network restrictions.
 
-The system is built around a single entry node (VPS in Moldova) that runs multiple VPN protocols and a monitoring stack. The architecture is designed for modularity, making it easy to add exit nodes, automate deployment, and extend monitoring.
+The system is built as a **three-hop chain**:
 
-## 2. Current Architecture
+1. **Russian Bridge Node** – first hop for clients, located in a Russian data center with an IP that is likely to remain in whitelists.
+2. **Moldova Entry Node** – second hop, receives traffic from the bridge and forwards it to the exit node.
+3. **France Exit Node** – final hop, provides a European exit IP and connects to the global internet.
 
-The current setup consists of one VPS (entry node) located in Moldova. It serves multiple clients (currently 4 devices) and includes an observability stack for health checks and alerts.
+A dedicated monitoring node (planned in the Netherlands) collects metrics and sends alerts. The architecture is modular, which allows easy replacement of any node, automated deployment and future extensions (additional proxies, failover paths).
 
-### 2.1. High‑level diagram
+## 2. Target Architecture
+
+The target setup consists of four VPS instances:
+- Russian Bridge
+- Moldova Entry (currently fully operational)
+- France Exit
+- Netherlands Monitoring (planned)
+
+### 2.1. High-Level Diagram
 
 ```mermaid
 graph LR
-    Clients[Clients: 4 devices] --> Entry[VPS Moldova – Entry Node]
-    Entry --> Monitoring[Monitoring Stack]
-    Entry --> Clients
-    Monitoring --> Telegram[Telegram Alerts]
-    Entry --> Future[Future Relay Node\nGermany – planned]
-    Future --> Proxy[Proxy Pool\nplanned]
+    Client["Client Devices"] --> Bridge["Russian Bridge Node<br/>AmneziaWG + Xray"]
+    Bridge --> Entry["Moldova Entry Node<br/>AmneziaWG + Xray"]
+    Entry --> Exit["France Exit Node<br/>Xray (VLESS + XHTTP)"]
+    Exit --> Internet["Internet"]
+
+    subgraph Monitoring
+        Monitor["Monitoring Node (Netherlands)<br/>Uptime Kuma • Prometheus • Grafana<br/>(planned)"]
+    end
+
+    Bridge -.-> Monitor
+    Entry -.-> Monitor
+    Exit -.-> Monitor
 ```
-### 2.2. Entry node (Moldova)
 
-| Component | Purpose |
-|-----------|---------|
-| **AmneziaWG** | Main VPN protocol. Uses obfuscation (Jc, Jmin, Jmax, H1–H4) to avoid DPI detection. Listens on UDP/443. |
-| **Xray + 3X‑UI** | Alternative protocol (VLESS+Reality) for environments where UDP is blocked. Listens on TCP/443. |
-| **Uptime Kuma** | Simple uptime monitoring. Checks server availability (ping), SSH, Xray port, and receives push notifications from a custom script that verifies AmneziaWG status. |
-| **Prometheus + Node Exporter** | Collects system metrics (CPU, memory, disk, network). |
-| **Alertmanager** | Sends alerts to Telegram based on Prometheus rules (e.g., high CPU, low disk space, server down). |
-| **Docker** | Runs monitoring stack (Prometheus, Node Exporter, Alertmanager, Uptime Kuma). |
+### 2.2. Node Roles
 
-### 2.3. Client connectivity
-- AmneziaWG: Clients import a .conf file generated on the server. The config includes obfuscation parameters and MTU = 1280 for stability in mobile networks.
-- Xray Reality: Clients (e.g., Hiddify) use a vless:// link obtained from 3X‑UI panel. This link contains the server address, port, UUID, and Reality settings.
-- Both protocols can be used independently. The client chooses which one to activate based on network conditions.
+| Node               | Location                  | Primary Role                                              | Protocols |
+|--------------------|---------------------------|-----------------------------------------------------------|-----------|
+| **Russian Bridge** | Russia (Saint Petersburg / Moscow) | First hop for clients. Accepts obfuscated client connections and forwards traffic to Moldova. | AmneziaWG (UDP/443) inbound<br>Xray outbound to MD |
+| **Moldova Entry**  | Moldova (Chișinău)        | Intermediate hop. Receives traffic from the bridge, performs routing/NAT and forwards to France. Currently hosts the monitoring stack and serves 6 client devices directly (interim). | AmneziaWG (UDP/443)<br>Xray (inbound from RU, outbound to FR) |
+| **France Exit**    | France (Paris)            | Final hop. Provides European exit IP to the global internet. | Xray (VLESS + XHTTP) inbound from MD |
+| **Monitoring**     | Netherlands (planned)     | Centralized observability and alerting.                   | HTTP/HTTPS, Prometheus scraping |
 
-### 2.4. Monitoring and alerts
+> **Note**: After the Russian bridge becomes active, direct client connections to Moldova will be phased out (or kept as a fallback). The 6 existing clients will be migrated to connect via the Russian node.
 
-- **Uptime Kuma**:
-  - **Ping monitor** – checks if server is reachable.
-  - **SSH port monitor** – ensures SSH is accessible.
-  - **Xray port monitor** – verifies TCP/443 is open.
-  - **Push monitor** – receives status from a cron script that runs `sudo awg show` every minute. If the script detects that AmneziaWG has no active handshake, it sends a `down` status; otherwise `up`.
+### 2.3. Client Connectivity
 
-- **Prometheus**:
-  - Collects metrics from Node Exporter (host system).
-  - Stores metrics, exposes them for queries and alerts.
-  - Rules are defined in `alerts.yml` (e.g., CPU > 80% for 5 min, disk < 15% free).
+- **Current (interim)**: Clients connect directly to the Moldova Entry Node via AmneziaWG (UDP/443). Works reliably over Wi-Fi and, under relaxed restrictions, over mobile networks.
+- **Target**: Clients will connect to the **Russian Bridge Node** using AmneziaWG. Traffic will then traverse the full three-hop chain.
 
-- **Alertmanager**:
-  - Receives alerts from Prometheus, groups them, and sends notifications to a Telegram bot.
+All client configurations include obfuscation parameters (`Jc`, `Jmin`, `Jmax`, `H1`–`H4`) and `MTU = 1280` for maximum stability.
 
-## 3. Rationale for technology choices
+## 3. Technology Stack & Rationale
 
-| Technology | Why chosen |
-|------------|------------|
-| **AmneziaWG** | Fork of WireGuard with built‑in obfuscation. Resists DPI better than standard WireGuard. UDP‑based, low overhead. |
-| **Xray Reality** | TCP‑based protocol that mimics real HTTPS traffic. Works even when UDP is blocked. |
-| **3X‑UI** | Web panel simplifies management of Xray inbounds and clients. Supports Let's Encrypt, multiple protocols, and client generation. |
-| **Uptime Kuma** | Lightweight, easy to configure, supports push monitors and Telegram notifications. |
-| **Prometheus + Node Exporter** | Industry‑standard stack for metrics collection. Can be extended with Grafana later. |
-| **Docker** | Isolates monitoring components, simplifies updates and maintenance. |
+| Technology                  | Purpose                                      | Why Chosen |
+|-----------------------------|----------------------------------------------|------------|
+| **AmneziaWG**               | Client-to-bridge VPN tunnel                  | WireGuard fork with built-in obfuscation. Strong DPI resistance and low overhead. |
+| **Xray (VLESS + XHTTP)**    | Internal hops and final exit                 | TCP-based protocol that mimics legitimate HTTPS traffic. Excellent resilience against throttling and blocking. |
+| **3X-UI**                   | Xray management and client generation        | User-friendly web panel with Let's Encrypt support and multi-protocol capabilities. |
+| **Uptime Kuma**             | Service monitoring and alerting              | Lightweight, supports push monitors and Telegram notifications. |
+| **Prometheus + Node Exporter** | System metrics collection                 | Industry-standard observability stack. |
+| **Docker**                  | Isolation of monitoring components           | Simplifies deployment, updates and maintenance. |
 
-## 4. Planned extensions
-The architecture is designed to be extended step by step. The following components are in the roadmap:
+## 4. Data Flows
 
-### 4.1. Exit node in Germany
-- A second VPS will be added in Germany.
-- An AmneziaWG tunnel will be established between the entry node (Moldova) and the exit node.
-- Clients will connect to the entry node, and traffic will exit via Germany, providing a European IP.
+### 4.1. Client → Russian Bridge
+```
+Client (Wi-Fi / mobile) → AmneziaWG (UDP/443) → Russian Bridge → Xray outbound
+```
 
-### 4.2. Proxy pool for failover
-- Residential proxies will be integrated, allowing dynamic switching of exit IPs if one gets blocked.
+### 4.2. Internal Hops
+```
+Russian Bridge (Xray) → TCP/443 (VLESS + XHTTP) → Moldova Entry (Xray) → TCP/443 (VLESS + XHTTP) → France Exit
+```
 
-### 4.3. Automation
-- **Terraform** will be used to provision VPS instances.
-- **Ansible** playbooks will automate installation and configuration of all components (AmneziaWG, Xray, monitoring).
-- CI/CD (GitHub Actions) can be added to test and deploy changes.
+### 4.3. Exit → Internet
+```
+France Exit → NAT → Internet
+```
 
-### 4.4. Grafana dashboards
-- **Grafana** will be added to create visual dashboards for system metrics and VPN traffic.
+## 5. Monitoring and Observability (Current State)
 
-### 4.5. Advanced monitoring
-- Custom exporter for AmneziaWG metrics (handshake age, peer count, traffic).
+The monitoring stack currently runs on the Moldova node:
+- **Uptime Kuma** – ping, SSH, Xray port (TCP/443) and push monitor from `check_awg.sh` (cron job checking AmneziaWG handshakes).
+- **Prometheus + Node Exporter** – CPU, RAM, disk, network metrics.
+- **Alertmanager** – Telegram alerts based on Prometheus rules (high CPU, low disk, node unreachable, etc.).
 
-- Blackbox exporter to test UDP connectivity from outside.
+**Planned**: Full migration to a dedicated VPS in the Netherlands to isolate monitoring from VPN traffic.
 
-## 5. Data flows
-### 5.1. AmneziaWG (UDP)
-`Client (Wi‑Fi / mobile) → (UDP/443) → VPS Moldova (entry) → (NAT) → Internet`
+## 6. Security Considerations
 
-### 5.2. Xray Reality (TCP)
-`Client (Wi‑Fi / mobile) → (TCP/443) → VPS Moldova (entry) → (NAT) → Internet`
-### 5.3. Monitoring data
-`VPS → Node Exporter (port 9100) → Prometheus (port 9090) → Alertmanager (port 9093) → Telegram`
-- **Uptime Kuma** collects status via:
-  - Ping and port checks (HTTP/port)
-  - Push data from `check_awg.sh` (HTTP POST)
+- SSH: key-based authentication only, password authentication disabled.
+- UFW: only required ports open (22, 443/UDP, 443/TCP, monitoring ports). Monitoring ports can be further restricted by source IP.
+- 3X-UI panel: change default `admin/admin` credentials immediately; use Let's Encrypt for HTTPS.
+- AmneziaWG keys: stored only on the servers and never exposed.
+- Future: dedicated monitoring node will create an additional security boundary.
 
-## 6. Security considerations
-- SSH: key‑based authentication only, password disabled.
-- UFW: only necessary ports are open (22, 443/udp, 443/tcp, 3001, 9090, 9093, 9100). Access to monitoring ports can be restricted by IP if needed.
-- 3X‑UI panel: default admin/admin should be changed. Optionally, use Let's Encrypt to enable HTTPS.
-- AmneziaWG keys: stored on server, never exposed.
-- Firewall on client: no additional configuration required; all traffic is routed through the VPN.
+## 7. Planned Extensions & Automation
 
-## 7. References
+- **Russian Bridge provisioning** – Python script + 4VPS.SU API (waiting for support reply with DC/tariff IDs). Fallback providers: Beget or FirstVDS.
+- **France Exit** – automated via existing Aeza Python script (ready).
+- **Configuration management** – Ansible playbooks for AmneziaWG, Xray and monitoring.
+- **Monitoring** – dedicated NL node + Grafana dashboards + Blackbox exporter.
+- **Failover** – residential proxy pool (e.g. Germany) for automatic exit IP rotation.
+- **Custom exporter** – Prometheus exporter for AmneziaWG metrics (handshake age, peer count, traffic).
 
-- [AmneziaWG documentation](https://amnezia.org/)
-- [3X‑UI GitHub](https://github.com/mhsanaei/3x-ui)
+## 8. References
+
+- [AmneziaWG](https://amnezia.org/)
+- [3X-UI](https://github.com/mhsanaei/3x-ui)
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma)
 - [Prometheus](https://prometheus.io/)
 - [WireGuard](https://www.wireguard.com/)
