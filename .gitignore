@@ -27,3 +27,6 @@ inventory/*.key
 .vscode/
 .idea/
 __pycache__/
+
+# Monitoring
+scripts/monitoring/awg_status_local.py
