@@ -114,28 +114,53 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
   - Gained hands‑on experience with Python virtual environments (`venv`), third‑party API integration, async debugging, and structuring automation scripts. 
 ---
 
-## Future Roadmap (as of 2026-04-04)
+## 2026-04-05
 
-### Immediate (next actions, no fixed time)
-- Wait for 4VPS.SU support reply. If IDs are provided, finalise the RU VPS creation script and provision the Russian bridge node.
-- Provision the France exit node using the Aeza script (already ready).
-- Write Ansible role for the Russian bridge node (Xray setup, key generation, firewall).
+### Ansible role for Russian bridge node
+- Created complete Ansible role `xray-relay`:
+  - Tasks: install Xray, generate Reality keys and UUID, deploy config template, open firewall port, start service.
+  - Handlers: restart Xray on config change.
+  - Template: `config.json.j2` with inbound from clients (VLESS+Reality) and outbound to Moldova entry node (VLESS+XHTTP).
+  - Playbook `deploy-bridge.yml` and updated inventory example (`production.yml.example`) with `ru_bridge` group.
+  - Group variables example (`all.yml.example`) for Moldova node parameters (IP, UUID, public key, shortId).
+- Role is ready for testing as soon as a Russian VPS is provisioned.
 
-### Short‑term
-- Deploy the full 3‑hop chain: **client → RU bridge → Moldova entry → France exit**.
-- Update client configs to point to the Russian node (seamless migration).
-- Validate end‑to‑end connectivity and measure performance.
-- Move monitoring to a dedicated VPS (Netherlands) with Prometheus, Grafana, and Uptime Kuma.
+### Monitoring enhancement (Uptime Kuma)
+- Replaced old bash script `check_awg.sh` with Python script `awg_status.py`.
+- Script collects extended metrics: number of peers, total received/transmitted bytes, latest handshake age.
+- Sends status and detailed message to Uptime Kuma push monitor using only standard library (no extra dependencies).
+- Added example file `awg_status.py.` to repository (placeholders for IP and token).
+- Updated `.gitignore` to exclude local secrets (`awg_status_local.py`, `.env`, etc.).
 
-### Long‑term
-- Automate full deployment with Ansible + Python scripts (Aeza, 4VPS.SU or alternative).
-- Add a proxy pool for fault tolerance (fallback exit IPs).
-- Build advanced Grafana dashboards for observability.
-- Write a custom metrics exporter for AmneziaWG (handshake age, peer count, traffic).
-- Implement CI/CD (GitHub Actions) for automated testing and deployment.
+### Documentation and housekeeping
+- Updated `README.md`:
+  - Reflected new architecture with Russian bridge, Moldova entry, France exit.
+  - Merged `Scripts` and `Automation (planned)` into a single `Automation and Scripts` section.
+  - Corrected script paths according to new `scripts/` structure (maintenance/, monitoring/, setup/, providers/).
+- Updated `architecture.md` with detailed three‑hop chain description, data flows, and planned extensions.
+- Polished `.gitignore` to exclude Python cache, IDE files, logs, and local secrets.
+- Updated `PROJECT_JOURNAL.md` (this entry) and prepared future roadmap.
+
+### Current blockers
+- Still waiting for 4VPS.SU support reply (Russian DC and tariff IDs). If no answer by mid‑week, will switch to alternative provider (Beget or FirstVDS).
 
 ---
 
-## Notes
-- The Russian retranslator is **not guaranteed** to work under a strict whitelist, but it significantly increases resilience.
-- If the RU node gets blocked, the architecture allows quick replacement with another provider.
+### Future Roadmap (as of 2026-04-05)
+
+#### Immediate (next actions, no fixed time)
+- Provision France exit node using Aeza Python script (requires API key and product ID).
+- Obtain Russian VPS (4VPS.SU or fallback) and test Ansible role `xray-relay` on it.
+- Validate full three‑hop chain: client → RU bridge → MD entry → FR exit → Internet.
+- Migrate monitoring stack to a dedicated VPS (Netherlands) with separate Prometheus/Grafana.
+
+#### Short‑term
+- Write Ansible playbooks for Moldova entry and France exit nodes (reuse existing roles).
+- Add custom metrics exporter for AmneziaWG (handshake age, peer count, traffic) to Prometheus via textfile collector.
+- Set up Grafana dashboards for end‑to‑end observability.
+
+#### Long‑term
+- Implement proxy pool (residential IPs) for automatic failover of exit nodes.
+- Add CI/CD (GitHub Actions) for automated testing of scripts and playbooks.
+- Explore Terraform for providers that offer official support (e.g., Timeweb, Beget).
+- Write detailed blog post / article about the project for portfolio.
