@@ -82,8 +82,6 @@ See [docs/setup-tutorial.md](docs/setup-tutorial.md)
 
 ## Automation and Scripts
 
-## Automation and Scripts
-
 ### Current automation
 
 Utility scripts are organised in the [`scripts/`](scripts/) directory:
