@@ -3,5 +3,10 @@ all:
     entry:
       hosts:
         vps-moldova:
-          ansible_host: <VPS_IP>
-          ansible_user: root  #temporarily, then we'll switch to the created user
+          ansible_host: <MOLDOVA_VPS_IP>
+          ansible_user: root  # temporarily
+    ru_bridge:
+      hosts:
+        russian-bridge:
+          ansible_host: <RUSSIAN_BRIDGE_VPS_IP>
+          ansible_user: root  # temporarily
