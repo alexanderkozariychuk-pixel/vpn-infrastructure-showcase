@@ -50,11 +50,11 @@ graph LR
 ## Current Status ✅
 - VPS1 configured and running (Moldova)
 - VPN tunnel (AmneziaWG) established
-- Config files created for 6 clients
+- Config files created for 9 clients
 - Monitoring setup:
     - Uptime Kuma + Telegram alerts
     - Node Exporter + Prometheus (metrics)
-    - Custom script for AmneziaWG UDP:443 check
+    - **Python script** (`awg_status.py`) collects AmneziaWG metrics (peers, traffic, handshake) and pushes to Uptime Kuma
 
 ---
 
@@ -82,20 +82,25 @@ See [docs/setup-tutorial.md](docs/setup-tutorial.md)
 
 ## Automation and Scripts
 
+## Automation and Scripts
+
 ### Current automation
 
-Utility scripts to automate common tasks. All scripts are located in the [`scripts/`](scripts/) directory and require execution on the VPS with appropriate permissions.
+Utility scripts are organised in the [`scripts/`](scripts/) directory:
 
 | Script | Description |
 |--------|-------------|
-| [`rotate-keys.sh`](scripts/rotate-keys.sh) | Generate new keys for an existing AmneziaWG client, update the server config, and restart the service. |
-| [`backup-configs.sh`](scripts/backup-configs.sh) | Create a timestamped archive of all critical configuration files (AmneziaWG, Xray, monitoring). |
-| [`install-monitoring.sh`](scripts/install-monitoring.sh) | Deploy the full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker on a fresh VPS. |
-| [`deploy-client.sh`](scripts/deploy-client.sh) | Wrapper around the AmneziaWG installer to create a new client and print its configuration. |
-| [`healthcheck.sh`](scripts/healthcheck.sh) | Verify the status of AmneziaWG, Xray, and essential ports. Returns exit code 0 if all healthy. |
-| [`setup-new-vps.sh`](scripts/setup-new-vps.sh) | Perform base setup on a new VPS: create a user, configure SSH keys, disable password authentication, set up firewall. |
-| [`check_awg.sh`](scripts/check_awg.sh) | Monitor AmneziaWG health and push status to Uptime Kuma (used in cron). |
-| [`install-amneziawg.sh`](scripts/install-amneziawg.sh) | One‑click installation of AmneziaWG on a fresh Ubuntu server (based on the official installer). |
+| **Maintenance** | |
+| [`rotate-keys.sh`](scripts/maintenance/rotate-keys.sh) | Generate new keys for an existing AmneziaWG client, update the server config, and restart the service. |
+| [`backup-configs.sh`](scripts/maintenance/backup-configs.sh) | Create a timestamped archive of all critical configuration files (AmneziaWG, Xray, monitoring). |
+| **Monitoring** | |
+| [`healthcheck.sh`](scripts/monitoring/healthcheck.sh) | Verify the status of AmneziaWG, Xray, and essential ports. Returns exit code 0 if all healthy. |
+| [`awg_status.py`](scripts/monitoring/awg_status.py) | Python script to collect AmneziaWG metrics (peers, traffic, handshake age) and push to Uptime Kuma. Copy to `/usr/local/bin/awg_status.py` and replace placeholders. |
+| **Setup** | |
+| [`install-monitoring.sh`](scripts/setup/install-monitoring.sh) | Deploy the full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker on a fresh VPS. |
+| [`setup-new-vps.sh`](scripts/setup/setup-new-vps.sh) | Perform base setup on a new VPS: create a user, configure SSH keys, disable password authentication, set up firewall. |
+| [`install-amneziawg.sh`](scripts/setup/install-amneziawg.sh) | One‑click installation of AmneziaWG on a fresh Ubuntu server (based on the official installer). |
+| **Provider automation** | |
 | [`create_aeza_vps.py`](scripts/providers/aeza/create_aeza_vps.py) | Python script to provision a VPS on Aeza (France exit node) using their official API. |
 | [`create_vps.py`](scripts/providers/fourvps/create_vps.py) | Python script to provision a VPS on 4VPS.SU (Russian bridge node) – requires API token and correct DC/tariff IDs (discovery mode included). |
 
