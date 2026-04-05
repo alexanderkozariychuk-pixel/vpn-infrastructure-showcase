@@ -11,7 +11,6 @@ from FourVps.types.Tariffs import ClusterInfo, Tariff, Preset, AvailableUpgradeP
     GetAvailableUpgradePresets
 
 
-
 class FourVpsClient:
     def __init__(self, token: str, base_url: str = "https://4vps.su", timeout: int = 15):
         self.token = token
@@ -23,9 +22,14 @@ class FourVpsClient:
 
     async def _get_session(self):
         if self.session is None:
-            self.session = aiohttp.ClientSession(base_url=self.base_url,
-                                                 timeout=aiohttp.ClientTimeout(total=self.timeout),
-                                                 headers=self.headers)
+            # Отключаем проверку SSL для теста
+            connector = aiohttp.TCPConnector(ssl=False)
+            self.session = aiohttp.ClientSession(
+                base_url=self.base_url,
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+                headers=self.headers,
+                connector=connector
+            )
         return self.session
 
     async def __get(self, endpoint: str, params: Optional[dict] = None, headers: Optional[dict] = None) -> dict:
@@ -64,20 +68,15 @@ class FourVpsClient:
 
     async def user_balance(self) -> Union[int, float]:
         result = await self.__get('/api/userBalance')
-
         return result.get('data').get('userBalance')
 
     async def get_dc_list(self) -> Optional[list[DataCenter]]:
-        """Return list of DataCenter object FourVps.types.DataCenter.DataCenter"""
         result = await self.__get('/api/getDcList')
         data = result.get('data')
-
         if not data.get('dcList', False):
             return None
-
         dc_list_data = data.get('dcList')
         dc_list = []
-
         for dc_id in dc_list_data:
             dc_info = dc_list_data.get(dc_id)
             data_center = DataCenter(dc_info.get('id'),
@@ -106,25 +105,18 @@ class FourVpsClient:
                                      dc_info.get('title'),
                                      dc_info.get('type_ram', None),
                                      bool(dc_info.get('verif', False)))
-
             dc_list.append(data_center)
-
         return dc_list
 
     async def get_tariff_list(self) -> Optional[list[Tariff]]:
-        """Return list of Tariffs object FourVps.types.Tariffs.Tariff"""
         result = await self.__get('/api/getTarifList')
         result_list = []
-
         tariff_list = result.get('data').get('tarifList')
-
         if not tariff_list:
             return None
-
         for cluster_id in tariff_list:
             cluster_info = tariff_list.get(cluster_id).get('clusterInfo')
             presets = tariff_list.get(cluster_id).get('presets')
-
             _cluster_info = ClusterInfo(cluster_info.get('id'),
                                         cluster_info.get('city'),
                                         float(cluster_info.get('core_price')),
@@ -156,7 +148,6 @@ class FourVpsClient:
             for preset in presets:
                 preset = presets.get(preset)
                 available_presets = preset.get('getAvailableUpgradePresets', None)
-
                 if available_presets:
                     temp_list = []
                     for key, value in available_presets.items():
@@ -172,7 +163,6 @@ class FourVpsClient:
                             value.get('rom_mib')
                         ))
                     available_presets = temp_list
-
                 one_preset = Preset(
                     preset.get('id'),
                     preset.get('name'),
@@ -187,11 +177,8 @@ class FourVpsClient:
                     [OsInfo(int(key), value) for key, value in preset.get('osNames').items()],
                     preset.get('ram_mib'),
                     preset.get('rom'))
-
                 presets_list.append(one_preset)
-
             result_list.append(Tariff(_cluster_info, presets_list))
-
         return result_list
 
     async def buy_server(self,
@@ -201,12 +188,9 @@ class FourVpsClient:
                          server_name: str,
                          domain: Optional[str] = None,
                          period: int = 720) -> ServerCreated:
-
         additional_options = {}
-
         if domain:
             additional_options['domain'] = domain
-
         result = await self.__post('/api/action/buyServer', json={'tarif': tariff_id,
                                                                   'datacenter': datacenter_id,
                                                                   'ostempl': ostempl_id,
@@ -214,60 +198,48 @@ class FourVpsClient:
                                                                   'period': period,
                                                                   **additional_options})
         data = result.get('data')
-
         return ServerCreated(data.get('serverid'), data.get('password'))
 
     async def buy_ip(self, server_id: int, count: int = 1) -> bool:
         result = await self.__post('/api/action/buyIp', json={'serverid': server_id, 'count': count})
-
         return bool(result.get('data'))
 
     async def power_on(self, server_id) -> bool:
         result = await self.__post('/api/action/power_on', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def shutdown(self, server_id) -> bool:
         result = await self.__post('/api/action/shutdown', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def reboot(self, server_id) -> bool:
         result = await self.__post('/api/action/reboot', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def get_vm_link(self, server_id, domain: Optional[str] = None) -> str:
         additional_options = {}
-
         if domain:
             additional_options['domain'] = domain
-
         result = await self.__post('/api/action/getVmLink', json={'serverid': server_id, **additional_options})
-
         return result.get('data').get('redirect')
 
     async def continue_server(self, server_id: int) -> bool:
         result = await self.__post('/api/action/continueServer', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def delete_server(self, server_id: int) -> bool:
         result = await self.__post('/api/action/deleteServer', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def reinstall(self, server_id: int, os_id: int, new_password: str) -> bool:
         result = await self.__post('/api/action/reinstall', json={'serverid': server_id,
                                                                   'ostempl': os_id,
                                                                   'password': new_password})
-
         return bool(result.get('data'))
 
     async def change_tariff(self, server_id: int, preset_id: int) -> bool:
         result = await self.__post('/api/action/changeTarif', json={'serverid': server_id,
                                                                     'preset': preset_id})
-
         return bool(result.get('data'))
 
     async def change_spec(self, server_id: int, cpu_count: int, ram_count: int, rom_count: int) -> bool:
@@ -275,20 +247,16 @@ class FourVpsClient:
                                                                    'cpu_count': cpu_count,
                                                                    'ram_count': ram_count,
                                                                    'rom_count': rom_count})
-
         return bool(result.get('data'))
 
     async def buy_backup(self, server_id: int, period: Union[int]) -> bool:
         result = await self.__post('/api/action/buyBackup', json={'serverid': server_id,
                                                                   'period': period})
-
         return bool(result.get('data'))
 
     async def my_servers(self) -> Optional[list[ServerInfo]]:
         result = await self.__get('/api/myservers')
-
         servers_list = []
-
         for server in result.get('data').get('serverlist'):
             servers_list.append(ServerInfo(server.get('id'),
                                            server.get('tid'),
@@ -307,21 +275,15 @@ class FourVpsClient:
                                            server.get('autoprolong'),
                                            server.get('period'),
                                            server.get('api_order')))
-
         return servers_list or None
 
     async def get_tariff_info(self, tariff_id: int, dc_id: int) -> Optional[list[TariffPreset]]:
         result = await self.__get(f'/api/getTarifInfo/{tariff_id}/{dc_id}')
-
         ready_list_of_tariff_preset = []
-
         tariff = result.get('data').get('tarifInfo')
-
         if not tariff:
             return None
-
         available_presets = tariff.get('getAvailableUpgradePresets', None)
-
         if available_presets:
             temp_list = []
             for key, value in available_presets.items():
@@ -337,7 +299,6 @@ class FourVpsClient:
                     value.get('rom_mib')
                 ))
             available_presets = temp_list
-
         t = TariffPreset(tariff.get('id'),
                          tariff.get('name'),
                          tariff.get('nameFull'),
@@ -351,70 +312,53 @@ class FourVpsClient:
                          [OsInfo(int(key), value) for key, value in tariff.get('osNames').items()],
                          tariff.get('ram_mib'),
                          tariff.get('rom'))
-
         ready_list_of_tariff_preset.append(t)
-
         return ready_list_of_tariff_preset
 
     async def get_images(self, tariff_id: int, dc_id: int) -> Optional[list[OsInfo]]:
         result = await self.__get(f'/api/getImages/{tariff_id}/{dc_id}')
-
         images = result.get('data').get('images')
-
         if not images:
             return None
-
-        ready_list_of_tariff_preset = [OsInfo(int(key), value) for key, value in images.items()]
-
-        return ready_list_of_tariff_preset
+        return [OsInfo(int(key), value) for key, value in images.items()]
 
     async def ip_list(self, server_id: int) -> Optional[list[ServerIP]]:
         result = await self.__get(f'/api/iplist/{server_id}')
-
         ips = result.get('data').get('iplist')
-
         if not ips:
             return None
-
         ips_list = []
         for ip in ips:
             ips_list.append(ServerIP(ip.get('id'),
                                      ip.get('name'),
                                      ip.get('ip'),
                                      ip.get('ptr')))
-
         return ips_list
 
     async def delete_ip(self, server_id: int, ip_id: int) -> bool:
         result = await self.__post('/api/action/deleteIp', json={'serverid': server_id,
                                                                  'ipid': ip_id})
-
         return bool(result.get('data'))
 
     async def get_messages(self) -> Optional[list[Message]]:
         result = await self.__get('/api/getMessages')
         messages = result.get('data').get('messagesList')
-
         if not messages:
             return None
-
         _messages = []
         for message in messages:
             _messages.append(Message(message.get('id'),
                                      message.get('title'),
                                      message.get('content'),
                                      message.get('time')))
-
         return _messages
 
     async def get_server_info(self, server_id: int) -> Optional[AdditionalServerInfo]:
         result = await self.__get(f'/api/getServerInfo/{server_id}')
         server_info = result.get('data').get('serverInfo')
         dc_info = result.get('data').get('dcInfo')
-
         if not result.get('data') or not server_info or not dc_info:
             return None
-
         _server_info = ServerInfo(server_info.get('id'),
                                   server_info.get('tid'),
                                   server_info.get('name'),
@@ -432,7 +376,6 @@ class FourVpsClient:
                                   server_info.get('autoprolong'),
                                   server_info.get('period'),
                                   server_info.get('api_order'))
-
         _dc_info = DataCenter(dc_info.get('id'),
                               dc_info.get('city'),
                               float(dc_info.get('core_price')),
@@ -459,19 +402,15 @@ class FourVpsClient:
                               dc_info.get('title'),
                               dc_info.get('type_ram', None),
                               bool(dc_info.get('verif', False)))
-
         return AdditionalServerInfo(_server_info, _dc_info)
 
     async def auto_prolong(self, server_id: int) -> bool:
         result = await self.__post('/api/action/autoprolong', json={'serverid': server_id})
-
         return bool(result.get('data'))
 
     async def get_available_upgrade_presets(self, server_id: int) -> list[GetAvailableUpgradePresets]:
         result = await self.__post('/api/action/getAvailableUpgradePresets', json={'serverid': server_id})
-
         available_upgrade_list = []
-
         for key, value in result.get('data').items():
             temp = GetAvailableUpgradePresets(value.get('id'),
                                               value.get('name'),
@@ -482,18 +421,14 @@ class FourVpsClient:
                                               value.get('rom_mib'),
                                               value.get('ram'),
                                               value.get('rom'))
-
             available_upgrade_list.append(temp)
-
         return available_upgrade_list
 
     async def get_backup_periods(self) -> list[BackupPeriods]:
         result = await self.__get('/api/action/getBackupPeriods')
-
         return [BackupPeriods(int(key), float(value)) for key, value in result.get('data').items()]
 
     async def delete_backup(self, server_id: int, period: int) -> bool:
         result = await self.__post('/api/action/deleteBackup', json={'serverid': server_id,
                                                                      'period': period})
-
         return bool(result.get('data'))

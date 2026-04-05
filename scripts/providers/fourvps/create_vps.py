@@ -31,7 +31,7 @@ from api import FourVpsClient
 
 # ==================== CONFIGURATION ====================
 # Obtain your API token from: https://4vps.su (Account → API)
-API_TOKEN = "YOUR_API_TOKEN_FROM_4VPS_SU"
+API_TOKEN = "N9YpNKU79cfGGdKjXmH9xHnsI"
 
 # Data center where the VPS will be hosted.
 # Use the script's discovery mode to find the correct ID for Saint Petersburg.
