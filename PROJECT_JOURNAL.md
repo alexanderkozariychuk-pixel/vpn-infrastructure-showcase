@@ -145,7 +145,7 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - Still waiting for 4VPS.SU support reply (Russian DC and tariff IDs). If no answer by mid‑week, will switch to alternative provider (Beget or FirstVDS).
 
 ---
-## 06.04.2026
+## 2026-04-06
 - Full migration to Pop!_OS 24.04 LTS as primary workstation
   - Successfully installed Pop!_OS 24.04 (COSMIC DE) on ASUS laptop.
   - Resolved multiple installation issues:
@@ -159,7 +159,7 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## 07.04.2026
+## 2026-04-07
 - Major documentation overhaul – **Architecture v2**
 - Completely reworked docs/architecture.md:
   - Updated main Mermaid diagram to reflect Architecture v2 with Russian Bridge and Policy-Based Routing.
