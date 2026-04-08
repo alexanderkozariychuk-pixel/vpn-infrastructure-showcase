@@ -96,12 +96,12 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ## 2026-04-04
 
-- **API integration for 4VPS.SU**  
+- ### API integration for 4VPS.SU  
   - Added official `FourVps` API client and discovery script.  
   - Successfully tested the script (data centers, tariffs) but Russian locations were not returned by the public API.  
   - Sent a support request asking for Russian DC and tariff IDs; waiting for reply.
 
-- **Documentation and repository updates**  
+- ### Documentation and repository updates  
   - Updated `PROJECT_JOURNAL.md` with progress.  
   - Created `configs/xray/chain-ru-to-moldova.json.example` – template for Xray chain (RU bridge → Moldova entry).  
   - Refactored `README.md`:  
@@ -110,7 +110,7 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
     - Added links to provider scripts (`create_aeza_vps.py`, `create_vps.py`).  
     - Fixed table of contents.
 
-- **Learning outcomes**  
+- ### Learning outcomes  
   - Gained hands‑on experience with Python virtual environments (`venv`), third‑party API integration, async debugging, and structuring automation scripts. 
 ---
 
@@ -169,6 +169,24 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - Worked extensively with VS Code + Markdown Preview Enhanced for proper Mermaid rendering.
 
 ### Result: Architecture documentation is now significantly more structured, visual, and presentation-ready.
+
+---
+
+## 2026-04-08
+
+### Client configuration and documentation improvements
+
+- Recreated and updated configuration files for several clients after connection issues.
+- Successfully resolved Android 10 import problem caused by long filename — shortened the filename and recreated the config.
+- Tested connection stability on newly created client configurations.
+- Updated README.md:
+  - Added badges for better visual presentation
+  - Improved overall structure and Current Status section
+
+### Progress:
+- Client configuration process stabilized. Documentation quality noticeably improved.
+
+---
 
 ## Short-term Plans (next 3–4 days)
 
