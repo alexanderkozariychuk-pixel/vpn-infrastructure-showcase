@@ -1,7 +1,15 @@
-# Multi-Hop VPN Infrastructure
+# Multi-Hop Obfuscated VPN Infrastructure
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE(MIT))
-[![Project Status](https://img.shields.io/badge/Status-Active-green.svg)](README.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)
+![Shell](https://img.shields.io/badge/Shell-bash-4EAA25.svg?logo=gnu-bash&logoColor=white)
+![Ansible](https://img.shields.io/badge/Ansible-EE0000.svg?logo=ansible&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED.svg?logo=docker&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624.svg?logo=linux&logoColor=black)
+
+---
+
+**Censorship-resistant multi-hop VPN** with Policy-Based Routing, AmneziaWG and Xray.
 
 ---
 
@@ -47,14 +55,25 @@ graph LR
 
 ---
 
-## Current Status ✅
-- VPS1 configured and running (Moldova)
-- VPN tunnel (AmneziaWG) established
-- Config files created for 9 clients
-- Monitoring setup:
-    - Uptime Kuma + Telegram alerts
-    - Node Exporter + Prometheus (metrics)
-    - **Python script** (`awg_status.py`) collects AmneziaWG metrics (peers, traffic, handshake) and pushes to Uptime Kuma
+## Current Status (as of April 08, 2026) ✅
+
+| Component                    | Status              | Details |
+|-----------------------------|---------------------|-------|
+| **Moldova Entry Node**      | Fully Operational   | Main working node, serving active clients |
+| **Russian Bridge Node**     | In Provisioning     | Waiting for clean IP from provider |
+| **France Exit Node**        | Ready               | Deployment script prepared |
+| **VPN Tunnel**              | Operational         | AmneziaWG + Xray multi-hop chain |
+| **Client Configurations**   | 9 clients           | Generated and tested |
+| **Policy-Based Routing**    | Implemented         | Selective routing logic developed and tested |
+| **Monitoring Stack**        | Active              | Uptime Kuma + Prometheus + Grafana (hosted on Moldova) |
+| **Alerts**                  | Working             | Telegram notifications configured |
+| **Custom Metrics**          | Developed           | `awg_status.py` collects AmneziaWG metrics and pushes to Uptime Kuma |
+
+**Key Achievements:**
+- Stable multi-hop VPN with strong obfuscation
+- Server-side Policy-Based Routing (selective routing)
+- Functional monitoring and alerting system
+- Infrastructure automation in active development
 
 ---
 
