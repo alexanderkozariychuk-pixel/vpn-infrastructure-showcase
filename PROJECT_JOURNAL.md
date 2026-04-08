@@ -145,22 +145,43 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - Still waiting for 4VPS.SU support reply (Russian DC and tariff IDs). If no answer by mid‑week, will switch to alternative provider (Beget or FirstVDS).
 
 ---
+## 06.04.2026
+- Full migration to Pop!_OS 24.04 LTS as primary workstation
+  - Successfully installed Pop!_OS 24.04 (COSMIC DE) on ASUS laptop.
+  - Resolved multiple installation issues:
+  - Fixed MokListRT: Volume Full error by resetting Secure Boot keys in BIOS.
+  - Handled Rufus ISOHybrid limitations (DD Image mode).
 
-### Future Roadmap (as of 2026-04-05)
+- Installed and configured AmneziaVPN.
+  - Switched from GUI client to CLI (awg-quick) due to better stability and control.
 
-#### Immediate (next actions, no fixed time)
-- Provision France exit node using Aeza Python script (requires API key and product ID).
-- Obtain Russian VPS (4VPS.SU or fallback) and test Ansible role `xray-relay` on it.
-- Validate full three‑hop chain: client → RU bridge → MD entry → FR exit → Internet.
-- Migrate monitoring stack to a dedicated VPS (Netherlands) with separate Prometheus/Grafana.
+### Result: Main working machine is now fully on native Linux. VPN client operates via command line.
 
-#### Short‑term
-- Write Ansible playbooks for Moldova entry and France exit nodes (reuse existing roles).
-- Add custom metrics exporter for AmneziaWG (handshake age, peer count, traffic) to Prometheus via textfile collector.
-- Set up Grafana dashboards for end‑to‑end observability.
+---
 
-#### Long‑term
-- Implement proxy pool (residential IPs) for automatic failover of exit nodes.
-- Add CI/CD (GitHub Actions) for automated testing of scripts and playbooks.
-- Explore Terraform for providers that offer official support (e.g., Timeweb, Beget).
-- Write detailed blog post / article about the project for portfolio.
+## 07.04.2026
+- Major documentation overhaul – **Architecture v2**
+- Completely reworked docs/architecture.md:
+  - Updated main Mermaid diagram to reflect Architecture v2 with Russian Bridge and Policy-Based Routing.
+  - Improved overall document structure and readability.
+  - Added new sections: Overview, Key Design Decisions, enhanced Node Roles, Data Flows, and better Technology Stack explanation.
+
+- Worked extensively with VS Code + Markdown Preview Enhanced for proper Mermaid rendering.
+
+### Result: Architecture documentation is now significantly more structured, visual, and presentation-ready.
+
+## Short-term Plans (next 3–4 days)
+
+- Finalize and activate Russian Bridge node (provisioning + testing)
+- Implement and test full Policy-Based Routing on the Russian Bridge (selective routing)
+- Migrate all clients from Moldova node to Russian Bridge
+- Complete Ansible roles for AmneziaWG and Xray deployment
+- Add GitHub Actions (basic linting + validation)
+
+## Long-term Plans
+
+- Deploy dedicated Monitoring node in the Netherlands
+- Implement automatic failover using residential proxy pool
+- Develop custom Prometheus exporter for AmneziaWG metrics
+- Achieve full GitOps workflow for the entire infrastructure
+- Prepare detailed portfolio materials based on this project for Junior DevOps / Linux SysAdmin positions
