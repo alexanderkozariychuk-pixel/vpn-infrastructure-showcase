@@ -188,18 +188,43 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## Short-term Plans (next 3–4 days)
+## 2026-04-09
 
-- Finalize and activate Russian Bridge node (provisioning + testing)
-- Implement and test full Policy-Based Routing on the Russian Bridge (selective routing)
-- Migrate all clients from Moldova node to Russian Bridge
-- Complete Ansible roles for AmneziaWG and Xray deployment
-- Add GitHub Actions (basic linting + validation)
+### Project Structure Audit & Refactoring
+
+- Conducted a full audit of the repository structure.
+- Reorganized the scripts/ directory for better separation of concerns:
+    - install/ – installation and provisioning scripts
+    - monitors/ – monitoring and healthcheck scripts
+    - providers/ – provider-specific automation (Aeza, 4VPS)
+    - utils/ – utility scripts (backup, key rotation, config generation)
+- Renamed several scripts and folders for improved clarity and consistency.
+- Created .github/workflows/ directory as a placeholder for future CI/CD.
+- Added scripts/README.md with overview of the scripts directory.
+- Cleaned up deprecated files and improved overall project organization.
+
+### Progress: 
+- The repository structure is now cleaner, more logical, and better prepared for further development and presentation.
+
+---
+
+## Short-term Plans (April 9 – 16, 2026)
+
+- Complete audit and refactoring of project structure and documentation
+- Add visualizations (screenshots of monitoring stack: Uptime Kuma, Grafana, etc.)
+- Develop script for automatic provisioning and basic hardening of VPS on Yandex Cloud (Russian Bridge)
+- Test load and stability of current Moldova VPS before connecting Russian Bridge
+- Prepare Moldova Entry node to accept traffic from Russian Bridge (Policy-Based Routing, configuration, testing)
+- Final audit of all files and documentation
+- Top up Yandex Cloud balance and test the provisioning script in practice
 
 ## Long-term Plans
 
-- Deploy dedicated Monitoring node in the Netherlands
+- Activate Russian Bridge node with full Policy-Based Routing
+- Migrate all clients from Moldova to Russian Bridge
+- Complete automation of deployment and configuration processes
+- Migrate monitoring stack to a dedicated VPS in the Netherlands
 - Implement automatic failover using residential proxy pool
 - Develop custom Prometheus exporter for AmneziaWG metrics
-- Achieve full GitOps workflow for the entire infrastructure
-- Prepare detailed portfolio materials based on this project for Junior DevOps / Linux SysAdmin positions
+- Achieve full GitOps workflow for the infrastructure
+- Prepare detailed portfolio materials for Junior DevOps / Linux SysAdmin positions

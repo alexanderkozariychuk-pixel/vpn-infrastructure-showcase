@@ -33,25 +33,7 @@ Multi-hop VPN infrastructure for stable, private connectivity, designed to bypas
 
 ## Architecture
 
-The infrastructure is designed as a multi‑hop chain to bypass DPI and whitelist‑based filtering.  
-Traffic flows from the client through a **Russian bridge node**, then to the **entry node** in Moldova, and finally to the **exit node** in France.  
-A separate **monitoring node** (Netherlands) collects metrics and sends alerts.
-
-```mermaid
-graph LR
-    Client["Client (6 devices)"] --> Bridge["Russian Bridge (Retranslator)<br/>AmneziaWG + Xray"]
-    Bridge --> Entry["Entry Node (Moldova)<br/>AmneziaWG + Xray"]
-    Entry --> Exit["Exit Node (France)<br/>Xray (VLESS+XHTTP)"]
-    Exit --> Internet["Internet"]
-    
-    subgraph Monitoring
-        Monitor["Monitoring Node (Netherlands)<br/>Uptime Kuma, Prometheus, Grafana"]
-    end
-    
-    Bridge -.-> Monitor
-    Entry -.-> Monitor
-    Exit -.-> Monitor
-```
+See detailed architecture in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -63,17 +45,17 @@ graph LR
 | **Russian Bridge Node**     | In Provisioning     | Waiting for clean IP from provider |
 | **France Exit Node**        | Ready               | Deployment script prepared |
 | **VPN Tunnel**              | Operational         | AmneziaWG + Xray multi-hop chain |
-| **Client Configurations**   | 9 clients           | Generated and tested |
+| **Client Configurations**   | 10+ clients         | Generated and tested |
 | **Policy-Based Routing**    | Implemented         | Selective routing logic developed and tested |
 | **Monitoring Stack**        | Active              | Uptime Kuma + Prometheus + Grafana (hosted on Moldova) |
 | **Alerts**                  | Working             | Telegram notifications configured |
 | **Custom Metrics**          | Developed           | `awg_status.py` collects AmneziaWG metrics and pushes to Uptime Kuma |
 
-**Key Achievements:**
-- Stable multi-hop VPN with strong obfuscation
-- Server-side Policy-Based Routing (selective routing)
-- Functional monitoring and alerting system
-- Infrastructure automation in active development
+**Key Features:**
+- Three-hop chain (Russia → Moldova → France)
+- Server-side Policy-Based Routing
+- Strong obfuscation (AmneziaWG + Xray)
+- Full automation (Ansible + Python)
 
 ---
 
@@ -89,40 +71,49 @@ graph LR
 - Observability with metrics and alerts
 - Failover testing scripts
 
+---
+
 ## Next Steps
-- Provision exit node in France (Aeza) using Python script.
-- Obtain Russian VPS (4VPS.SU or alternative) and set up bridge role.
-- Configure Xray chain: RU bridge → Moldova entry → France exit.
-- Migrate monitoring to a separate VPS (Netherlands).
-- Write Ansible playbooks to automate the entire deployment.
+- Provision Russian Bridge node on Yandex Cloud with Policy-Based Routing
+- Migrate all clients from Moldova Entry node to the new Russian Bridge
+- Prepare Moldova node for receiving and forwarding traffic from Russian Bridge
+- Complete automation of VPS provisioning and base hardening
+- Migrate monitoring stack to a dedicated VPS in the Netherlands
+- Final audit and polishing of project documentation and structure
+
+Detailed weekly plans and progress tracking are available in [`PROJECT-JOURNAL.md`](PROJECT-JOURNAL.md).
+
+---
 
 ## Setup
-See [docs/setup-tutorial.md](docs/setup-tutorial.md)
+See detailed setup instructions in [`docs/setup-tutorial.md`](docs/setup-tutorial.md).
+
+---
 
 ## Automation and Scripts
 
-### Current automation
+All automation scripts are organized in the [`scripts/`](scripts/) directory with a clear separation of concerns.
 
-Utility scripts are organised in the [`scripts/`](scripts/) directory:
+### Script Overview
 
-| Script | Description |
-|--------|-------------|
-| **Maintenance** | |
-| [`rotate-keys.sh`](scripts/maintenance/rotate-keys.sh) | Generate new keys for an existing AmneziaWG client, update the server config, and restart the service. |
-| [`backup-configs.sh`](scripts/maintenance/backup-configs.sh) | Create a timestamped archive of all critical configuration files (AmneziaWG, Xray, monitoring). |
-| **Monitoring** | |
-| [`healthcheck.sh`](scripts/monitoring/healthcheck.sh) | Verify the status of AmneziaWG, Xray, and essential ports. Returns exit code 0 if all healthy. |
-| [`awg_status.py`](scripts/monitoring/awg_status.py) | Python script to collect AmneziaWG metrics (peers, traffic, handshake age) and push to Uptime Kuma. Copy to `/usr/local/bin/awg_status.py` and replace placeholders. |
-| **Setup** | |
-| [`install-monitoring.sh`](scripts/setup/install-monitoring.sh) | Deploy the full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker on a fresh VPS. |
-| [`setup-new-vps.sh`](scripts/setup/setup-new-vps.sh) | Perform base setup on a new VPS: create a user, configure SSH keys, disable password authentication, set up firewall. |
-| [`install-amneziawg.sh`](scripts/setup/install-amneziawg.sh) | One‑click installation of AmneziaWG on a fresh Ubuntu server (based on the official installer). |
-| **Provider automation** | |
-| [`create_aeza_vps.py`](scripts/providers/aeza/create_aeza_vps.py) | Python script to provision a VPS on Aeza (France exit node) using their official API. |
-| [`create_vps.py`](scripts/providers/fourvps/create_vps.py) | Python script to provision a VPS on 4VPS.SU (Russian bridge node) – requires API token and correct DC/tariff IDs (discovery mode included). |
+| Category              | Script                              | Description |
+|-----------------------|-------------------------------------|-----------|
+| **Installation**      | `install/install-amneziawg.sh`      | One-click installation of AmneziaWG on a fresh Ubuntu server |
+| **Installation**      | `install/install-monitoring.sh`     | Deploy full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker |
+| **Installation**      | `install/provision-new-vps.sh`      | Base setup for a new VPS: create user, configure SSH keys, harden security, set up firewall |
+| **Monitoring**        | `monitors/awg-status.py`            | Collect AmneziaWG metrics (peers, traffic, handshake age) and push to Uptime Kuma |
+| **Monitoring**        | `monitors/healthcheck.sh`           | Verify AmneziaWG, Xray and critical ports health |
+| **Utilities**         | `utils/rotate-keys.sh`              | Rotate keys for an existing client and restart the service |
+| **Utilities**         | `utils/backup-configs.sh`           | Create timestamped backup of all critical configuration files |
+| **Utilities**         | `utils/generate-config.sh`          | Generate client configuration files |
+| **Providers**         | `providers/aeza/create-aeza-vps.py` | Provision VPS on Aeza using official API |
+| **Providers**         | `providers/fourvps/create-vps.py`   | Provision VPS on 4VPS.SU (supports discovery mode) |
 
-> **Provider automation**: The scripts in `providers/` use each hoster's API to create VPS programmatically.  
-> They are the first step towards full Infrastructure as Code (IaC) for this project.
+> **Note**: Provider scripts allow programmatic VPS creation and are the foundation for full Infrastructure as Code (IaC) in this project.
+
+For detailed usage instructions, see [`docs/setup-tutorial.md`](docs/setup-tutorial.md).
+
+---
 
 ### Planned automation
 
@@ -132,15 +123,22 @@ Utility scripts are organised in the [`scripts/`](scripts/) directory:
 
 All server configuration will be handled by Ansible, making the setup repeatable and version‑controlled.
 
-## Troubleshooting
+---
 
-### Real-World Challenge
+## Troubleshooting & Real-World Challenges
 
-During testing, I encountered mobile network restrictions where only whitelisted websites were accessible.
+One of the main motivations behind this project was solving real connectivity problems in restrictive networks.
 
-This project includes troubleshooting and analysis of:
-- DPI filtering behavior
-- UDP traffic instability
-- VPN protocol blocking
+### Key Challenge Faced
 
-See details in [docs/troubleshooting.md](docs/troubleshooting.md)
+During testing, mobile networks with strict **whitelist-based restrictions** were encountered — only pre-approved websites were accessible, while UDP traffic was heavily throttled or blocked.
+
+This project addresses the following real-world issues:
+- Deep Packet Inspection (DPI) behavior and protocol blocking
+- UDP traffic instability on mobile networks
+- Whitelist-based internet access limitations
+- Multi-hop VPN stability under censorship conditions
+
+Detailed analysis, solutions and lessons learned are documented in:
+
+→ [`docs/troubleshooting.md`](docs/troubleshooting.md)

@@ -1,59 +1,52 @@
+# Multi-Hop Obfuscated VPN Infrastructure Architecture
+
 ## Overview
 
-This project is a **censorship-resistant multi-hop VPN infrastructure** designed to provide stable, private and high-performance internet access in environments with aggressive Deep Packet Inspection (DPI) and whitelist-based network restrictions.
+This project implements a **censorship-resistant multi-hop VPN** designed to provide stable, private and high-performance internet access in environments with aggressive Deep Packet Inspection (DPI) and whitelist-based network restrictions.
 
-## Key Features
-
-- **Three-hop chain** with intelligent routing
-- **Policy-Based Routing** on the Russian Bridge node (selective routing: Russian services go directly, blocked/foreign traffic goes through full chain)
+**Key Features:**
+- Three-hop chain (Russia → Moldova → France) with intelligent routing
+- **Policy-Based Routing** on the Russian Bridge (selective routing)
 - Strong obfuscation using **AmneziaWG** + **Xray (VLESS + XHTTP)**
-- Full automation (Ansible, Python provisioning scripts)
+- Full automation via Ansible and Python scripts
 - Modern observability stack
 
-The architecture allows clients to connect once to the Russian Bridge and automatically receive optimal routing: low latency for Russian services and maximum bypass capability for everything else.
+Clients connect once to the Russian Bridge and automatically receive the optimal path: low latency for Russian services and maximum bypass for foreign/blocked resources.
 
-**Current status**: Moldova Entry node is fully operational. Russian Bridge and France Exit nodes are in the provisioning phase.
+**Current Status**: Moldova Entry node is fully operational. Russian Bridge and France Exit nodes are in the provisioning phase.
 
 ## Architecture v2 – High-Level Diagram
-
 ```mermaid
 graph TD
     subgraph "Client Devices"
         Client["Client Devices<br/>10+ clients"]
     end
-
     subgraph "Russian Bridge Node<br/>(Saint Petersburg / Moscow)"
         Bridge[AmneziaWG Server<br/>awg0]
         PBR["Policy-Based Routing<br/>ip rule + nftables"]
         XrayRU[Xray Outbound<br/>VLESS + XHTTP]
     end
-
-    subgraph "Moldova Entry Node<br/>(Chisinau)"
+    subgraph "Moldova Entry Node<br/>(Chișinău)"
         Entry[AmneziaWG + Xray Inbound]
         PBR2["Policy-Based Routing"]
         XrayMD[Xray Outbound<br/>VLESS + XHTTP]
     end
-
     subgraph "France Exit Node<br/>(Paris)"
         Exit[Xray Inbound<br/>VLESS + XHTTP]
         NAT[NAT / Masquerading]
     end
-
     Internet[Internet]
 
-    %% Traffic flows
     Client -->|"AmneziaWG<br/>UDP/443 + Obfuscation"| Bridge
     Bridge --> PBR
-    PBR -->|"Russian traffic"| Internet
-    PBR -->|"Non-Russian / blocked"| XrayRU
-
+    PBR -->|"Russian services"| Internet
+    PBR -->|"Foreign / blocked"| XrayRU
     XrayRU -->|"VLESS + XHTTP<br/>TCP/443"| Entry
     Entry --> PBR2
     PBR2 --> XrayMD
     XrayMD -->|"VLESS + XHTTP"| Exit
     Exit --> NAT --> Internet
 
-    %% Monitoring
     subgraph "Monitoring Node<br/>(Netherlands - planned)"
         Monitor["Uptime Kuma + Prometheus + Grafana"]
     end
@@ -62,21 +55,20 @@ graph TD
     Entry -.-> Monitor
     Exit -.-> Monitor
 
-    classDef client fill:#a5b4fc,stroke:#4338ca,stroke-width:2px,color:#000
-    classDef bridge fill:#4ade80,stroke:#166534,stroke-width:2px,color:#000
-    classDef entry fill:#60a5fa,stroke:#1e40af,stroke-width:2px,color:#000
-    classDef exit fill:#f87171,stroke:#991b1b,stroke-width:2px,color:#000
-    classDef monitor fill:#c084fc,stroke:#6b21a8,stroke-width:2px,color:#000
+    classDef clientDev fill:#a5b4fc,stroke:#4338ca,stroke-width:2px,color:#000
+    classDef bridgeNode fill:#4ade80,stroke:#166534,stroke-width:2px,color:#000
+    classDef entryNode fill:#60a5fa,stroke:#1e40af,stroke-width:2px,color:#000
+    classDef exitNode fill:#f87171,stroke:#991b1b,stroke-width:2px,color:#000
+    classDef monitorNode fill:#c084fc,stroke:#6b21a8,stroke-width:2px,color:#000
 
-    class Client client
-    class Bridge,PBR,XrayRU bridge
-    class Entry,PBR2,XrayMD entry
-    class Exit,NAT exit
-    class Monitor monitor
+    class Client clientDev
+    class Bridge,PBR,XrayRU bridgeNode
+    class Entry,PBR2,XrayMD entryNode
+    class Exit,NAT exitNode
+    class Monitor monitorNode
 ```
 
-### Node Roles
-
+## Node Roles
 | Node                | Location                  | Status              | Primary Role                                                                 | Key Technologies |
 |---------------------|---------------------------|---------------------|------------------------------------------------------------------------------|------------------|
 | **Russian Bridge**  | Russia (Saint Petersburg / Moscow) | In provisioning     | First hop for all clients. Accepts obfuscated connections and performs **Policy-Based Routing**. | AmneziaWG (UDP/443), Xray (VLESS+XHTTP), nftables + ip rule |
