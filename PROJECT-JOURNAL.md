@@ -208,10 +208,23 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
+## 2026-04-10
+### Visual improvements and documentation update
+
+- Created docs/screenshots/ directory for project visuals
+- Added screenshots of the monitoring system:
+    - Uptime Kuma dashboard overview
+    - Live AmneziaWG status (awg show)
+- Updated README.md with monitoring screenshots placed in a two-column table
+
+### Progress: 
+- Significantly improved visual presentation of the project. The README now better demonstrates the current state of monitoring and live tunnel status.
+
+---
+
 ## Short-term Plans (April 9 – 16, 2026)
 
 - Complete audit and refactoring of project structure and documentation
-- Add visualizations (screenshots of monitoring stack: Uptime Kuma, Grafana, etc.)
 - Develop script for automatic provisioning and basic hardening of VPS on Yandex Cloud (Russian Bridge)
 - Test load and stability of current Moldova VPS before connecting Russian Bridge
 - Prepare Moldova Entry node to accept traffic from Russian Bridge (Policy-Based Routing, configuration, testing)
