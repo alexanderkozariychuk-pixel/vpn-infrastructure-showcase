@@ -51,11 +51,13 @@ See detailed architecture in [`docs/architecture.md`](docs/architecture.md).
 | **Alerts**                  | Working             | Telegram notifications configured |
 | **Custom Metrics**          | Developed           | `awg_status.py` collects AmneziaWG metrics and pushes to Uptime Kuma |
 
-### Monitoring Dashboard
+## Monitoring & Live Status
 
-![Uptime Kuma Overview](docs/screenshots/uptime-kuma-overview.png)
+| Uptime Kuma Dashboard | AmneziaWG Status |
+|----------------------|------------------|
+| ![Uptime Kuma](docs/screenshots/uptime-kuma-overview.png) | ![AmneziaWG Status](docs/screenshots/awg-show.png) |
 
-*Uptime Kuma monitoring dashboard showing Amnezia Tunnel Health, server status and SSH monitoring.*
+*Current monitoring overview and real-time AmneziaWG tunnel status showing active peers and traffic.*
 
 **Key Features:**
 - Three-hop chain (Russia → Moldova → France)
