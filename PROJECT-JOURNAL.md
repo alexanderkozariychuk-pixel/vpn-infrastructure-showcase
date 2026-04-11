@@ -222,10 +222,27 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
+## 2026-04-11
+### Terraform infrastructure preparation for Yandex Cloud
+
+- Created Terraform module for Russian Bridge in infrastructure/terraform/yandex/
+- Configured resources:
+    - yandex_compute_instance (2 vCPU, 4 GB RAM, Ubuntu 24.04)
+    - VPC network and subnet
+    - Cloud-init for basic hardening (SSH key, UFW, package updates)
+
+- Added proper .gitignore rules to protect sensitive files (terraform.tfvars, state files, credentials)
+- Created terraform.tfvars.example template
+- Successfully ran terraform init and terraform validate
+- terraform plan completed without errors (3 resources to create)
+
+### Progress: 
+- Infrastructure code for Russian Bridge is ready for deployment.
+
+---
+
 ## Short-term Plans (April 9 – 16, 2026)
 
-- Complete audit and refactoring of project structure and documentation
-- Develop script for automatic provisioning and basic hardening of VPS on Yandex Cloud (Russian Bridge)
 - Test load and stability of current Moldova VPS before connecting Russian Bridge
 - Prepare Moldova Entry node to accept traffic from Russian Bridge (Policy-Based Routing, configuration, testing)
 - Final audit of all files and documentation
