@@ -1,32 +1,72 @@
-# OS
+# =============================================
+# Terraform
+# =============================================
+infrastructure/terraform/**/terraform.tfvars
+infrastructure/terraform/**/*.tfvars
+infrastructure/terraform/**/.terraform/
+infrastructure/terraform/**/terraform.tfstate*
+infrastructure/terraform/**/terraform.tfstate.backup
+infrastructure/terraform/**/.terraform.lock.hcl
+
+# Yandex Cloud specific
+infrastructure/terraform/yandex/terraform.tfvars
+
+# =============================================
+# Python & Virtual Environments
+# =============================================
+venv/
+venv-*/
+.env
+*.env
+.python-version
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# =============================================
+# IDE and Editor files
+# =============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 
-# Logs
+# =============================================
+# Logs and temporary files
+# =============================================
 *.log
+logs/
+tmp/
+temp/
 
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
+# =============================================
+# Monitoring and sensitive configs
+# =============================================
+monitoring/**/grafana-dashboard.json
+configs/**/3x-ui-settings.txt
+configs/**/*.conf
+!configs/**/*.example
 
-# Ansible
-*.retry
-*.vault
-inventory/*.key
+# =============================================
+# Secrets and credentials
+# =============================================
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
 
-# Environment variables
-.env
-*.env
-
-# Node Exporter / Prometheus
-*.db
-*.prom
-
-# IDE
-.vscode/
-.idea/
-__pycache__/
-
-# Monitoring
-scripts/monitoring/awg_status_local.py
+# =============================================
+# Miscellaneous
+# =============================================
+*.bak
+*.backup
+*.tmp
