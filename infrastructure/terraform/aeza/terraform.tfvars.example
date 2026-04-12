@@ -1,0 +1,4 @@
+aeza_token      = "YOUR_API_TOKEN"
+server_name     = "fr-exit-01"
+location        = "fr"                    # France (Paris)
+ssh_public_key  = "YOUR_PUBLIC_KEY"

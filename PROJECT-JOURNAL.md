@@ -241,6 +241,20 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
+## 2026-04-12
+### Terraform modules development
+
+- Created Terraform module for Aeza provider (infrastructure/terraform/aeza/)
+- Configured aeza_service resource for France Exit Node
+- Added aeza_products data source and fixed validation issues
+- Improved .gitignore to protect sensitive Terraform files
+- Prepared module for simpler Exit Node (2 vCPU, 4 GB RAM)
+
+### Progress:
+- Aeza Terraform module is ready for testing.
+
+---
+
 ## Short-term Plans (April 9 – 16, 2026)
 
 - Test load and stability of current Moldova VPS before connecting Russian Bridge
