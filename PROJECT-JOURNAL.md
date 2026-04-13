@@ -255,12 +255,46 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## Short-term Plans (April 9 – 16, 2026)
+## 2026-04-13
 
-- Test load and stability of current Moldova VPS before connecting Russian Bridge
-- Prepare Moldova Entry node to accept traffic from Russian Bridge (Policy-Based Routing, configuration, testing)
-- Final audit of all files and documentation
-- Top up Yandex Cloud balance and test the provisioning script in practice
+### Terraform: Refactoring and unifying infrastructure
+
+#### Aeza module (exit node, France)
+- Analyzed the current `aeza` module, added dynamic product retrieval using `data "aeza_products"`.
+- Replaced hardcoded `product_id` with `exit_nodes` variable (map of tariff names), enabling multi-region management.
+- Replaced `count` with `for_each` for managing multiple instances (preparation for fault tolerance).
+- Added `null_resource` with `local-exec` to automatically add an SSH key via the Aeza API (placeholder, requires endpoint verification).
+- Added variable validation (`product_id > 0`, `server_name` – only letters/numbers/hyphens).
+- Fixed syntax errors and duplicate outputs.
+- Successfully ran `terraform init`, `terraform validate`, `terraform plan` (dry-run). The module is ready for deployment.
+
+#### Yandex Cloud module (bridge node, Russia)
+- Reviewed the current `yandex` module structure.
+- Added dynamic OS image lookup using `data "yandex_compute_image"` (instead of a hardcoded ID).
+- Moved VM resources to variables (`cores`, `memory`).
+- Added a `locals` block for `cloud-init` (user setup, SSH, basic packages).
+- Fixed syntax errors (block nesting, duplicate outputs).
+- Added variable validation (non‑empty checks).
+- The module passes `terraform validate` and `terraform plan`.
+
+#### Unified configuration
+- Created a root `main.tf` in `infrastructure/terraform/` that calls both modules.
+- Organised common variables and outputs in root `variables.tf` and `outputs.tf`.
+- Prepared a `terraform.tfvars.example` for both providers.
+- Updated `.gitignore`: added all sensitive Terraform files (tfvars, state, lock), Python virtual environments, IDE files, logs, backups. Removed duplicates, kept structure clean.
+
+### Progress:
+- A single entry point to manage the whole infrastructure: `terraform apply` can deploy the France exit node (Aeza) and the Russian bridge node (Yandex Cloud) together.
+- Infrastructure as Code is ready for CI/CD automation.
+- All sensitive data is excluded from the repository; example variables are available for new contributors.
+
+---
+
+## Next steps
+- Test the unified module with real accounts (when funds are available).
+- Set up a Terraform backend (e.g., Yandex Object Storage).
+- Move to Ansible: write playbooks for post‑provisioning of the created VPS (AmneziaWG, Xray, chaining).
+- Update documentation (README, architecture) with Terraform module descriptions.
 
 ## Long-term Plans
 

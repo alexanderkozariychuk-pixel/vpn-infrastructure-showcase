@@ -1,0 +1,14 @@
+# Aeza
+aeza_api_key = "your_aeza_api_key"
+
+# Yandex Cloud
+yandex_token     = "y0_xxxxx"
+yandex_cloud_id  = "b1gxxxxx"
+yandex_folder_id = "b1gxxxxx"
+yandex_zone      = "ru-central1-a"
+yandex_server_name = "ru-bridge-01"
+yandex_cores       = 2
+yandex_memory      = 4
+
+# SSH public key
+ssh_public_key = "ssh-ed25519 AAAAC3... user@host"

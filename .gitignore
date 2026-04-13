@@ -1,15 +1,18 @@
 # =============================================
 # Terraform
 # =============================================
-infrastructure/terraform/**/terraform.tfvars
-infrastructure/terraform/**/*.tfvars
-infrastructure/terraform/**/.terraform/
-infrastructure/terraform/**/terraform.tfstate*
-infrastructure/terraform/**/terraform.tfstate.backup
-infrastructure/terraform/**/.terraform.lock.hcl
+**/terraform.tfvars
+**/*.tfvars
+**/.terraform/
+**/terraform.tfstate*
+**/terraform.tfstate.backup
+**/.terraform.lock.hcl
 
-# Yandex Cloud specific
+# Yandex Cloud specific (covered by patterns above, but keep for clarity)
 infrastructure/terraform/yandex/terraform.tfvars
+
+# Aeza specific (covered by patterns above, but keep for clarity)
+infrastructure/terraform/aeza/terraform.tfvars
 
 # =============================================
 # Python & Virtual Environments
@@ -70,19 +73,3 @@ credentials/
 *.bak
 *.backup
 *.tmp
-
-# =============================================
-# Terraform sensitive files
-# =============================================
-infrastructure/terraform/**/terraform.tfvars
-infrastructure/terraform/**/*.tfvars
-infrastructure/terraform/**/.terraform/
-infrastructure/terraform/**/terraform.tfstate*
-infrastructure/terraform/**/terraform.tfstate.backup
-infrastructure/terraform/**/.terraform.lock.hcl
-
-# =============================================
-# Aeza specific
-# =============================================
-infrastructure/terraform/aeza/terraform.tfvars
-infrastructure/terraform/aeza/*.tfvars

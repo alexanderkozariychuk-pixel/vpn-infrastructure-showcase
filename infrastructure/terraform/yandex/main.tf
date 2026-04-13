@@ -1,5 +1,29 @@
 # Yandex Cloud Russian Bridge VPS
 
+data "yandex_compute_image" "ubuntu" {
+  family = var.os_family
+}
+
+locals {
+  cloud_init_config = <<-EOF
+    #cloud-config
+    users:
+      - name: ubuntu
+        ssh-authorized-keys:
+          - ${var.ssh_public_key}
+        sudo: ['ALL=(ALL) NOPASSWD:ALL']
+        groups: sudo
+    packages:
+      - curl
+      - git
+      - ufw
+    runcmd:
+      - ufw allow 22/tcp
+      - ufw --force enable
+      - apt update && apt upgrade -y
+  EOF
+}
+
 resource "yandex_vpc_network" "default" {
   name = "ru-bridge-network"
 }
@@ -17,13 +41,13 @@ resource "yandex_compute_instance" "russian_bridge" {
   platform_id = "standard-v3"
 
   resources {
-    cores  = 2
-    memory = 4
+    cores  = var.cores
+    memory = var.memory
   }
 
   boot_disk {
     initialize_params {
-      image_id = "fd8vmcue7aaj4p5e9v8t"  # Ubuntu 24.04 LTS
+      image_id = data.yandex_compute_image.ubuntu.id
       size     = 20
       type     = "network-ssd"
     }
@@ -35,32 +59,6 @@ resource "yandex_compute_instance" "russian_bridge" {
   }
 
   metadata = {
-    user-data = <<-EOF
-      #cloud-config
-      users:
-        - name: ubuntu
-          ssh-authorized-keys:
-            - ${var.ssh_public_key}
-          sudo: ['ALL=(ALL) NOPASSWD:ALL']
-          groups: sudo
-      packages:
-        - curl
-        - git
-        - ufw
-      runcmd:
-        - ufw allow 22/tcp
-        - ufw --force enable
-        - apt update && apt upgrade -y
-      EOF
+    user-data = local.cloud_init_config
   }
-}
-
-output "russian_bridge_ip" {
-  description = "Public IP of Russian Bridge"
-  value       = yandex_compute_instance.russian_bridge.network_interface[0].nat_ip_address
-}
-
-output "ssh_command" {
-  description = "SSH command to connect"
-  value       = "ssh ubuntu@${yandex_compute_instance.russian_bridge.network_interface[0].nat_ip_address}"
 }

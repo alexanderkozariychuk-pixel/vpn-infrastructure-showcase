@@ -16,12 +16,22 @@ variable "location" {
   default     = "fr"   # France (Paris)
 }
 
-variable "ssh_public_key" {
-  description = "Your SSH public key"
-  type        = string
-}
-
 variable "product_id" {
   description = "Aeza product ID (tariff ID)"
   type        = number
+}
+
+variable "exit_nodes" {
+  description = "Map of exit nodes to create. Key is a unique identifier, value is the product name."
+  type        = map(string)
+  default = {
+    france = "PARs-1"
+    # netherlands = "NLs-1"
+  }
+}
+
+variable "ssh_public_key_path" {
+  description = "Path to the public SSH key file"
+  type        = string
+  default     = "~/.ssh/id_rsa.pub"
 }
