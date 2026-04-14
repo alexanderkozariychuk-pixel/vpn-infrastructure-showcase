@@ -1,0 +1,6 @@
+---
+awg_install: true
+awg_generate_keys: true
+awg_listen_port: 443
+awg_enable_nat: false
+awg_peers: []

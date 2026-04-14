@@ -13,6 +13,8 @@
       - iptables
       - net-tools
       - software-properties-common
+      - expect        
+      - python3      
     state: present
 
 - name: Create a new user

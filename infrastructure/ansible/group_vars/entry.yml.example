@@ -1,0 +1,17 @@
+# Entry node (Moldova)
+awg_address: "10.66.66.2/24"
+awg_listen_port: 443
+awg_private_key: "<ENTRY_PRIVATE_KEY>"
+awg_public_key: "<ENTRY_PUBLIC_KEY>"
+
+awg_peers:
+  - public_key: "<BRIDGE_PUBLIC_KEY>"
+    allowed_ips: "10.66.66.1/32"
+    endpoint: "{{ hostvars['ru-bridge']['ansible_host'] }}:443"
+    persistent_keepalive: 25
+  - public_key: "<EXIT_PUBLIC_KEY>"
+    allowed_ips: "10.66.66.3/32"
+    endpoint: "{{ hostvars['fr-exit']['ansible_host'] }}:443"
+    persistent_keepalive: 25
+
+awg_enable_nat: false

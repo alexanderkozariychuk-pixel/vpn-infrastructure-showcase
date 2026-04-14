@@ -1,12 +1,17 @@
 all:
   children:
+    bridge:
+      hosts:
+        ru-bridge:
+          ansible_host: <RUSSIAN_BRIDGE_IP>
+          ansible_user: ubuntu  
     entry:
       hosts:
-        vps-moldova:
-          ansible_host: <MOLDOVA_VPS_IP>
-          ansible_user: root  # temporarily
-    ru_bridge:
+        md-entry:
+          ansible_host: <MOLDOVA_ENTRY_IP>
+          ansible_user: ubuntu
+    exit:
       hosts:
-        russian-bridge:
-          ansible_host: <RUSSIAN_BRIDGE_VPS_IP>
-          ansible_user: root  # temporarily
+        fr-exit:
+          ansible_host: <FRANCE_EXIT_IP>
+          ansible_user: ubuntu

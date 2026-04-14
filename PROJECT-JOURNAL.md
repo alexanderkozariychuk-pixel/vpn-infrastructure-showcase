@@ -255,46 +255,50 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## 2026-04-13
+## 2026-04-14
 
-### Terraform: Refactoring and unifying infrastructure
+### Architecture simplification: primary focus on AmneziaWG
 
-#### Aeza module (exit node, France)
-- Analyzed the current `aeza` module, added dynamic product retrieval using `data "aeza_products"`.
-- Replaced hardcoded `product_id` with `exit_nodes` variable (map of tariff names), enabling multi-region management.
-- Replaced `count` with `for_each` for managing multiple instances (preparation for fault tolerance).
-- Added `null_resource` with `local-exec` to automatically add an SSH key via the Aeza API (placeholder, requires endpoint verification).
-- Added variable validation (`product_id > 0`, `server_name` – only letters/numbers/hyphens).
-- Fixed syntax errors and duplicate outputs.
-- Successfully ran `terraform init`, `terraform validate`, `terraform plan` (dry-run). The module is ready for deployment.
+- **Decision**: Xray (VLESS+XHTTP) removed from the main multi‑hop chain. The primary protocol is now **AmneziaWG** on all hops (client → Russia → Moldova → France). Xray remains only as an **optional fallback** for clients that cannot use AmneziaWG (e.g., UDP‑restricted mobile networks).
+- **Updated documentation**:
+  - `architecture.md` – rewrote Overview, Node Roles, Data Flows, Technology Stack, Monitoring, Security, Planned Extensions to reflect the new design.
+  - `README.md` – updated Current Status, Tech Stack, Planned automation; removed references to Xray from the core description.
+  - `PROJECT-JOURNAL.md` – added this entry.
 
-#### Yandex Cloud module (bridge node, Russia)
-- Reviewed the current `yandex` module structure.
-- Added dynamic OS image lookup using `data "yandex_compute_image"` (instead of a hardcoded ID).
-- Moved VM resources to variables (`cores`, `memory`).
-- Added a `locals` block for `cloud-init` (user setup, SSH, basic packages).
-- Fixed syntax errors (block nesting, duplicate outputs).
-- Added variable validation (non‑empty checks).
-- The module passes `terraform validate` and `terraform plan`.
+### Ansible automation for AmneziaWG chain
 
-#### Unified configuration
-- Created a root `main.tf` in `infrastructure/terraform/` that calls both modules.
-- Organised common variables and outputs in root `variables.tf` and `outputs.tf`.
-- Prepared a `terraform.tfvars.example` for both providers.
-- Updated `.gitignore`: added all sensitive Terraform files (tfvars, state, lock), Python virtual environments, IDE files, logs, backups. Removed duplicates, kept structure clean.
+- **Enhanced role `amneziawg`**:
+  - Added automatic key generation (`wg genkey` / `wg pubkey`) when private key is not provided.
+  - Created Jinja2 template `awg0.conf.j2` that supports multiple peers (via `awg_peers` list).
+  - Added tasks for enabling IP forwarding, NAT (for exit node), and starting the service.
+  - Handlers for restarting `awg-quick@awg0`.
+- **Created inventory and group variables**:
+  - `inventory/production.yml.example` – groups `bridge`, `entry`, `exit`.
+  - `group_vars/bridge.yml.example`, `entry.yml.example`, `exit.yml.example` – node‑specific variables (IPs, keys, peers, NAT flag).
+- **Playbook `site.yml`** – applies role `amneziawg` to all nodes.
 
-### Progress:
-- A single entry point to manage the whole infrastructure: `terraform apply` can deploy the France exit node (Aeza) and the Russian bridge node (Yandex Cloud) together.
-- Infrastructure as Code is ready for CI/CD automation.
-- All sensitive data is excluded from the repository; example variables are available for new contributors.
+### Terraform backend setup (attempt)
+
+- Created a temporary configuration to set up Yandex Object Storage bucket for remote state.
+- Faced `PermissionDenied` errors due to cloud account restrictions (trial period ended, no active billing). Bucket creation via CLI also failed.
+- **Decision**: Postpone backend setup until account is activated (or use Terraform Cloud / local state for now). Documented the issue in journal.
+
+### Current status
+
+- All Terraform modules (Aeza, Yandex Cloud) are ready and validated.
+- Ansible roles for AmneziaWG and common base setup are ready.
+- The architecture is simplified and focused on performance.
+- Next steps: provision VPS (when funds available), run Ansible, test the full chain.
 
 ---
 
-## Next steps
-- Test the unified module with real accounts (when funds are available).
-- Set up a Terraform backend (e.g., Yandex Object Storage).
-- Move to Ansible: write playbooks for post‑provisioning of the created VPS (AmneziaWG, Xray, chaining).
-- Update documentation (README, architecture) with Terraform module descriptions.
+### Next steps (planned for 2026-04-15)
+
+- Test Terraform modules with real accounts (if balance is available).
+- Run Ansible playbook on existing Moldova node to validate the role without breaking current configuration.
+- Finalise `setup-tutorial.md` and `troubleshooting.md` to reflect AmneziaWG‑only chain.
+- Prepare for Russian Bridge and France Exit deployment.
+
 
 ## Long-term Plans
 

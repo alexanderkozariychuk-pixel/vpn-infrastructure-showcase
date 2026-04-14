@@ -37,14 +37,14 @@ See detailed architecture in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
-## Current Status (as of April 08, 2026) ✅
+## Current Status (as of April 14, 2026) ✅
 
 | Component                    | Status              | Details |
-|-----------------------------|---------------------|-------|
-| **Moldova Entry Node**      | Fully Operational   | Main working node, serving active clients |
-| **Russian Bridge Node**     | In Provisioning     | Waiting for clean IP from provider |
-| **France Exit Node**        | Ready               | Deployment script prepared |
-| **VPN Tunnel**              | Operational         | AmneziaWG + Xray multi-hop chain |
+|-----------------------------|---------------------|---------|
+| **Moldova Entry Node**      | Fully Operational   | Main working node, serving 10+ client devices |
+| **Russian Bridge Node**     | Terraform module ready | Awaiting provisioning (Yandex Cloud) |
+| **France Exit Node**        | Terraform module ready | Awaiting provisioning (Aeza) |
+| **VPN Tunnel**              | Operational         | AmneziaWG multi‑hop chain (Russia → Moldova → France) |
 | **Client Configurations**   | 10+ clients         | Generated and tested |
 | **Policy-Based Routing**    | Implemented         | Selective routing logic developed and tested |
 | **Monitoring Stack**        | Active              | Uptime Kuma + Prometheus + Grafana (hosted on Moldova) |
@@ -68,10 +68,9 @@ See detailed architecture in [`docs/architecture.md`](docs/architecture.md).
 ---
 
 ## Tech Stack
-- **Networking**: WireGuard, AmneziaWG
-- **Monitoring**: Prometheus, Node Exporter, Uptime Kuma
-- **Automation**: Python (Aeza, 4VPS.SU API), Ansible (in progress)
----
+- **Networking**: AmneziaWG (primary), WireGuard, Xray (optional fallback)
+- **Monitoring**: Prometheus, Node Exporter, Uptime Kuma, Alertmanager
+- **Automation**: Terraform (Yandex Cloud, Aeza), Ansible, Python (Aeza API, 4VPS.SU API)
 
 ## Key Features
 - DPI bypass via obfuscation layer
@@ -125,12 +124,11 @@ For detailed usage instructions, see [`docs/setup-tutorial.md`](docs/setup-tutor
 
 ### Planned automation
 
-- **Ansible playbooks** for configuring AmneziaWG, Xray, and monitoring on all nodes (see `ansible/` directory).
+- **Ansible playbooks** for configuring AmneziaWG and monitoring on all nodes (see `ansible/` directory).
 - **CI/CD** (GitHub Actions) for automated testing of scripts and playbooks (planned).
-- **Terraform** (optional) – if a provider with official Terraform support is chosen in the future.
+- **Terraform** already in use for Yandex Cloud and Aeza; further provider integrations may be added.
 
 All server configuration will be handled by Ansible, making the setup repeatable and version‑controlled.
-
 ---
 
 ## Troubleshooting & Real-World Challenges

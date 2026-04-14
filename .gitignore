@@ -73,3 +73,9 @@ credentials/
 *.bak
 *.backup
 *.tmp
+
+# =============================================
+Terraform Backend
+# =============================================
+infrastructure/yc-backend-setup/
+sa-key.json

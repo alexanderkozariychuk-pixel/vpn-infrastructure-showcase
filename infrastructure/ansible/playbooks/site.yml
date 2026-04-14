@@ -1,1 +1,9 @@
+---
+- name: Configure AmneziaWG on all nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
 
+  roles:
+    - common
+    - amneziawg
