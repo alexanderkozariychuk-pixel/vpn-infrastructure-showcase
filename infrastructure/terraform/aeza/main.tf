@@ -13,7 +13,7 @@ resource "aeza_service" "exit" {
   name         = "${each.key}-exit"
   product_id   = each.value
   auto_prolong = false
- }
+}
 
 # Resource for managing SSH keys via API
 resource "null_resource" "add_ssh_key" {

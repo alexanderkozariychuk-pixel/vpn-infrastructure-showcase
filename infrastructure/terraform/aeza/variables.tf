@@ -13,7 +13,7 @@ variable "server_name" {
 variable "location" {
   description = "Location code for France"
   type        = string
-  default     = "fr"   # France (Paris)
+  default     = "fr" # France (Paris)
 }
 
 variable "product_id" {
