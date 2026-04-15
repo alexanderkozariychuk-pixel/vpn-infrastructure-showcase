@@ -283,7 +283,7 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - Faced `PermissionDenied` errors due to cloud account restrictions (trial period ended, no active billing). Bucket creation via CLI also failed.
 - **Decision**: Postpone backend setup until account is activated (or use Terraform Cloud / local state for now). Documented the issue in journal.
 
-### Current status
+### Progress
 
 - All Terraform modules (Aeza, Yandex Cloud) are ready and validated.
 - Ansible roles for AmneziaWG and common base setup are ready.
@@ -292,13 +292,48 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-### Next steps (planned for 2026-04-15)
+## 2026-04-15
 
-- Test Terraform modules with real accounts (if balance is available).
-- Run Ansible playbook on existing Moldova node to validate the role without breaking current configuration.
-- Finalise `setup-tutorial.md` and `troubleshooting.md` to reflect AmneziaWG‑only chain.
-- Prepare for Russian Bridge and France Exit deployment.
+### CI/CD pipeline with GitHub Actions
 
+#### Initial setup
+- Created `.github/workflows/lint.yml` to automate code quality checks on every push and pull request.
+- Workflow includes:
+  - Terraform formatting check (`terraform fmt -check`)
+  - Terraform validation (without backend init) for Aeza and Yandex modules
+  - Ansible syntax check for all playbooks
+  - ShellCheck for `.sh` scripts
+  - Ruff linting for Python scripts
+
+#### Fixes and adjustments
+- **Terraform**: ran `terraform fmt -recursive` locally to fix formatting issues; committed changes.
+- **Ansible**:
+  - Moved `ansible.cfg` to repository root and configured `roles_path = ./infrastructure/ansible/roles`.
+  - Fixed misplaced `handlers` section in `common` role – moved to `handlers/main.yml`.
+  - Corrected `vars` syntax in `deploy-bridge.yml` (list → dictionary).
+  - Removed empty `wireguard.yml` playbook.
+- **Python** (ruff):
+  - Removed unused import `os` in `create-aeza-vps.py`.
+  - Removed extraneous `f`‑prefix from f‑strings without placeholders in `create-vps.py`.
+  - Deleted unused variable `result` in `create-vps.py`.
+- **CI execution**: All steps passed successfully after fixes.
+
+#### CI badge
+- Added a status badge to `README.md`:
+
+### Progress:
+- The repository now has a fully functional CI pipeline that validates Terraform, Ansible, shell, and Python code automatically.
+- The green badge in README demonstrates project maturity and adherence to quality standards.
+- Any future pull request will be checked automatically, reducing the risk of broken code.
+
+---
+
+## Next steps (planned for 2026-04-16)
+
+- Consider adding automatic deployment (CD) using GitHub Actions with secrets for real cloud providers.
+- Add more advanced tests (e.g., terraform plan with mock providers or dry‑run).
+- Prepare a demo video or additional screenshots for the portfolio.
+- Continue improving documentation (setup-tutorial.md, troubleshooting.md) to reflect the final AmneziaWG‑only architecture.
 
 ## Long-term Plans
 
