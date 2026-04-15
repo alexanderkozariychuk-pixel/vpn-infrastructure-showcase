@@ -130,7 +130,7 @@ For detailed usage instructions, see [`docs/setup-tutorial.md`](docs/setup-tutor
 - **CI/CD** (GitHub Actions) for automated testing of scripts and playbooks (planned).
 - **Terraform** already in use for Yandex Cloud and Aeza; further provider integrations may be added.
 
-All server configuration will be handled by Ansible, making the setup repeatable and version‑controlled.
+> All server configuration will be handled by Ansible, making the setup repeatable and version‑controlled.
 ---
 
 ## Troubleshooting & Real-World Challenges
