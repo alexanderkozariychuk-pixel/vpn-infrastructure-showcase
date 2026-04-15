@@ -1,5 +1,7 @@
 # Multi-Hop Obfuscated VPN Infrastructure
 
+[![Lint](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml/badge.svg)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)
 ![Shell](https://img.shields.io/badge/Shell-bash-4EAA25.svg?logo=gnu-bash&logoColor=white)
