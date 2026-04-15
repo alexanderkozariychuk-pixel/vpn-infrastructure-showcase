@@ -75,12 +75,3 @@
     state: enabled
     policy: allow
   notify: enable ufw
-
-handlers:
-  - name: restart ssh
-    service:
-      name: ssh
-      state: restarted
-  - name: enable ufw
-    ufw:
-      state: enabled
