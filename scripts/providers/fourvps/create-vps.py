@@ -67,7 +67,7 @@ async def main():
         dcs = await client.get_dc_list()
         print("Data centers:")
         for dc in dcs:
-            print(f"  ID: {dc.id}, City: {dc.city}, Name: {dc.name}")
+            print("  ID: {dc.id}, City: {dc.city}, Name: {dc.name}")
         print("\nSet DATACENTER_ID to the ID of Saint Petersburg (or your preferred location).\n")
 
         # 2. List all tariff plans (presets) – find the one matching your hardware requirements
@@ -75,27 +75,27 @@ async def main():
         tariffs = await client.get_tariff_list()
         print("Tariffs:")
         for tariff in tariffs:
-            print(f"  Cluster: {tariff.cluster_info.name} (Data center ID: {tariff.cluster_info.id})")
+            print("  Cluster: {tariff.cluster_info.name} (Data center ID: {tariff.cluster_info.id})")
             for preset in tariff.presets:
-                print(f"    Preset ID: {preset.id}, Name: {preset.name}, "
-                      f"CPU cores: {preset.cpu_number}, RAM: {preset.ram_mib} MiB, Disk: {preset.rom} GB")
+                print("    Preset ID: {preset.id}, Name: {preset.name}, "
+                      "CPU cores: {preset.cpu_number}, RAM: {preset.ram_mib} MiB, Disk: {preset.rom} GB")
         print("\nSet TARIFF_ID to the Preset ID matching your desired specs (Ryzen, 2GB RAM, 50GB).\n")
 
         # 3. List available OS templates for the chosen tariff and data center
         # Note: At this point we use the (still placeholder) IDs to demonstrate.
         # In a real run, you would set them after discovery.
-        print(f"Fetching OS images for tariff ID {TARIFF_ID} and data center ID {DATACENTER_ID}...")
+        print("Fetching OS images for tariff ID {TARIFF_ID} and data center ID {DATACENTER_ID}...")
         images = await client.get_images(tariff_id=TARIFF_ID, dc_id=DATACENTER_ID)
         if images:
             print("OS images:")
             for img in images:
-                print(f"  ID: {img.id}, Name: {img.name}")
+                print("  ID: {img.id}, Name: {img.name}")
         else:
             print("  No images found – check that TARIFF_ID and DATACENTER_ID are correct.")
         print("\nSet OS_TEMPLATE_ID to the ID of Ubuntu 22.04 (or your preferred OS).\n")
 
         # 4. Create the VPS using the configured parameters
-        print(f"Creating VPS with name '{SERVER_NAME}'...")
+        print("Creating VPS with name '{SERVER_NAME}'...")
         result = await client.buy_server(
             tariff_id=TARIFF_ID,
             datacenter_id=DATACENTER_ID,
@@ -103,10 +103,10 @@ async def main():
             server_name=SERVER_NAME,
             period=PERIOD
         )
-        print(f"\n✅ VPS successfully created!")
-        print(f"   Server ID: {result.server_id}")
-        print(f"   Root password: {result.password}")
-        print(f"\nYou can now use this server ID for further API calls (e.g., get VM link, power on).")
+        print("\n✅ VPS successfully created!")
+        print("   Server ID: {result.server_id}")
+        print("   Root password: {result.password}")
+        print("\nYou can now use this server ID for further API calls (e.g., get VM link, power on).")
 
 if __name__ == "__main__":
     asyncio.run(main())

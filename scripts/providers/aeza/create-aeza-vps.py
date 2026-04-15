@@ -3,7 +3,6 @@
 Script to create a VPS on Aeza using their official API.
 Requires library installation: pip install aeza
 """
-import os
 from aeza import AezaClient
 
 # --- CONFIGURATION (replace with your data) ---
