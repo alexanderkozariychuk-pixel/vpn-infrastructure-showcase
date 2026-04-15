@@ -1,0 +1,86 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -------------------------------
+      # Terraform
+      # -------------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform fmt check (aeza)
+        run: |
+          cd infrastructure/terraform/aeza
+          terraform fmt -check -recursive
+
+      - name: Terraform fmt check (yandex)
+        run: |
+          cd infrastructure/terraform/yandex
+          terraform fmt -check -recursive
+
+      - name: Terraform validate (aeza) – no backend init
+        run: |
+          cd infrastructure/terraform/aeza
+          terraform init -backend=false
+          terraform validate
+        continue-on-error: true  
+
+      - name: Terraform validate (yandex) – no backend init
+        run: |
+          cd infrastructure/terraform/yandex
+          terraform init -backend=false
+          terraform validate
+        continue-on-error: true
+
+      # -------------------------------
+      # Ansible
+      # -------------------------------
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Ansible syntax check (site.yml)
+        run: ansible-playbook infrastructure/ansible/playbooks/site.yml --syntax-check
+
+      - name: Ansible syntax check (other playbooks)
+        run: |
+          for playbook in infrastructure/ansible/playbooks/*.yml; do
+            ansible-playbook "$playbook" --syntax-check
+          done
+
+      # -------------------------------
+      # Shell scripts
+      # -------------------------------
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on all .sh files
+        run: |
+          find scripts/ -name "*.sh" -exec shellcheck {} \;
+
+      # -------------------------------
+      # Python scripts
+      # -------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff check (Python scripts)
+        run: ruff check scripts/ --output-format=github
