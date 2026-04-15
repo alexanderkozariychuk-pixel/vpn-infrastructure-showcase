@@ -53,8 +53,9 @@ jobs:
         run: pip install ansible
 
       - name: Ansible syntax check (site.yml)
-        run: ansible-playbook infrastructure/ansible/playbooks/site.yml --syntax-check
-
+        run: |
+          ansible-playbook infrastructure/ansible/playbooks/site.yml --syntax-check --roles-path ./infrastructure/ansible/roles
+          
       - name: Ansible syntax check (other playbooks)
         run: |
           for playbook in infrastructure/ansible/playbooks/*.yml; do
