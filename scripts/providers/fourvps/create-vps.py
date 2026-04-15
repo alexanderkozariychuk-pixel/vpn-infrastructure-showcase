@@ -96,7 +96,7 @@ async def main():
 
         # 4. Create the VPS using the configured parameters
         print("Creating VPS with name '{SERVER_NAME}'...")
-        result = await client.buy_server(...)
+        await client.buy_server(...)
 
         print("\n✅ VPS successfully created!")
         print("   Server ID: {result.server_id}")
