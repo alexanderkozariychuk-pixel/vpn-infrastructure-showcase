@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------
+       # -------------------------------
       # Terraform
       # -------------------------------
       - name: Setup Terraform
@@ -22,28 +22,62 @@ jobs:
         with:
           terraform_version: 1.10.0
 
+      - name: Cache Terraform plugins
+        uses: actions/cache@v3
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infrastructure/terraform/**/.terraform.lock.hcl') }}
+          restore-keys: |
+            ${{ runner.os }}-terraform-
+
+      # --- Aeza module ---
       - name: Terraform fmt check (aeza)
         run: |
           cd infrastructure/terraform/aeza
           terraform fmt -check -recursive
 
+      - name: Terraform init (aeza)
+        run: |
+          cd infrastructure/terraform/aeza
+          terraform init -backend=false
+
+      - name: Terraform validate (aeza)
+        run: |
+          cd infrastructure/terraform/aeza
+          terraform validate
+
+      - name: Terraform plan (aeza)
+        env:
+          AEZA_API_KEY: ${{ secrets.AEZA_API_KEY }}
+        run: |
+          cd infrastructure/terraform/aeza
+          terraform plan -input=false -no-color
+        continue-on-error: true  
+
+      # --- Yandex module ---
       - name: Terraform fmt check (yandex)
         run: |
           cd infrastructure/terraform/yandex
           terraform fmt -check -recursive
 
-      - name: Terraform validate (aeza) – no backend init
-        run: |
-          cd infrastructure/terraform/aeza
-          terraform init -backend=false
-          terraform validate
-        continue-on-error: true  
-
-      - name: Terraform validate (yandex) – no backend init
+      - name: Terraform init (yandex)
         run: |
           cd infrastructure/terraform/yandex
           terraform init -backend=false
+
+      - name: Terraform validate (yandex)
+        run: |
+          cd infrastructure/terraform/yandex
           terraform validate
+
+      - name: Terraform plan (yandex)
+        env:
+          YC_TOKEN: ${{ secrets.YANDEX_CLOUD_TOKEN }}
+          YC_CLOUD_ID: ${{ secrets.YANDEX_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+        run: |
+          cd infrastructure/terraform/yandex
+          terraform plan -input=false -no-color
         continue-on-error: true
 
       # -------------------------------
