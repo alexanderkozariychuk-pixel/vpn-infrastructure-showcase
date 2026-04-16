@@ -1,7 +1,7 @@
-```markdown
-Installing and configuring VPN infrastructure
+# Installing and configuring VPN infrastructure
 
-Requirements
+```markdown
+**Requirements**
 - VPS with Ubuntu 24.04 (minimum 1 vCPU, 1 GB RAM, 15 GB disk)
 - SSH access to the server (password or key)
 - Basic familiarity with the command line
@@ -9,15 +9,15 @@ Requirements
 ```
 
 ---
-1. Server Preparation
+## 1. Server Preparation
  
-1.1. System Update
+### 1.1. System Update
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-1.2. User creation and configuration (recommended)
+### 1.2. User creation and configuration (recommended)
 
 Create a user (replace vpnadmin with the desired name):
 
@@ -32,7 +32,7 @@ Copy the public key (run on your computer; instead of <ip_server>, specify the I
 ssh-copy-id vpnadmin@<ip_server>
 ```
 
-1.3. Configuring the firewall
+### 1.3. Configuring the firewall
 
 ```bash
 sudo ufw allow 22/tcp   # SSH
@@ -42,9 +42,9 @@ sudo ufw enable
 
 ---
 
-2. Installing AmneziaWG
+## 2. Installing AmneziaWG
 
-2.1. Download and run the installation script
+### 2.1. Download and run the installation script
 
 ```bash
 curl -O https://raw.githubusercontent.com/Varckin/amneziawg-install/main/amneziawg-install.sh
@@ -52,7 +52,7 @@ chmod +x amneziawg-install.sh
 sudo ./amneziawg-install.sh
 ```
 
-2.2. Installation parameters
+### 2.2. Installation parameters
 
 - Public IPv4 or IPv6 address: enter the IP of your VPS
 - Public interface: usually eth0 or ens3 (check with ip a command)
@@ -70,7 +70,14 @@ sudo systemctl status awg-quick@awg0
 sudo awg show
 ```
 
-2.3. Adding a client
+### 2.3. Generate server keys
+
+```bash
+cd /etc/amneziawg
+sudo wg genkey | sudo tee privatekey | sudo wg pubkey | sudo tee publickey
+``` 
+
+### 2.4. Adding a client(on the Bridge Node)
 
 Run the script again:
 
@@ -85,55 +92,75 @@ The client configuration is saved in /root/awg0-client-<name>.conf. Copy it to y
 ```bash
 scp root@<IP_server>:/root/awg0-client-<name>.conf ~/Downloads/
 ```
+>  **Note**: For the internal chain between nodes (bridge → entry → exit), you will need to manually add [Peer] sections – see the next section.
 
 ---
 
-3. Installing Xray + 3X-UI (additional protocol)
+## 3. Optional: Xray fallback setup (only if needed)
 
-3.1. Installing the panel
+> **Note:** This section is **optional**. The primary VPN chain uses only AmneziaWG.  
+> Xray may be added as a fallback for clients that cannot use AmneziaWG (e.g., UDP‑restricted mobile networks).
+
+### 3.1. Install Xray + 3X-UI panel
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
 ```
+- Follow the instructions:
 
-Follow the instructions:
+  - Panel port: 54321
 
-- Panel port: 54321
-- SSL certificate: select 2 (Let's Encrypt for IP) or skip if HTTPS is not needed.
-- Remember the login and password you set (by default, admin / admin).
+  - SSL certificate: choose option 2 (Let's Encrypt for IP) or skip if HTTPS not needed.
 
-3.2. Creating an inbound (VLESS+Reality)
+  - Save the login credentials (default admin/admin).
+
+### 3.2. Create a VLESS+Reality inbound
 
 1. Open the panel: http://<IP_server>:54321
+
 2. Go to Inbounds → Add Inbound.
-3. Fill in:
-   - Protocol: VLESS
-   - Port: 443
-   - Network: tcp
-   - Security: reality
-   - Reality Settings:
-     - Dest: www.microsoft.com:443
-     - ServerNames: www.microsoft.com
-     - PrivateKey: click Generate
-     - ShortIds: 6ba85179e30d4fc2
-     - Fingerprint: chrome
+
+3. Set:
+
+  - Protocol: VLESS
+
+  - Port: 443
+
+  - Network: tcp
+
+  - Security: reality
+
+  - Reality Settings:
+
+  -  Dest: www.microsoft.com:443
+
+  -  ServerNames: www.microsoft.com
+
+  -  PrivateKey: click Generate
+
+  -  ShortIds: 6ba85179e30d4fc2
+
+  -  Fingerprint: chrome
+
 4. Add a client (click Add Client, generate an ID).
-5. Save.
 
-Copy the link (Link button) — it will be useful for the client.
+5. Save
 
+- Copy the client link – it can be used in Hiddify, v2rayNG, etc.
+
+  | For more detailed Xray configuration, see `configs/xray/` in this repository.
 ---
 
-4. Monitoring (Uptime Kuma + Prometheus + Node Exporter + Alertmanager)
+## 4. Monitoring (Uptime Kuma + Prometheus + Node Exporter + Alertmanager)
 
-4.1. Installing Docker
+### 4.1. Installing Docker
 
 ```bash
 sudo apt install -y docker.io docker-compose
 sudo systemctl enable docker --now
 ```
 
-4.2. Creating docker-compose.yml
+### 4.2. Creating docker-compose.yml
 
 Create the /opt/monitoring folder and the file docker-compose.yml with the following content:
 
@@ -194,11 +221,11 @@ volumes:
   uptime-kuma-data:
 ```
 
-4.3. Configuration files
+### 4.3. Configuration files
 
 Create in the same folder:
 
-prometheus.yml
+#### prometheus.yml
 
 ```yaml
 global:
@@ -219,7 +246,7 @@ scrape_configs:
       - targets: ['node-exporter:9100']
 ```
 
-alerts.yml
+#### alerts.yml
 
 ```yaml
 groups:
@@ -253,7 +280,7 @@ groups:
           description: "VPS is not responding to scrape."
 ```
 
-alertmanager.yml
+#### alertmanager.yml
 
 ```yaml
 route:
@@ -272,14 +299,14 @@ receivers:
         api_url: 'https://api.telegram.org'
 ```
 
-4.4. Launching monitoring
+### 4.4. Launching monitoring
 
 ```bash
 cd /opt/monitoring
 docker-compose up -d
 ```
 
-4.5. AmneziaWG verification script for Uptime Kuma
+### 4.5. AmneziaWG verification script for Uptime Kuma
 
 Create the file /usr/local/bin/check_awg.sh:
 
@@ -315,7 +342,7 @@ Add the following line:
 
 ---
 
-5. Health check
+## 5. Health check
 
 - AmneziaWG: Connect to the client, check the IP (it must be the server’s IP).
 - Xray: Use the link from 3X-UI in Hiddify or V2RayNG.
@@ -327,10 +354,8 @@ Add the following line:
 
 ---
 
-Notes
-
-- UDP port 443 is used for AmneziaWG, TCP port 443 is used for Xray. They do not conflict.
-- The SSL certificate of the 3X-UI panel requires a domain if you want HTTPS.
-- This guide describes only the entry server. In the next steps, an exit node and automation will be added.
-
+## 6. Notes
+> - UDP port 443 is used for AmneziaWG. TCP port 443 may be used for optional Xray fallback – they do not conflict.
+> - The SSL certificate of the 3X-UI panel (if used) requires a domain for HTTPS.
+> - This guide describes the setup for a single node (entry). For the full three‑hop chain (Russia → Moldova → France), repeat the AmneziaWG installation on each node and configure peers as described in the architecture documentation.
 

@@ -326,14 +326,46 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - The green badge in README demonstrates project maturity and adherence to quality standards.
 - Any future pull request will be checked automatically, reducing the risk of broken code.
 
+--- 
+
+## 2026-04-16
+
+### CI/CD pipeline improvements
+
+- Enhanced `.github/workflows/lint.yml`:
+  - Added caching for Terraform plugins and pip dependencies to speed up runs.
+  - Integrated `terraform plan` with real API keys (Aeza, Yandex Cloud) using GitHub Secrets.
+  - Set `continue-on-error: true` for `plan` steps to avoid false failures.
+  - Added `terraform init` and `validate` without backend for both modules.
+- Fixed all linting errors:
+  - Terraform formatting (`terraform fmt -recursive`).
+  - Ansible syntax: moved `handlers` to separate file, corrected `vars` in `deploy-bridge.yml`, removed empty `wireguard.yml`.
+  - Python: removed unused import, extraneous `f`-prefix, unused variable.
+- CI now runs successfully on every push/PR, providing a green badge in README.
+
+### Documentation update
+
+- Rewrote `docs/setup-tutorial.md` to reflect the primary AmneziaWG‑only chain:
+  - Removed Xray from the core installation steps (moved to optional fallback).
+  - Added key generation step for AmneziaWG.
+  - Clarified IP addressing for bridge/entry/exit nodes.
+  - Added note about optional Xray fallback.
+
+### Progress: 
+
+- All Terraform modules (Aeza, Yandex Cloud) validated with `plan`.
+- Ansible roles for AmneziaWG and common base setup ready.
+- CI/CD pipeline fully functional.
+- Documentation aligned with the simplified architecture.
+
 ---
 
-## Next steps (planned for 2026-04-16)
+## Next steps (planned for 2026-04-17)
 
-- Consider adding automatic deployment (CD) using GitHub Actions with secrets for real cloud providers.
-- Add more advanced tests (e.g., terraform plan with mock providers or dry‑run).
-- Prepare a demo video or additional screenshots for the portfolio.
-- Continue improving documentation (setup-tutorial.md, troubleshooting.md) to reflect the final AmneziaWG‑only architecture.
+- Add more detailed badges to README.md
+- Refine `docs/troubleshooting.md` with real‑world issues and solutions.
+- Prepare for actual deployment when cloud funds become available.
+
 
 ## Long-term Plans
 
