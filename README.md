@@ -1,6 +1,7 @@
 # Multi-Hop Obfuscated VPN Infrastructure
 
 [![Lint](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml/badge.svg)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)
@@ -8,6 +9,11 @@
 ![Ansible](https://img.shields.io/badge/Ansible-EE0000.svg?logo=ansible&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED.svg?logo=docker&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-FCC624.svg?logo=linux&logoColor=black)
+[![Terraform](https://img.shields.io/badge/Terraform-1.10-844FBA?logo=terraform)](https://terraform.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus)](https://prometheus.io)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana)](https://grafana.com)
+[![WireGuard](https://img.shields.io/badge/WireGuard-88171A?logo=wireguard)](https://wireguard.com)
+
 
 ---
 

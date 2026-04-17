@@ -139,6 +139,43 @@ However, such approaches are:
 - Use alternative networks/operators where possible  
 - For standard or DPI-based restrictions, AmneziaWG (UDP/443) remains the most reliable and performant solution
 
+### 1.5. VPN does not work on devices connected to an iPhone in Personal Hotspot mode
+
+#### Problem
+- VPN connection successfully establishes on the iPhone itself.
+- When trying to connect to the same server from a laptop or tablet that uses the iPhone's Personal Hotspot, the VPN does not work.
+- However, if the laptop runs its own VPN client (or uses other networks), the connection works.
+
+#### Environment
+- **Phone (hotspot source)**: iPhone (iOS 17+), mobile operators MTS / Tele2 / Beeline.
+- **Client device**: MacBook / Windows laptop connected to the iPhone hotspot.
+- **VPN protocol**: AmneziaWG, WireGuard.
+
+#### Hypothesis
+- The mobile operator uses DPI to detect tethering.
+- iOS in Personal Hotspot mode does not route traffic from connected devices through the iPhone's VPN tunnel.
+- Consequently, traffic from tethered devices bypasses the VPN, is easily detected by the operator, and gets blocked or throttled.
+
+#### Tests
+
+| Test | Description | Result |
+|------|-------------|--------|
+| **TTL analysis** | Compare TTL (Time To Live) of packets when connected directly to Wi‑Fi vs via iPhone hotspot. | TTL of packets going through the hotspot is decreased by 1, proving an extra router (iPhone) is in the path. |
+| **VPN on client** | Enable a VPN client on the laptop while connected through the iPhone hotspot. | VPN connects successfully and works. |
+| **VPN on hotspot source** | iPhone VPN enabled, laptop connected to hotspot without its own VPN. | VPN on laptop does not work. |
+| **VPN on hotspot + TTL change** | iPhone VPN enabled, laptop TTL changed to 65. | May sometimes work, but unstable. |
+
+#### Results
+- Mobile operator DPI can identify tethering by the altered TTL.
+- iOS is not designed to act as a VPN gateway for other devices.
+- The most stable solution is to run a VPN client directly on each device that needs protection.
+
+#### Conclusion
+The root cause is a combination of iOS limitations and mobile operator policies. To reliably use a VPN while tethering, each device must establish its own VPN connection. Using the phone as a hotspot does not allow VPN traffic to be passed through to connected devices.
+
+#### Next Steps
+- **Recommendation**: Use a VPN on each tethered device individually.
+- **Alternative (advanced)**: Buy a specialised travel router (e.g., GL.iNet) that connects to the VPN itself and broadcasts protected Wi‑Fi.
 ---
 ## 2. Errors in the installation and configuration of AmneziaWG
 

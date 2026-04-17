@@ -360,12 +360,33 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
-## Next steps (planned for 2026-04-17)
+## 2026-04-17
 
-- Add more detailed badges to README.md
-- Refine `docs/troubleshooting.md` with real‑world issues and solutions.
+### README badges enhancement
+- Added new badges to `README.md`:
+  - Terraform version badge
+  - Prometheus badge
+  - Grafana badge
+  - WireGuard badge
+  - GitHub last commit badge
+- These badges improve the project's visual appeal and provide quick status information.
+
+### Troubleshooting section expansion
+- Added a detailed troubleshooting entry about VPN failures when using an iPhone as a Personal Hotspot.
+- The new section (1.5 `docs/troubleshooting.md`) covers:
+  - Problem description and environment
+  - Hypothesis (iOS NAT + carrier DPI)
+  - Test methodology including TTL analysis
+  - Results and conclusions
+  - Recommended solutions (VPN on each client device, TTL adjustment, dedicated router)
+- This addition demonstrates systematic problem analysis and practical troubleshooting skills.
+
+### Next steps (planned for 2026-04-18)
+- Continue refining documentation.
+- Possibly add more badges (e.g., code coverage, security scan).
 - Prepare for actual deployment when cloud funds become available.
 
+---
 
 ## Long-term Plans
 
