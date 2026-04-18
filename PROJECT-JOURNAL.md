@@ -381,10 +381,35 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
   - Recommended solutions (VPN on each client device, TTL adjustment, dedicated router)
 - This addition demonstrates systematic problem analysis and practical troubleshooting skills.
 
-### Next steps (planned for 2026-04-18)
-- Continue refining documentation.
-- Possibly add more badges (e.g., code coverage, security scan).
-- Prepare for actual deployment when cloud funds become available.
+## 2026-04-18
+
+### Next‑generation Telegram bot with AI integration
+
+- **Monitoring migration**:
+  - Created a new Telegram bot with Google Gemini integration (`ai-bot.py`).
+  - Configured a systemd service for automatic startup.
+  - Updated Uptime Kuma notification settings (replaced old bot token with the new one).
+  - Removed the old bot instance, resolved `Conflict: terminated by other getUpdates request`.
+
+- **Sudoers configuration**:
+  - Added `/etc/sudoers.d/ai-bot` rules to allow `awg show`, `journalctl`, `systemctl restart` without password.
+
+- **Currently implemented commands**:
+  - `/status` – shows AmneziaWG status (peers, handshake).
+  - `/logs [N]` – returns last N lines of `awg-quick@awg0` log.
+  - `/restart` – restarts the service after confirmation.
+  - `/help` – usage instructions.
+  - Natural language queries are handled by Gemini (log analysis, advice).
+
+- ### Progress:
+  - The bot is running; notifications now come from the new bot.
+  - Basic monitoring commands are operational.
+
+- ## Next steps:
+  - Add client management commands: `/clients`, `/addclient`, `/delclient`.
+  - Add configuration commands: `/setdns`, `/setmtu`.
+  - Finalise and commit the fully featured bot to GitHub.
+  - Update documentation accordingly.
 
 ---
 
