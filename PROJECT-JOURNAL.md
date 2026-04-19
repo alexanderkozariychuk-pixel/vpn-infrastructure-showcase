@@ -405,11 +405,34 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
   - The bot is running; notifications now come from the new bot.
   - Basic monitoring commands are operational.
 
-- ## Next steps:
-  - Add client management commands: `/clients`, `/addclient`, `/delclient`.
-  - Add configuration commands: `/setdns`, `/setmtu`.
-  - Finalise and commit the fully featured bot to GitHub.
-  - Update documentation accordingly.
+---
+
+## 2026-04-19
+### AI Integration & Security Foundations
+
+  #### AI Diagnostics Engine:
+  - Successfully integrated Google Gemini 3.0 (Flash Preview) as the core brain for system analysis.
+  - Implemented the /analyze command, enabling the bot to process system metrics and logs to provide SRE-level recommendations.
+  - Configured bilingual (EN/RU) output for AI-generated reports.
+
+  #### Security & Access Control:
+  - Implemented a centralized auth_filter for the entire bot.
+  - Hardened Security: Secured all entry points, including text commands and inline button callbacks (preventing unauthorized service restarts).
+  - Configured sudoers rules for the bot's operation.
+
+  ### Ongoing Development (In Progress):
+  - Client Management: Module logic developed but currently blocked by file system permissions (access to private/public keys).
+  - Log System: Encountered an issue where /logs returns outdated data (dated April 2nd). Investigating the source of the cache/log rotation issue.
+  - Filtration: Advanced log filtering (priority-based) is planned but not yet deployed.
+
+### Progress:
+  - The bot is now "AI-aware" and secure.
+  - Core communication channel with Gemini is stable and functional.
+
+### Next steps:
+  - Debug the /logs command to ensure real-time data fetching.
+  - Fix permission issues for the /addclient module to allow key generation and config writing.
+  - Implement granular log filtering (-p flags).
 
 ---
 
