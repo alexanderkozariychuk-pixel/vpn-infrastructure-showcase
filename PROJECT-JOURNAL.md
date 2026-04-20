@@ -436,6 +436,32 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 
 ---
 
+## [2026-04-20] — Phase: Monitoring & AI Integration
+
+### 🛠 Done Today:
+- **Telegram Bot Core:** Re-engineered the bot to work with AmneziaWG (AWG). 
+- **Infrastructure:**
+    - Integrated `subprocess` calls for `awg show`, `journalctl`, and `dmesg`.
+    - Implemented a secure authentication filter (LDAP-style ID check) to prevent unauthorized access.
+- **Async Transformation:** - Moved all blocking system calls and AI requests to `asyncio.run_in_executor`. 
+    - This fixed the "Timed out" issues and `409 Conflict` errors by keeping the Telegram event loop alive.
+- **Peer Management:** Added functionality to add/delete clients directly from the Telegram UI (including automatic config generation for the client).
+- **Project Structure:** Migrated the codebase from `Downloads` to the official repository path: `monitoring/ai-bot-monitoring/`. Sanitized all sensitive API keys and tokens.
+
+### 🧠 AI Analysis Progress:
+- Configured **Gemini 3 Flash** as the primary diagnostic engine.
+- Implemented a "Fallback" mechanism: if the AI times out, the bot now sends raw system logs instead of an error message.
+- Tested connectivity; server-side access to Google API confirmed (HTTP 200/404).
+
+### 📋 Plans for Tomorrow (2026-04-21):
+- **AI Debugging:** Solve the `models/gemini-3-flash-preview` 404/Timeout issue (test `gemini-2.0-flash-exp` or `gemini-1.5-flash-latest`).
+- **UI/UX Polishing:**
+    - Implement Inline Buttons for the client list (one-click deletion).
+    - Add "Analysis" button to the main persistent menu.
+- **Cleanup:** - Refactor `analyze_logs_command` with a more robust prompt.
+    - Final code linting and removal of redundant debug prints.
+- **Documentation:** Create a comprehensive `README.md` for the bot sub-project (environment variables, sudoers permissions, etc.).
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
