@@ -453,14 +453,30 @@ Terraform/Python integration for Aeza has been postponed until tomorrow. The foc
 - Implemented a "Fallback" mechanism: if the AI times out, the bot now sends raw system logs instead of an error message.
 - Tested connectivity; server-side access to Google API confirmed (HTTP 200/404).
 
-### 📋 Plans for Tomorrow (2026-04-21):
-- **AI Debugging:** Solve the `models/gemini-3-flash-preview` 404/Timeout issue (test `gemini-2.0-flash-exp` or `gemini-1.5-flash-latest`).
-- **UI/UX Polishing:**
-    - Implement Inline Buttons for the client list (one-click deletion).
-    - Add "Analysis" button to the main persistent menu.
-- **Cleanup:** - Refactor `analyze_logs_command` with a more robust prompt.
-    - Final code linting and removal of redundant debug prints.
-- **Documentation:** Create a comprehensive `README.md` for the bot sub-project (environment variables, sudoers permissions, etc.).
+---
+
+## 2026-04-21
+
+### 🛠 Done Today
+
+#### AI Bot Monitoring — Refactoring
+Started splitting monolithic `main.py` into a modular structure:
+
+- `config.py` — centralized configuration via environment variables
+- `utils/telegram.py` — auth filter and long message helper
+- `services/wireguard.py` — all AWG logic (parse, add/remove peer, key generation)
+- `services/gemini.py` — Gemini API wrapper with prompt templates
+
+Goal: make the bot easier to extend and maintain
+as the infrastructure scales from 1 to 30 nodes.
+
+### 📋 Plans for Tomorrow (2026-04-22)
+
+- Create `handlers/` (status, clients, ai, system)
+- Refactor `main.py` — registration only
+- Test the refactored bot end-to-end
+
+---
 
 ## Long-term Plans
 
