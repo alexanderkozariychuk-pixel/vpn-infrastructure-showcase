@@ -309,3 +309,26 @@ def restart_wireguard() -> bool:
     except Exception as e:
         logger.error("restart_wireguard failed: %s", e)
         return False
+
+def get_awg_params() -> dict | None:
+    """
+    Read AmneziaWG obfuscation parameters from awg0.conf
+    Returns dict with Jc, Jmin, Jmax, S1, S2, H1-H4 or None on failure.
+    """
+    try:
+        result = subprocess.run(
+            ["sudo", "cat", AWG_CONF_PATH],
+            capture_output=True, text=True, check=True,
+        )
+        params ={}
+        for line in result.stdout.splitlines():
+            if "=" in line:
+                key, _, value = line,partition("=")
+                key = key.strip()
+                if key in ["Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4"]:
+                    params[key] = value.strip()
+        return params if params else None
+
+    except Exception as e:
+        logger.error("get_awg_params failed: %s", e)
+        return None

@@ -6,7 +6,8 @@ import asyncio
 import logging
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
@@ -44,7 +45,7 @@ Assistant:"""
 # Initialization
 # ----------------------------------------------------------------------
 
-_model: Optional[genai.GenerativeModel] = None
+client: Optional[genai.Client] = None
 
 
 def init() -> None:
@@ -52,17 +53,16 @@ def init() -> None:
     Initialize Gemini. Called once at startup from main.py.
     Raises on missing API key.
     """
-    global _model
+    global client
     if not GEMINI_API_KEY:
         raise EnvironmentError("GEMINI_API_KEY is not set")
 
-    genai.configure(api_key=GEMINI_API_KEY)
-    _model = genai.GenerativeModel(GEMINI_MODEL)
+    client = genai.Client(api_key=GEMINI_API_KEY)
     logger.info("Gemini initialized | model=%s", GEMINI_MODEL)
 
 
-def _get_model() -> genai.GenerativeModel:
-    if _model is None:
+def _get_model() -> genai.Client:
+    if client is None:
         raise RuntimeError("Gemini is not initialized. Call init() first.")
     return _model
 
@@ -81,19 +81,20 @@ async def _generate(
     Run Gemini generation in a thread pool (SDK is synchronous).
     Returns the response text or an error message.
     """
-    model = _get_model()
+    c = _get_client()
     loop = asyncio.get_event_loop()
 
     try:
         response = await asyncio.wait_for(
             loop.run_in_executor(
                 None,
-                lambda: model.generate_content(
-                    prompt,
-                    generation_config={
-                        "max_output_tokens": max_tokens,
-                        "temperature": temperature,
-                    },
+                lambda: c.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents = prompt,
+                    config=types.GenerateConfig(
+                        max_output_tokens=max_tokens,
+                        temperature=temperature,
+                    ),
                 ),
             ),
             timeout=timeout,
