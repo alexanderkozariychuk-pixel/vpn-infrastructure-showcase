@@ -500,6 +500,32 @@ Finished splitting monolithic `main.py` into a modular structure:
 
 ---
 
+## 2026-04-23
+
+### 🛠 Done Today
+
+#### AI Bot Monitoring - Manual import verification
+
+- Created `__init.py__` for `services/`, `handlers/`, `utils/`
+- Installed dependencies in venv: 
+  `python-telegram-bot`, `google-genai`, `python-dotenv`, `aiohttp`
+- Ran import checks module by module, fixed two issues found:
+  -`get_awg_params()` was missing from `services/wireguard.py`
+  - Migrated Gemini SDK: `google-generativeai`—> `google-genai`
+    (new Client-based API, model name without 'models/' prefix)
+- Started writting CI/CD lint workflow for bot (`bot-lint.yml`)
+
+#### Result
+All modules import successfully:
+`config`, `utils`, `wireguard`, `gemini`, `handlers.*`, `main`
+
+### 📋 Plans for Tomorrow (2026-04-24)
+- Finish and push `bot-lint.yml` GitHub Actions workflow
+- Run bot live on server, test all commands end-to-end
+- Fix any runtime errors found during live test
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
