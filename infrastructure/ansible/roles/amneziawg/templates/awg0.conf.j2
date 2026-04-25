@@ -2,50 +2,28 @@
 Address = {{ awg_address }}
 ListenPort = {{ awg_listen_port | default(443) }}
 PrivateKey = {{ awg_private_key }}
-
-{% if awg_post_up is defined %}
-PostUp = {{ awg_post_up }}
-{% endif %}
-{% if awg_post_down is defined %}
-PostDown = {{ awg_post_down }}
-{% endif %}
-
-# Obfuscation parameters
-{% if awg_jc is defined %}
+{% for rule in awg_post_up | default([]) %}
+PostUp = {{ rule }}
+{% endfor %}
+{% for rule in awg_post_down | default([]) %}
+PostDown = {{ rule }}
+{% endfor %}
 Jc = {{ awg_jc }}
-{% endif %}
-{% if awg_jmin is defined %}
 Jmin = {{ awg_jmin }}
-{% endif %}
-{% if awg_jmax is defined %}
 Jmax = {{ awg_jmax }}
-{% endif %}
-{% if awg_s1 is defined %}
 S1 = {{ awg_s1 }}
-{% endif %}
-{% if awg_s2 is defined %}
 S2 = {{ awg_s2 }}
-{% endif %}
-{% if awg_h1 is defined %}
 H1 = {{ awg_h1 }}
-{% endif %}
-{% if awg_h2 is defined %}
 H2 = {{ awg_h2 }}
-{% endif %}
-{% if awg_h3 is defined %}
 H3 = {{ awg_h3 }}
-{% endif %}
-{% if awg_h4 is defined %}
 H4 = {{ awg_h4 }}
-{% endif %}
-
 {% for peer in awg_peers %}
+
+### Client {{ peer.name }}
 [Peer]
 PublicKey = {{ peer.public_key }}
+PresharedKey = {{ peer.preshared_key }}
 AllowedIPs = {{ peer.allowed_ips }}
-{% if peer.endpoint is defined %}
-Endpoint = {{ peer.endpoint }}
-{% endif %}
 {% if peer.persistent_keepalive is defined %}
 PersistentKeepalive = {{ peer.persistent_keepalive }}
 {% endif %}

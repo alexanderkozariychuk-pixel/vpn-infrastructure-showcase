@@ -1,0 +1,60 @@
+// infrastructure/ansible/roles/exit-node/templates/config.json.j2
+{
+  "log": {
+    "loglevel": "{{ xray_log_level }}"
+  },
+  "inbounds": [
+    {
+      "tag": "moldova-in",
+      "port": {{ xray_inbound_port }},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "{{ client_uuid }}",
+            "flow": "xtls-rprx-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "dest": "{{ xray_dest }}",
+          "serverNames": ["{{ xray_server_name }}"],
+          "privateKey": "{{ reality_private_key }}",
+          "shortIds": ["{{ xray_short_id }}"],
+          "fingerprint": "{{ xray_fingerprint }}"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "block",
+        "ip": ["geoip:private"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "network": "tcp,udp"
+      }
+    ]
+  }
+}

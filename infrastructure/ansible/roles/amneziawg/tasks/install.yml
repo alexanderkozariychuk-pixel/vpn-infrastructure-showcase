@@ -1,31 +1,35 @@
 ---
-- name: Download AmneziaWG install script
-  get_url:
-    url: https://raw.githubusercontent.com/Varckin/amneziawg-install/main/amneziawg-install.sh
-    dest: /tmp/amneziawg-install.sh
-    mode: 0755
+- name: Install dependencies for PPA
+  apt:
+    name: 
+      - software-properties-common
+      - python3-launchpadlib
+    state: present
 
-- name: Install AmneziaWG (non-interactive using expect)
-  expect:
-    command: /tmp/amneziawg-install.sh
-    responses:
-      'Public IPv4 or IPv6 address or domain:': "{{ ansible_default_ipv4.address }}"
-      'Public interface:': "{{ ansible_default_ipv4.interface }}"
-      'AmneziaWG interface name:': "awg0"
-      'Server AmneziaWG IPv4:': "{{ awg_server_ip | default('10.66.66.1/24') }}"
-      'Server AmneziaWG port [1-65535]:': "{{ awg_listen_port | default(443) }}"
-      'First DNS resolver to use for the clients:': '1.1.1.1'
-      'Second DNS resolver to use for the clients (optional):': '1.0.0.1'
-      'Allowed IPs list for generated clients (leave default to route everything):': '0.0.0.0/0,::/0'
-      'Server AmneziaWG Jc [1-128]:': "{{ awg_jc | default(4) }}"
-      'Server AmneziaWG Jmin [1-1280]:': "{{ awg_jmin | default(50) }}"
-      'Server AmneziaWG Jmax [1-1280]:': "{{ awg_jmax | default(1000) }}"
-      'Server AmneziaWG S1 [15-150]:': "{{ awg_s1 | default(113) }}"
-      'Server AmneziaWG S2 [15-150]:': "{{ awg_s2 | default(129) }}"
-      'Server AmneziaWG H1 [5-2147483647]:': "{{ awg_h1 | default(2084167604) }}"
-      'Server AmneziaWG H2 [5-2147483647]:': "{{ awg_h2 | default(496352973) }}"
-      'Server AmneziaWG H3 [5-2147483647]:': "{{ awg_h3 | default(523868278) }}"
-      'Server AmneziaWG H4 [5-2147483647]:': "{{ awg_h4 | default(1364490158) }}"
-      'Do you want to add a new client?': 'n'
-    timeout: 300
-  when: awg_install | default(true)
+- name: Preseed iptables-persistent answers
+  debconf:
+    name: iptables-persistent
+    question: "{{ item }}"
+    value: 'true'
+    vtype: 'boolean'
+  loop:
+    - iptables-persistent/autosave_v4
+    - iptables-persistent/autosave_v6
+
+- name: Install iptables-persistent
+  apt:
+    name: iptables-persistent
+    state: present
+
+- name: Add AmneziaWG PPA
+  apt_repository:
+    repo: 'ppa:amnezia/ppa'
+    state: present
+
+- name: Install AmneziaWG packages
+  apt:
+    name:
+      - amneziawg
+      - amneziawg-tools
+    state: present
+    update_cache: yes

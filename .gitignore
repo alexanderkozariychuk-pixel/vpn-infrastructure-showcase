@@ -75,7 +75,14 @@ credentials/
 *.tmp
 
 # =============================================
-Terraform Backend
+#Terraform Backend
 # =============================================
 infrastructure/yc-backend-setup/
 sa-key.json
+
+# =============================================
+#Infrastructure 
+infrastructure/ansible/inventory/hosts.ini
+infrastructure/ansible/group_vars/entry.yml
+infrastructure/ansible/group_vars/bulgaria.yml
+# =============================================

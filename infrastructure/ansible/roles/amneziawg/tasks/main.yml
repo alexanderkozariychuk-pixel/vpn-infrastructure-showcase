@@ -6,7 +6,7 @@
 - name: Generate private and public keys if not provided
   block:
     - name: Generate a new private key
-      shell: wg genkey
+      shell: awg genkey
       register: generated_private_key
       when: awg_private_key is not defined or awg_private_key == ""
 
@@ -16,7 +16,7 @@
       when: awg_private_key is not defined or awg_private_key == ""
 
     - name: Generate public key from the private key
-      shell: echo "{{ awg_private_key }}" | wg pubkey
+      shell: echo "{{ awg_private_key }}" | awg pubkey
       register: generated_public_key
       when: awg_public_key is not defined or awg_public_key == ""
 
@@ -30,15 +30,15 @@
 
 - name: Create AmneziaWG config directory
   file:
-    path: /etc/amneziawg
+    path: /etc/amnezia/amneziawg
     state: directory
-    mode: 0755
+    mode: 0700
 
 - name: Deploy awg0.conf from template
   template:
     src: awg0.conf.j2
-    dest: /etc/amneziawg/awg0.conf
-    mode: 0644
+    dest: /etc/amnezia/amneziawg/awg0.conf
+    mode: 0600
   notify: restart awg
 
 - name: Enable IP forwarding

@@ -1,0 +1,9 @@
+---
+- name: Deploy Bulgaria Exit Node
+  hosts: bulgaria
+  become: yes
+  gather_facts: yes
+  roles:
+    - common
+    - exit-node
+    - monitoring

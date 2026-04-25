@@ -1,0 +1,6 @@
+monitoring_dir: /opt/monitoring
+grafana_port: 3000
+prometheus_port: 9090
+loki_port: 3100
+grafana_admin_password: "changeme"
+prometheus_retention: "30d"

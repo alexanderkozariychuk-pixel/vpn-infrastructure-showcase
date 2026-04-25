@@ -118,3 +118,45 @@ jobs:
 
       - name: Ruff check (Python scripts)
         run: ruff check scripts/ --output-format=github
+
+      #------------------------------
+      # AIBot-Monitoring
+      #------------------------------
+      - name: Bot - import check
+        on:
+          push:
+            paths:
+              -'monitoring/ai-bot-monitoring/**'
+            pull_request:
+              paths:
+                -'monitoring/ai-bot-monitoring/**'
+        jobs:
+          verify:
+            runs-on: ubuntu-latest
+            defaults:
+              run:
+                working-directory: monitoring/ai-bot-monitoring
+            
+            steps:
+              - uses: actions/checkout@v4
+
+              - uses: actions/setup-python@v5
+                with:
+                  python-version: '3.12'
+
+              - name: Install dependencies
+                run: |
+                  pip install\
+                    python-telegram-bot\
+                    google-genai\
+                    python-dotenv\
+                    aiohttp
+                  
+              - name: Check imports
+                env:
+                  TELEGRAM_BOT_TOKEN: "dummy"
+                  ALLOWED_USER-ID:"123"
+                  GEMINI_API_KEY:"dummy"
+                run: |
+                  python -c "
+        
