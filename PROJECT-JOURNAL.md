@@ -526,6 +526,39 @@ All modules import successfully:
 
 ---
 
+## 2026-04-24
+
+### 🛠 Done Today
+
+#### VPN Infrastructure: Upgrade Attempt & "Dirty IP" Discovery
+
+- **Server Provisioning (Upgrade Attempt):** - Accessed and verified the new high-performance VPS in Moldova (**2 Core, 2 GB RAM**). This was intended to replace the aging Moldova (1/1) node which is currently operating at peak capacity.
+- **Ansible Automation & Deployment:**
+  - Fully automated the deployment of `common` and `amneziawg` roles on the new 2/2 node.
+  - Successfully resolved environment-specific issues (UFW port syntax, PPA integration, and configuration paths).
+- **Network Diagnostics (DPI Interference):**
+  - **Finding:** Connectivity tests confirmed that the new 2/2 server's IP address is flagged by **DPI (Deep Packet Inspection)** filters and resides in a "dirty" IP range.
+  - **Observation:** Despite a perfect software configuration, the IP itself is blocked/throttled at the ISP level, making it unusable as a direct entry point for clients.
+- **Current Status:**
+  - The new 2/2 node is technically configured but network-restricted.
+  - The "old" stable Moldova node (1/1) remains the sole operational gateway to ensure 16+ clients maintain internet access.
+
+### 📋 Plans for Tomorrow (2026-04-25)
+
+- **Infrastructure Life-Impact Corrective:**
+  - Renew the "old" Moldova (1/1) subscription for another month. It serves as a "safe harbor" while the 2/2 node issue is resolved.
+- **Architecture Shift (Relocation to Bulgaria):**
+  - Initiate a location swap for the 2/2 VPS: migrating from the restricted Moldova range to a new **Bulgaria** location.
+  - Configure the future Bulgaria (2/2) node strictly as an **Exit Node**.
+- **Load Distribution Strategy:**
+  - Transition the old Moldova (1/1) node to an **Entry (Relay)** role.
+  - This shift will offload NAT and heavy traffic processing to the Bulgaria Exit node, significantly reducing CPU/RAM stress on the Moldova Entry node.
+- **Ansible Refactoring:**
+  - Add `NOPASSWD` for `vpnadmin` in `sudoers.d` to streamline further automated tasks.
+  - Finalize and run the bulk client generation playbook (16 unique configs).
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
