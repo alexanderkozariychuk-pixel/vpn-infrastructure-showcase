@@ -543,19 +543,34 @@ All modules import successfully:
   - The new 2/2 node is technically configured but network-restricted.
   - The "old" stable Moldova node (1/1) remains the sole operational gateway to ensure 16+ clients maintain internet access.
 
-### 📋 Plans for Tomorrow (2026-04-25)
+---
 
-- **Infrastructure Life-Impact Corrective:**
-  - Renew the "old" Moldova (1/1) subscription for another month. It serves as a "safe harbor" while the 2/2 node issue is resolved.
-- **Architecture Shift (Relocation to Bulgaria):**
-  - Initiate a location swap for the 2/2 VPS: migrating from the restricted Moldova range to a new **Bulgaria** location.
-  - Configure the future Bulgaria (2/2) node strictly as an **Exit Node**.
-- **Load Distribution Strategy:**
-  - Transition the old Moldova (1/1) node to an **Entry (Relay)** role.
-  - This shift will offload NAT and heavy traffic processing to the Bulgaria Exit node, significantly reducing CPU/RAM stress on the Moldova Entry node.
-- **Ansible Refactoring:**
-  - Add `NOPASSWD` for `vpnadmin` in `sudoers.d` to streamline further automated tasks.
-  - Finalize and run the bulk client generation playbook (16 unique configs).
+## 2026-04-25
+
+### 🛠 Done Today
+
+#### Infrastructure — Bulgaria Exit Node preparation
+
+- Designed two-hop architecture:
+  Clients → Moldova (AWG Entry) → Bulgaria (Xray Exit) → Internet
+- Created Ansible role exit-node:
+  - Xray VLESS/Reality inbound (accepts from Moldova)
+  - Freedom outbound (direct to internet)
+  - Saves Reality keys + UUID to /etc/xray-credentials.txt
+- Created Ansible role monitoring:
+  - Prometheus + Loki + Grafana + node-exporter via Docker Compose
+  - Prometheus scrapes Bulgaria and Moldova nodes
+  - Loki receives logs from all nodes via Promtail
+- Created playbooks/deploy-bulgaria.yml
+- Created group_vars/bulgaria.yml.example
+
+**Security**
+- Caught hosts.ini and entry.yml before push — added to .gitignore
+- Removed both files from git tracking via git rm --cached
+
+### 📋 Plans for Tomorrow (2026-04-26)
+
+- Write Promtail role
 
 ---
 
@@ -566,6 +581,4 @@ All modules import successfully:
 - Complete automation of deployment and configuration processes
 - Migrate monitoring stack to a dedicated VPS in the Netherlands
 - Implement automatic failover using residential proxy pool
-- Develop custom Prometheus exporter for AmneziaWG metrics
-- Achieve full GitOps workflow for the infrastructure
 - Prepare detailed portfolio materials for Junior DevOps / Linux SysAdmin positions
