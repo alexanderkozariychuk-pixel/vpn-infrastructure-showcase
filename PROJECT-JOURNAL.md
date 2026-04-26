@@ -574,6 +574,41 @@ All modules import successfully:
 
 ---
 
+## 2026-04-26
+
+### 🛠 Done Today
+
+#### Infrastructure — Bulgaria Exit Node deployed
+
+- Received Bulgaria server (2GB/2Core), deployed via Ansible in one command
+- Fixed critical issue: group_vars not picked up by Ansible —
+  moved to inventory/group_vars/ (Ansible looks relative to inventory)
+- Fixed role common: added NOPASSWD sudo for new_user via sudoers.d
+- Bulgaria stack running: Xray + Prometheus + Loki + Grafana + node-exporter
+
+#### Moldova → Bulgaria tunnel
+
+- Established WireGuard tunnel between Moldova and Bulgaria (wg1)
+- Both servers see each other, packets confirmed via tcpdump
+- Attempted policy routing for client subnet 10.66.66.0/24 → failed
+  Clients lost internet — asymmetric routing issue on Bulgaria NAT
+- Rolled back to stable state — old Moldova VPN working, 15 clients online
+- Xray relay abandoned on Moldova — wrong tool, too complex for this use case
+
+#### Key decisions
+- WireGuard tunnel is the right approach for Moldova → Bulgaria
+- Need to fix NAT on Bulgaria for 10.66.66.0/24 subnet before retry
+- Will test on single client before touching production routing
+
+### 📋 Plans for Tomorrow (2026-04-27)
+
+- Debug NAT on Bulgaria for client subnet 10.66.66.0/24
+- Test routing on single client first (workstation config)
+- Fix ip rule / ip route configuration on Moldova
+- Verify end-to-end: client → Moldova → Bulgaria → internet
+- Push working wg1 configs to Ansible roles
+- Update client configs if Bulgaria IP becomes exit point
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
