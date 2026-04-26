@@ -1,0 +1,7 @@
+---
+- name: Deploy Xray relay on Moldova Entry Node
+  hosts: entry
+  become: yes
+  gather_facts: yes
+  roles:
+    - xray-relay

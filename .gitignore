@@ -85,4 +85,6 @@ sa-key.json
 infrastructure/ansible/inventory/hosts.ini
 infrastructure/ansible/group_vars/entry.yml
 infrastructure/ansible/group_vars/bulgaria.yml
-# =============================================
+# =============================================infrastructure/ansible/inventory/group_vars/
+infrastructure/ansible/group_vars/exit.yml
+infrastructure/ansible/group_vars/entry.yml

@@ -1,0 +1,58 @@
+# Common
+new_user: vpnadmin
+ssh_public_key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+# UFW
+ufw_allowed_ports:
+  - "22/tcp"
+  - "443/udp"
+
+# AmneziaWG
+awg_install: true
+awg_generate_keys: true
+awg_interface: awg0
+awg_address: "10.66.66.1/24,fd42:42:42::1/64"
+awg_listen_port: 443
+awg_enable_nat: true
+
+# Obfuscation parameters 
+awg_jc: 4
+awg_jmin: 50
+awg_jmax: 1000
+awg_s1: 113
+awg_s2: 129
+awg_h1: 2084167604
+awg_h2: 496352973
+awg_h3: 523868278
+awg_h4: 1364490158
+
+# Network interface
+awg_interface_name: ens3
+
+# PostUp/PostDown
+awg_post_up:
+  - "iptables -I INPUT -p udp --dport 443 -j ACCEPT"
+  - "iptables -I FORWARD -i ens3 -o awg0 -j ACCEPT"
+  - "iptables -I FORWARD -i awg0 -j ACCEPT"
+  - "iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE"
+  - "ip6tables -I INPUT -p udp --dport 443 -j ACCEPT"
+  - "ip6tables -I FORWARD -i ens3 -o awg0 -j ACCEPT"
+  - "ip6tables -I FORWARD -i awg0 -j ACCEPT"
+  - "ip6tables -t nat -A POSTROUTING -o ens3 -j MASQUERADE"
+awg_post_down:
+  - "iptables -D INPUT -p udp --dport 443 -j ACCEPT"
+  - "iptables -D FORWARD -i ens3 -o awg0 -j ACCEPT"
+  - "iptables -D FORWARD -i awg0 -j ACCEPT"
+  - "iptables -t nat -D POSTROUTING -o ens3 -j MASQUERADE"
+  - "ip6tables -D INPUT -p udp --dport 443 -j ACCEPT"
+  - "ip6tables -D FORWARD -i ens3 -o awg0 -j ACCEPT"
+  - "ip6tables -D FORWARD -i awg0 -j ACCEPT"
+  - "ip6tables -t nat -D POSTROUTING -o ens3 -j MASQUERADE"
+
+awg_peers: []
+
+# Xray relay → Bulgaria
+moldova_entry_ip: "185.237.223.94"
+moldova_entry_uuid: "5e246cfa-b30f-4a26-bf50-fef57666e3c4"
+moldova_entry_public_key: "n8x1wt_rt7IdjzmvvwxPgckqDpa5MAW8sginz8DwsV8"
+moldova_entry_short_id: "6ba85179e30d4fc2"

@@ -31,6 +31,13 @@
     key: "{{ ssh_public_key }}"
     state: present
 
+- name: Grant passwordless sudo to new user
+  copy:
+    content: "{{ new_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    dest: "/etc/sudoers.d/{{ new_user }}"
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
 - name: Disable root login via SSH
   lineinfile:
     path: /etc/ssh/sshd_config

@@ -1,6 +1,6 @@
 ---
 - name: Deploy Bulgaria Exit Node
-  hosts: bulgaria
+  hosts: exit
   become: yes
   gather_facts: yes
   roles:
