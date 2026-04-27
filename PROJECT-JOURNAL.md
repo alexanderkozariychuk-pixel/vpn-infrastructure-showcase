@@ -609,6 +609,37 @@ All modules import successfully:
 - Push working wg1 configs to Ansible roles
 - Update client configs if Bulgaria IP becomes exit point
 
+---
+
+## 2026-04-27
+
+### 🛠 Done Today
+
+#### Infrastructure — Exit Node Migration & Pivot to Proxy
+- **Cleanup & Reset:** Completely purged legacy traces of the failed dual-WireGuard experiments. This included removing `wg0/wg1` interfaces, routing tables `100/200`, and cascading `ip rule` entries. Process fully automated via an Ansible cleanup playbook.
+- **Bulgaria Exit Node:** Deployed `shadowsocks-rust` (server) as the new, high-performance egress point. Port opened for both TCP/UDP; functionality verified.
+- **Moldova Entry Node:** Implemented a **Transparent Proxying** architecture. Installed `shadowsocks-libev` (client) and `tun2socks` to bridge the L3/L4 gap.
+- **MTU/Fragmentation Fix:** Resolved the "ping works, browser fails" bottleneck by pivoting from an L3 tunnel (WireGuard) to an L4 stream (Shadowsocks). This eliminated the MTU overhead and encapsulation conflicts that were dropping large TCP packets.
+
+#### Routing & Testing
+- **Policy Based Routing (PBR):** Initialized a virtual `tun0` interface. Successfully routed specific traffic through this interface using a dedicated routing table.
+- **Isolated Testing:** Enabled the Bulgarian route **for a single test client only** to prevent service disruption for the other 15 active users on the Moldova node.
+- **Success Criteria:** Confirmed end-to-end connectivity from the workstation. The client now exits to the internet via the Bulgarian node with stable page loading and expected latency.
+
+#### Key Decisions
+- **L3 → L4 Pivot:** Adopted `tun2socks` as the primary transport mechanism between nodes. This sidesteps the "VPN-inside-VPN" MTU issues by re-streaming traffic rather than re-encapsulating raw packets.
+- **Persistence:** Routing rules were temporarily committed to `rc.local` on the Moldova node to ensure survival across reboots during the final testing phase before full Ansible role integration.
+
+### 📋 Plans for Tomorrow (2026-04-28)
+
+- **Stability Marathon:** 12-hour monitoring of the current connection to check for packet drops or memory leaks in the `tun2socks` user-space process.
+- **Mobile Network Test:** Verify the tunnel's resilience over cellular networks, where carrier-grade DPI and varying MTU values often cause instability.
+- **Global Rollout:** Upon successful testing, expand the `ip rule` mask via Ansible to transition all clients to the Bulgarian exit point.
+- **Observability:** Integrate `shadowsocks` and `tun2socks` metrics into the existing Grafana dashboard on the Exit Node.
+- **Documentation:** Finalize traffic flow diagrams in the PROJECT-JOURNAL to reflect the new hybrid L3/L4 architecture.
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
