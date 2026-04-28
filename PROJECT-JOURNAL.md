@@ -640,6 +640,43 @@ All modules import successfully:
 
 ---
 
+## 2026-04-28
+
+### 🛠 Done Today
+
+#### Infrastructure — IPIP Tunnel Moldova → Bulgaria (Production)
+
+**Architecture Pivot**
+* **Abandoned WireGuard Site-to-Site**: Double UDP encapsulation caused MTU fragmentation, leading to instability on mobile devices (iOS/Android).
+* **Abandoned tun2socks + Shadowsocks**: Eliminated excessive encapsulation and user-space overhead that hampered mobile performance.
+* **Final Solution**: IPIP tunnel (kernel-space, 20-byte overhead).
+  Moldova (10.0.0.1) ↔ Bulgaria (10.0.0.2).
+
+**Debugging & Fixes**
+* **Resolved Routing Conflict**: Identified that the client subnet `10.66.66.0/24` on the Bulgaria node was incorrectly bound to the `wg0` interface.
+* **Fixed Return Route**: Configured the correct route: `10.66.66.0/24 via 10.0.0.1 dev ipip0` to ensure traffic returns to Moldova.
+* **Firewall Configuration**: Added explicit `FORWARD` rules for the `ipip0` interface on the Bulgaria node.
+* **TCP Optimization**: Applied `TCPMSS --clamp-mss-to-pmtu` to automatically adjust segment sizes for the tunnel capacity.
+
+**Verification**
+* **Android Client**: Full internet connectivity confirmed.
+* **Speed Test**: ~33 Mbit/s — stable performance for the current setup.
+* **Security Audit**: Confirmed `UFW DEFAULT_FORWARD_POLICY=ACCEPT` is active and stable.
+
+**Moldova Node Cleanup**
+* **Service Optimization**: Stopped and disabled `tun2socks`, `ss-local`, and `shadowsocks-libev`.
+* **AWG Status**: Remains operational as the entry point; achieved zero downtime for users during the migration.
+
+### 📋 Plans for Tomorrow (2026-04-29)
+
+* **iOS Integration**: Add one test iOS client to verify tunnel stability and MTU compatibility.
+* **Stability Stress-Test**: Perform long-term connectivity checks (MTR/Latency) from mobile clients.
+* **SRE Stack Deployment (v2.0)**: Deploy advanced monitoring (Prometheus/Grafana/VictoriaMetrics) on the Bulgaria Exit Node, integrated with the AI Monitoring bot.
+* **Entry Node Optimization**: Decommission legacy monitoring services on the Moldova node to minimize CPU/RAM overhead, leaving only lightweight metric exporters.
+
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
