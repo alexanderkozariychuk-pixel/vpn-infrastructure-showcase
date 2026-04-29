@@ -674,6 +674,35 @@ All modules import successfully:
 * **SRE Stack Deployment (v2.0)**: Deploy advanced monitoring (Prometheus/Grafana/VictoriaMetrics) on the Bulgaria Exit Node, integrated with the AI Monitoring bot.
 * **Entry Node Optimization**: Decommission legacy monitoring services on the Moldova node to minimize CPU/RAM overhead, leaving only lightweight metric exporters.
 
+---
+
+## 2026-04-29
+
+### Done Today
+
+#### Infrastructure - AI Monitoring and SRE Stack (v2.0 Deployment)
+
+**Architecture Pivot**
+* Containerization (Docker): Successfully migrated the monitoring bot from a manual Python script to a Docker-based architecture. This ensures dependency isolation and environment consistency across different hosts.
+* Artifact-Based Deployment: Adopted the SRE workflow of local builds and remote deployment (Build -> Save -> SCP -> Load). The bot is now a portable artifact, independent of the host system Python version.
+
+**Debugging and Environment Stabilization**
+* Resource Audit (Workstation): Used the bot to identify abnormal load on the local Pop OS environment (Load Average 1.9, Swap > 4GB). Closing background processes and browser tabs recovered 3GB of RAM.
+* Bulgaria Exit Node Deployment: Successfully launched the bot container in Bulgaria. Observed near-perfect baseline metrics: Load Average 0.08 and RAM sage 300MB.
+* Dependency Resolution: Identified a missing aiohttp module within the containerized environment. Mapped the fix for the next build cycle.
+
+**Current Deployment State**
+* Docker Networking: Container running with --network host to ensure visibility of the awg0 interface and the local network stack.
+* Volume Mapping: Implemented volume passthrough for /var/log and /run/systemd/journal to allow the bot to access host logs (pending permission finalization).
+
+### 📋 Plans for Tomorrow (2026-04-30)
+
+* iOS Integration (Priority 1): Add and test the first iOS client. Verify IPIP tunnel stability and MTU compatibility for Apple mobile devices.
+* Bot and Image Refinement: 
+    - Update Dockerfile to include the systemd package to resolve the journalctl missing command issue.
+    - Rebuild and redeploy the image with aiohttp and necessary system utilities.
+* Permission Elevation: Configure sudoers on the Bulgaria node to allow the vpnadmin user (via the container) to execute awg and journalctl without a password.
+* Interactive Fixes: Begin implementing the Human-in-the-loop feature—adding Telegram buttons for one-click VPN interface restarts.
 
 ---
 
