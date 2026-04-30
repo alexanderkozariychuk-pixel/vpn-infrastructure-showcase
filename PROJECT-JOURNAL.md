@@ -706,6 +706,37 @@ All modules import successfully:
 
 ---
 
+## 2026-04-30
+
+### Done Today
+
+#### Infrastructure — AI Monitoring and SRE Stack (v3.0 Stability & Refactoring)
+
+**Architecture Refactoring**
+- Decoupling Logic: Fully separated data extraction (SSH/Parsing in `net_manager.py`) from presentation (UI/Formatting in `status.py`). Eliminated architectural confusion and simplified future scaling.
+- Data Modeling: Introduced `PeerStatus` dataclass for typed AmneziaWG data, ensuring stable object passing between modules.
+- Centralized SSH Logic: Unified all remote calls to the Moldova node. Added timeout protection and proper error handling to prevent bot freezes on network issues.
+
+**Debugging and Environment Stabilization**
+- Async Resolution: Fixed critical `TypeError` and `NameError` in async handlers. Heavy system calls now correctly run via `run_in_executor` without blocking the main thread.
+- Syntax & Import Fixes: Resolved f-string syntax errors and circular imports. Bot successfully passes initialization and responds in Telegram.
+- LLM Integration: Connected and tested Gemini-2.0-Flash engine via OpenRouter. Bot is ready for autonomous log and metric analysis.
+
+**Current State**
+- Local MVP: Bot is fully operational in local Pop!_OS environment.
+  Basic monitoring of `awg0` interface and remote Moldova node polling are implemented.
+- Security: All sensitive data (IPs, tokens, SSH keys) moved to environment variables (`.env`) with startup validation.
+
+### 📋 Plans for Tomorrow (2026-05-01)
+
+- System Health Module (Priority 1): Add CPU load, swap, and disk space monitoring for both nodes (Bulgaria & Moldova). Implement metric visualization in Telegram.
+- IPIP Migration: Switch two clients to `ipip0` tunnel. Set up RX/TX packet monitoring to verify traffic flow.
+- Dockerization & Deployment: Build final bot image and deploy it as a container on Bulgaria server for permanent operation.
+- Operational Monitoring: Final stability testing of the link and AI-agent behavior under real load after client migration.
+
+---
+
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
