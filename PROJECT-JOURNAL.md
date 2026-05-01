@@ -735,7 +735,34 @@ All modules import successfully:
 - Operational Monitoring: Final stability testing of the link and AI-agent behavior under real load after client migration.
 
 ---
+## 2026-05-01
 
+### Done Today
+
+#### Infrastructure — Dockerization and SRE Deployment (Production Readiness)
+
+**Architecture & Container Stabilization**
+- Docker Deployment: Successfully built and deployed the `vpn-bot:latest` container to the Bulgaria exit node for permanent operation.
+- Base Image Optimization: Updated the `Dockerfile` to include essential system tools (`procps`, `systemd`, `iproute2`), resolving critical missing command errors (`uptime`, `journalctl`) within the `python:3.12-slim` environment.
+- Log Passthrough: Configured volume mounts in `docker-compose.yml` (`/var/log/journal`) to expose host system logs directly to the AI analysis module.
+
+**Debugging and Privilege Escalation Fixes**
+- Sudo Dependency Elimination: Completely refactored `net_manager.py` and `ai.py` to remove `sudo` calls. Commands now execute natively under the container's root user, resolving `[Errno 2] No such file or directory: 'sudo'` crashes.
+- Network Permissions: Added `privileged: true` and `network_mode: "host"` to the Docker Compose configuration. This resolved the `RTNETLINK answers: Operation not permitted` error, granting the bot full management rights over the `ipip0` and `awg0` interfaces.
+- System Health Resolution: Fixed the "N/A" data parsing issue. The bot now successfully collects and visualizes CPU load, RAM, Swap, and Disk metrics for the local Bulgarian node.
+
+**Current State**
+- Production MVP: The monitoring bot is fully operational directly on the Bulgarian server.
+- Link Stability: The IPIP tunnel between Bulgaria and Moldova is active, monitored, and currently reporting 0% packet loss.
+- AI Diagnostics: Gemini-2.0 is now fully capable of reading both cross-node metrics and local system journals to autonomously identify hardware pressure or network anomalies.
+
+### 📋 Plans for Tomorrow (2026-05-02)
+
+- Canary Deployment (Priority 1): Pivot from mass client migration to a targeted "Canary" test. Route a test iPhone and the primary workstation (Pop!_OS) through the `ipip0` tunnel to isolate risks.
+- Load & MTU Testing: Monitor RX/TX packet flow, connection stability, and potential fragmentation issues under real-world workloads via the newly deployed bot.
+- Operational Observation: Establish a baseline for system resource consumption (CPU/RAM) on the Bulgaria node while the tunnel handles active traffic, utilizing the `/analyze` function to catch any early warnings.
+
+---
 
 ## Long-term Plans
 
