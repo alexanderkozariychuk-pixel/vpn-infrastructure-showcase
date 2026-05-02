@@ -764,6 +764,49 @@ All modules import successfully:
 
 ---
 
+## 2026-05-02
+
+### 🛠 Done Today
+
+#### Observability Stack — Full Setup
+
+- Loki: fixed config (tsdb v13, delete_request_store, permissions)
+- Promtail on Moldova: collecting awg, sshd, ipip, fail2ban → Loki
+- fail2ban on Moldova: maxretry=3, bantime=24h — active, detecting attacks
+- Grafana: Loki + Prometheus datasources connected
+- Prometheus: scraping Moldova + Bulgaria node-exporters (all 4 targets up)
+
+#### IPIP Migration — 3 clients on Bulgaria exit
+
+- Fixed routing conflict on Bulgaria: removed stale wg0 route for 10.66.66.6
+- Switched workstation (10.66.66.6) to IPIP → Bulgaria
+- Switched iOS client Kristina (10.66.66.3) to IPIP → Bulgaria
+- Android (10.66.66.12) already on IPIP for several days — stable
+
+**Speed test results (workstation):**
+- Moldova direct:  30.59 / 16.98 Mbps, ping 184ms
+- Bulgaria (IPIP): 36.87 / 14.49 Mbps, ping 188ms
+- Conclusion: +6 Mbps download, only +4ms latency overhead — acceptable
+
+#### Priority Decision
+
+- Bot code too raw for GitHub push
+- Daily commits continue via PROJECT-JOURNAL.md
+- Focus: stable infrastructure first, then bot v1.0, then showcase
+
+### 📋 Plans for Tomorrow (2026-05-03)
+
+- Monitor iOS client stability overnight — check Loki logs in the morning
+- If iOS stable: migrate remaining clients to IPIP gradually
+- Bot v1.0:
+  - Fix System Health display for both nodes
+  - Stable Analyze command with Loki integration
+  - Fix operations: AWG restart, IPIP restart
+- Make IPIP routing rules persistent across Moldova reboots (rc.local or systemd)
+- Grafana: first dashboard (node metrics Bulgaria + Moldova)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
