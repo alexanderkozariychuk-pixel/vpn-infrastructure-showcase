@@ -807,6 +807,41 @@ All modules import successfully:
 
 ---
 
+## 2026-05-03
+### 🛠 Done Today
+#### Bot v1.0 — Deployed to Production
+- Refactored net_[manager.py](http://manager.py): unified SSH helper, all remote calls via _ssh()
+- Fixed fix_awg_interface(): now runs via SSH on Moldova instead of local call
+- Fixed get_logs_text(): real logs from Moldova via SSH, --since '24 hours ago'
+- Fixed clear_logs(): vacuum runs on Moldova via SSH
+- Fixed AI prompt: added infrastructure context, removed false journalctl advice
+- Removed systemd volumes from docker-compose — not needed, logs via SSH
+- Built vpn-bot:v1.0, deployed to Bulgaria via SCP + docker load
+- All menu buttons operational: Status, Health, Fix, Analyze
+- Pending: Logs button returns no entries — debug tomorrow
+#### PWA — Started
+- Initial landing page built, running in container on Bulgaria
+- RAM footprint: 15-20MB — acceptable
+- Foundation for Web API layer above bot services
+#### Architecture Decision — Russian Bridge Strategy
+- Dual-track approach adopted:
+- Normal mode:
+    - Client → RU Bridge (VPS, major RU provider) → Moldova → Bulgaria → Internet
+- Hard mode (Cheburanet scenario):
+    - Client → RU Bridge (Raspberry Pi, residential IP) → Moldova → Bulgaria → Internet
+- RU VPS: stable, handles DPI bypass for all clients by default
+- Raspberry Pi: residential IP, allowlist bypass, deployed at 3 locations
+  (home SPb, brother, Kristina Moscow) — activated when VPS gets blocked
+- 2 EU nodes: Moldova (relay/entry) + Bulgaria (NAT/exit) — stays the same
+- Architecture is adaptive, not locked into single solution
+
+### 📋 Plans for Tomorrow (2026-05-04)
+
+- Deploy and configure Russian Bridge (RU VPS)
+- Fix Logs button (journalctl no entries via SSH)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
