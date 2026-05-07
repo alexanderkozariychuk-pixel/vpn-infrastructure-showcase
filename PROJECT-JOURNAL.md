@@ -842,6 +842,136 @@ All modules import successfully:
 
 ---
 
+## 2026-05-04
+
+### 🛠 Done Today
+
+#### Russian Bridge — First deployment attempt (Beget VPS)
+
+**Server provisioned:**
+- Provider: Beget (Saint Petersburg)
+- Spec: 2 vCPU, 2GB RAM, 30GB NVMe, 1Gbit
+- OS: Ubuntu 24.04
+- Cost: ~980 RUB/month
+
+**Ansible roles created:**
+- `wireguard-bridge`: WireGuard server for clients (port 51820)
+- `amneziawg-client`: AmneziaWG client for Moldova tunnel
+- `playbooks/deploy-bridge.yml`
+
+**Issues encountered:**
+- Beget uses internal apt mirror — `noble-backports` not available
+  Fixed: rewrote `ubuntu.sources` to use `public-mirrors.beget.ru/apt/ru.archive.ubuntu.com`
+- AmneziaWG PPA (Launchpad) blocked on RU servers
+  Fixed: copied binaries from Moldova, built kernel module via DKMS
+- UFW blocked SSH after first successful deploy
+  Root cause: `deny incoming` applied before SSH rule
+  Fix: added explicit `Allow SSH before enabling UFW` task to common role
+- System reinstalled twice due to locked SSH + no VNC access
+
+**Result:** Ansible playbook completes successfully (56 tasks, 0 errors)
+
+---
+
+## 2026-05-05
+
+### 🛠 Done Today
+
+#### Russian Bridge — AWG tunnel to Moldova
+
+**AWG kernel module:**
+- Built amneziawg DKMS module (v1.0.20241112) on Bridge
+- Source compiled against kernel 6.8.0-106-generic
+- Module persistent across reboots via `/etc/modules-load.d/amneziawg.conf`
+
+**Moldova awg1 interface:**
+- Created second AWG interface `awg1` on Moldova (port 51820)
+- Separate subnet: `10.77.77.0/30`
+- Moldova: `10.77.77.1`, Bridge: `10.77.77.2`
+- Separate obfuscation parameters from `awg0`
+
+**Tunnel established:**
+- Bridge → Moldova `awg1` handshake confirmed
+- Ping `10.77.77.1` from Bridge: 65-67ms, stable
+- Peer exchange completed manually (credentials saved to file)
+
+**Issues:**
+- System reinstalled 3 more times due to SSH lockouts
+- `AllowedIPs = 0.0.0.0/0` in AWG client config caused SSH loss on startup
+  Fix: changed to `AllowedIPs = 10.77.77.1/32` — only Moldova endpoint
+
+---
+
+## 2026-05-06
+
+### 🛠 Done Today
+
+#### Russian Bridge — Routing attempts (multiple iterations)
+
+**Goal:** Forward client traffic: Android → wg0 → awg1 → Moldova → IPIP → Bulgaria
+
+**Attempts:**
+- Policy routing table 200: `ip rule add from 10.99.99.0/24 lookup 200`
+  Result: route existed but `ICMP host unreachable` — Moldova not receiving packets
+- Added MASQUERADE on `awg1`: traffic counters grew but no internet
+- Added FORWARD rules `wg0 → awg1` and `awg1 → wg0`
+- `ufw default allow routed` — fixed UFW forward policy
+- Added `ip route add 0.0.0.0/1 dev awg1` — SSH lost immediately, system reinstalled again
+
+**Root cause identified:**
+- Two separate subnets (`10.99.99.0/24` for WireGuard, `10.77.77.0/30` for AWG)
+  cause routing conflicts — default route via AWG kills SSH
+- Bulgaria only knows `10.66.66.0/24` — doesn't route `10.99.99.x` or `10.77.77.x`
+- Moldova `awg1` receives no packets from Bridge despite correct rules
+
+**Total reinstalls to date: 6**
+
+---
+
+## 2026-05-07
+
+### 🛠 Done Today
+
+#### Russian Bridge — Routing architecture failures and pivot
+
+**Routing attempts (all failed):**
+- Policy routing table 200 with `ip rule from 10.99.99.0/24`
+- MASQUERADE on awg1 — traffic counters grew but no internet
+- `ufw default allow routed` — UFW forward policy fixed but no result
+- `ip route add 0.0.0.0/1 dev awg1` — SSH lost immediately
+
+**Root cause (final diagnosis):**
+WireGuard (`wg0`) and AmneziaWG (`awg1`) on same server create
+irresolvable routing conflicts. Any default route via AWG kills SSH.
+Same pattern observed earlier with Moldova→Bulgaria WireGuard attempt.
+This is a systemic issue, not a configuration error.
+
+**Total system reinstalls: 7**
+
+**Architecture decision — abandon WireGuard on Bridge:**
+- WireGuard + AmneziaWG routing conflicts are not worth solving
+- New approach: Outline (Shadowsocks) as client protocol on Bridge
+- No kernel-level routing conflicts — works at application layer
+- Available on iOS App Store, Google Play, Linux, Windows, Mac
+- Single Docker container, minimal CPU overhead (chacha20-ietf-poly1305)
+- DNAT forwarding Bridge → Moldova (no tunnel between them)
+
+**New target architecture:**
+- Client (Outline app) → Shadowsocks (Bridge:443/TCP)
+- Bridge → iptables DNAT → Moldova:443
+- Moldova → AWG → IPIP → Bulgaria → Internet
+
+### 📋 Plans for Tomorrow (2026-05-08)
+
+- Deploy Outline server on Bridge (Docker, single command)
+- Configure DNAT: Bridge:443 → Moldova:443
+- Test end-to-end: Android Outline client → Bridge → Moldova → Bulgaria
+- If successful: generate Outline access keys for all clients
+- Update Ansible role for Bridge (replace wireguard-bridge + amneziawg-client)
+- Commit working configuration to git
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
