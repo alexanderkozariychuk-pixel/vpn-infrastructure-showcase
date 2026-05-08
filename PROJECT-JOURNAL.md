@@ -972,6 +972,60 @@ This is a systemic issue, not a configuration error.
 
 ---
 
+## 2026-05-08
+
+### 🛠 Done Today
+
+#### Russian Bridge — VLESS/Reality experiment and pivot to dual AWG
+
+**Outline (Shadowsocks) test — failed:**
+- Deployed Outline in Docker on port 443
+- Android client: connection unstable, only Google search worked
+- DPI throttling detected — Shadowsocks signature on port 443 too obvious
+- Switched to non-standard port 8388 — same result
+- Conclusion: plain Shadowsocks insufficient for current DPI level
+
+**VLESS + Reality preparation — abandoned:**
+- Started writing xray-reality Ansible role
+- User insight: client app compatibility issues (no AmneziaWG-equivalent on iOS App Store)
+- Decision: stick with AmneziaWG protocol on all hops — proven to work reliably
+
+**Final architecture (working):**
+
+- Client (AWG app) → AWG awg0 (Bridge:8443/UDP, custom obfuscation)
+- Bridge → AWG awg1 (Moldova:51820/UDP, original obfuscation)
+- Moldova → IPIP → Bulgaria → Internet
+
+**Bridge — dual AWG interfaces:**
+- `awg0` — server for clients, port 8443, subnet 10.88.88.0/24
+- `awg1` — client to Moldova, subnet 10.77.77.0/30
+- Both use kernel module `amneziawg` — no protocol conflicts
+- Different obfuscation parameters on each interface (DPI sees different patterns)
+
+**Ansible role created: `amneziawg-bridge`**
+- Single role for both AWG interfaces
+- AWG kernel module via DKMS (built from GitHub source)
+- Binaries copied from Moldova (PPA blocked on RU)
+- Beget mirror for apt (foreign repos blocked)
+
+**Client connection (Android):**
+- Handshake works on first attempt (WiFi + LTE) ✅
+- Tunnel Bridge → Moldova: 0% packet loss, 65-70ms latency
+- Internet routing: not yet working (debug tomorrow)
+
+**Total system reinstalls: 8** (Outline cleanup + final architecture)
+
+### 📋 Plans for Tomorrow (2026-05-09)
+
+- Debug routing: client traffic reaches Bridge but no internet
+- Likely issue: NAT/MASQUERADE rules or table 200 routing
+- Make Bridge routing persistent (ip rule + ip route survive reboot)
+- Test all clients (Android, iOS, workstation)
+- Update PROJECT-JOURNAL with final working architecture
+- Commit Ansible roles to git
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
