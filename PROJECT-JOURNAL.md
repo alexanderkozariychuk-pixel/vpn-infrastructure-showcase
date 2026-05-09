@@ -1026,6 +1026,59 @@ This is a systemic issue, not a configuration error.
 
 ---
 
+## 2026-05-09
+
+### 🛠 Done Today
+
+#### Russian Bridge — End-to-end tunnel WORKING
+
+**Final architecture (verified):**
+
+- Client (AmneziaWG app) → AWG awg0 (Bridge:8443/UDP, custom obfuscation)
+- Bridge → AWG awg1 (Moldova:51820/UDP, original obfuscation)
+- Moldova → IPIP → Bulgaria → Internet
+
+**Routing breakthrough — `Table = off` in awg1 config:**
+- Problem: `AllowedIPs = 0.0.0.0/0` killed SSH (default route hijack)
+- Problem: `AllowedIPs = 10.0.0.0/8` only allowed private subnets — public traffic dropped
+- Solution: `AllowedIPs = 0.0.0.0/0` + `Table = off` directive
+- `Table = off` prevents wg-quick from auto-adding default route
+- Custom routing only via table 200 for client subnet 10.88.88.0/24
+- SSH stays on main routing table → no lockout
+- Client traffic uses table 200 → goes via awg1
+
+**Moldova-side change:**
+- Extended `AllowedIPs` for Bridge peer: `10.77.77.2/32, 10.88.88.0/24`
+- Required because client packets arrive with original source IP (no MASQUERADE on Bridge)
+
+**Persistent routing:**
+- Created `/etc/systemd/system/rc-local.service`
+- Runs after `awg-quick@awg1.service` and `network-online.target`
+- Restores `ip rule` and `ip route` for table 200 on every boot
+
+**Test results (Android client):**
+- WiFi: handshake on first attempt, internet works
+- LTE: handshake on first attempt, internet works ✅
+- Speed: 16.45 Mbps download, 205ms ping
+- Exit IP confirmed: 185.237.223.94 (Bulgaria)
+
+#### Strategic decisions
+
+- Don't migrate other clients yet — observe Android stability first
+- Bot fixes deferred to post-migration phase
+- PWA development continues in parallel with bot work
+- PWA SRE control panel — separate domain from user-facing PWA
+  (security separation: admin tools isolated from client interface)
+
+### 📋 Plans for Tomorrow (2026-05-10)
+
+- Monitor Android client stability overnight
+- If stable: implement split tunneling (RU services bypass via Bridge IP)
+- ipset-based routing: RU domains → eth0, foreign → awg1
+- Sources: antifilter.network IP lists, manual ASN entries for major RU services
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
