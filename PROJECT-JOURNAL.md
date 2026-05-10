@@ -1079,6 +1079,37 @@ This is a systemic issue, not a configuration error.
 
 ---
 
+## 2026-05-10
+
+### 🛠 Done Today
+
+#### Russian Bridge — Full validation across all platforms
+
+**Tested clients:**
+- Android (Honor, Chinese market): WiFi + LTE (MTS) ✅
+- Workstation (Pop-OS): WiFi, 38.2 Mbps ✅
+- iOS (iPhone): WiFi + LTE (Beeline) ✅
+
+**Speed benchmarks:**
+- Workstation WiFi: 38.2 Mbps / 6.87 Mbps, 216ms
+- iOS WiFi: 35 Mbps
+- iOS LTE (Beeline): 12 Mbps
+- Android LTE: 16.45 Mbps
+
+**Technical breakthrough:**
+`Table = off` in awg1 config — prevents default route hijack,
+allows custom policy routing via table 200 without killing SSH.
+Client subnet 10.88.88.0/24 → table 200 → awg1 → Moldova.
+
+### 📋 Plans for Tomorrow (2026-05-11)
+
+- Migrate remaining clients to Bridge tunnel
+- Implement split tunneling (RU domains via Bridge IP directly)
+- Bot: debug Logs button, integrate Loki API
+- PWA: SRE admin panel on separate domain
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
