@@ -1,0 +1,19 @@
+[Interface]
+PrivateKey = {{ awg0_private_key }}
+Address = 10.88.88.1/24
+ListenPort = {{ bridge_listen_port }}
+Jc = {{ bridge_awg_jc | default(5) }}
+Jmin = {{ bridge_awg_jmin | default(30) }}
+Jmax = {{ bridge_awg_jmax | default(700) }}
+S1 = {{ bridge_awg_s1 | default(90) }}
+S2 = {{ bridge_awg_s2 | default(105) }}
+H1 = {{ bridge_awg_h1 | default(1234567890) }}
+H2 = {{ bridge_awg_h2 | default(987654321) }}
+H3 = {{ bridge_awg_h3 | default(1456789012) }}
+H4 = {{ bridge_awg_h4 | default(1789012345) }}
+
+PostUp = iptables -I FORWARD -i awg0 -j ACCEPT
+PostUp = iptables -I FORWARD -o awg0 -j ACCEPT
+
+PostDown = iptables -D FORWARD -i awg0 -j ACCEPT
+PostDown = iptables -D FORWARD -o awg0 -j ACCEPT

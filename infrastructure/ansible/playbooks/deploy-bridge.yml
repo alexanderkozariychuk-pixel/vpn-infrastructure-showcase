@@ -1,11 +1,9 @@
 ---
-- name: Deploy Russian bridge node (Xray relay)
-  hosts: ru_bridge
+- name: Deploy Russian Bridge Node (AmneziaWG)
+  hosts: bridge
   become: yes
   gather_facts: yes
 
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
   roles:
-    - xray-relay
+    - common
+    - amneziawg-bridge

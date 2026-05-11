@@ -1110,6 +1110,47 @@ Client subnet 10.88.88.0/24 → table 200 → awg1 → Moldova.
 
 ---
 
+## 2026-05-11
+
+### 🛠 Done Today
+
+#### Russian Bridge — Client migration continues
+
+#### PWA — Day 1: FastAPI skeleton
+
+**Stack:** FastAPI + Uvicorn + python-dotenv
+
+**Structure:**
+pwa/
+├── main.py          — FastAPI app, CORS, router
+├── config.py        — env-based config
+├── services/
+│   └── net_manager.py  — reused from bot (SSH-based)
+└── api/
+└── status.py    — /api/status, /api/health
+
+**Endpoints implemented:**
+- `GET /` — root health check
+- `GET /api/status` — AWG peers (19 total, 12 active), handshake times, transfer stats
+- `GET /api/health` — Bulgaria + Moldova CPU/RAM/Disk, IPIP tunnel quality
+
+**Data confirmed live:**
+- Moldova: 19 peers, 12 active connections
+- Bulgaria: 7GB RAM, 75GB disk free
+- Moldova: 961MB RAM, 14GB disk free
+- Bridge peer visible: vpZ1KPFsYd4p, 740MB RX / 14GB TX
+
+**Committed to git:** feat(pwa): FastAPI skeleton
+
+### 📋 Plans for Tomorrow (2026-05-12)
+
+- PWA Day 2: `/api/clients` endpoint (peer list with names, not just keys)
+- PWA Day 3: `/api/logs` endpoint (AWG + system logs via SSH from Moldova)
+- Continue client migration to Bridge tunnel (1-2 per day)
+- Monitor Bridge stability under growing load
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing

@@ -9,7 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from config import AWG_SERVICE
-from services.gemini import analyze_logs, chat
+from services.llm_engine import analyze_logs, chat
 from utils.telegram import auth_filter, send_long_message
 
 logger = logging.getLogger(__name__)

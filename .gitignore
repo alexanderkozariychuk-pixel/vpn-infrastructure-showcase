@@ -88,3 +88,32 @@ infrastructure/ansible/group_vars/bulgaria.yml
 # =============================================infrastructure/ansible/inventory/group_vars/
 infrastructure/ansible/group_vars/exit.yml
 infrastructure/ansible/group_vars/entry.yml
+
+# Bot archives
+monitoring/ai-bot-monitoring/*.tar.gz
+
+# Docker scripts
+monitoring/get-docker.sh
+
+# Old/experimental playbooks
+infrastructure/ansible/playbooks/deploy-shadowsocks.yml
+infrastructure/ansible/playbooks/deploy-tun2socks.yml
+infrastructure/ansible/playbooks/deploy-backbone.yml
+
+# Roles from abandoned experiments
+infrastructure/ansible/roles/outline/
+infrastructure/ansible/roles/fou-backbone/
+
+# Bot archives
+monitoring/ai-bot-monitoring/*.tar.gz
+monitoring/get-docker.sh
+
+# Experimental/abandoned playbooks and roles
+infrastructure/ansible/playbooks/deploy-shadowsocks.yml
+infrastructure/ansible/playbooks/deploy-tun2socks.yml
+infrastructure/ansible/playbooks/deploy-backbone.yml
+infrastructure/ansible/roles/outline/
+infrastructure/ansible/roles/fou-backbone/
+
+# Outdated docs (will be rewritten)
+docs/

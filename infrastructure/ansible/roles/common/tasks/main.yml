@@ -1,4 +1,30 @@
 ---
+- name: Fix apt sources for Beget RU servers
+  when: "'bridge' in group_names"
+  block:
+    - name: Clear sources.list
+      copy:
+        content: ""
+        dest: /etc/apt/sources.list
+        mode: 0644
+
+    - name: Write correct ubuntu.sources for Beget
+      copy:
+        content: |
+          Types: deb
+          URIs: http://public-mirrors.beget.ru/apt/ru.archive.ubuntu.com/ubuntu/
+          Suites: noble noble-updates
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: http://public-mirrors.beget.ru/apt/ru.archive.ubuntu.com/ubuntu/
+          Suites: noble-security
+          Components: main universe restricted multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+        dest: /etc/apt/sources.list.d/ubuntu.sources
+        mode: 0644
+
 - name: Update apt cache
   apt:
     update_cache: yes
@@ -13,8 +39,7 @@
       - iptables
       - net-tools
       - software-properties-common
-      - expect        
-      - python3      
+      - python3
     state: present
 
 - name: Create a new user
@@ -25,18 +50,18 @@
     append: yes
     state: present
 
-- name: Add SSH public key for the new user
-  authorized_key:
-    user: "{{ new_user }}"
-    key: "{{ ssh_public_key }}"
-    state: present
-
 - name: Grant passwordless sudo to new user
   copy:
     content: "{{ new_user }} ALL=(ALL) NOPASSWD: ALL\n"
     dest: "/etc/sudoers.d/{{ new_user }}"
     mode: '0440'
     validate: 'visudo -cf %s'
+
+- name: Add SSH public key for the new user
+  authorized_key:
+    user: "{{ new_user }}"
+    key: "{{ ssh_public_key }}"
+    state: present
 
 - name: Disable root login via SSH
   lineinfile:
@@ -62,6 +87,12 @@
     state: present
     reload: yes
 
+- name: Allow SSH before enabling UFW
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
 - name: Configure UFW default policies
   ufw:
     direction: "{{ item.direction }}"
@@ -80,5 +111,3 @@
 - name: Enable UFW
   ufw:
     state: enabled
-    policy: allow
-  notify: enable ufw

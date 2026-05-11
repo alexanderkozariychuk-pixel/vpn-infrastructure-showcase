@@ -1,0 +1,14 @@
+services:
+  vpn-bot:
+    build: .
+    container_name: ./ai-bot-monitoring
+    restart: always
+    network_mode: "host"
+    privileged: true
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - /run/systemd/journal:/run/systemd/journal:ro
+      - /var/log:/var/log:ro
+      - /home/vpnadmin/.ssh:/root/.ssh:ro
+    env_file:
+      - .env

@@ -1,0 +1,25 @@
+---
+new_user: vpnadmin
+ssh_public_key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+ufw_allowed_ports:
+  - "22/tcp"
+  - "8443/udp"
+
+# AWG server для клиентов
+bridge_listen_port: 8443
+
+# Обфускация awg0 — отличается от awg1, но в допустимых пределах
+bridge_awg_jc: 5
+bridge_awg_jmin: 30
+bridge_awg_jmax: 700
+bridge_awg_s1: 90
+bridge_awg_s2: 105
+bridge_awg_h1: 1234567890
+bridge_awg_h2: 987654321
+bridge_awg_h3: 1456789012
+bridge_awg_h4: 1789012345
+
+# AWG клиент к Moldova
+moldova_ip: "45.140.146.134"
+moldova_awg1_public_key: "awC06ycOvSFFWs6m246uH3B3orLQm9pE/VAPjn8EUnU="
