@@ -149,7 +149,7 @@ def get_logs_text(lines: int = 30) -> str:
     cmd = (
         f"sudo journalctl -u {AWG_SERVICE} "
         f"-n {lines} --no-pager --output short-iso "
-        f"--since '24 hours ago'"
+        f""
     )
     stdout, stderr = _ssh(cmd)
     if stdout:
@@ -299,3 +299,17 @@ def fix_ipip_bridge() -> bool:
     except Exception as e:
         logger.error("IPIP fix failed: %s", e)
         return False
+
+
+def get_logs(lines: int = 50) -> dict:
+    """Fetch recent logs from Moldova via SSH."""
+    services = {
+        "awg": f"sudo journalctl -u awg-quick@{AWG_INTERFACE} -n {lines} --no-pager --output short-iso ",
+        "sshd": f"sudo journalctl -u ssh -n {lines} --no-pager --output short-iso ",
+        "fail2ban": f"sudo journalctl -u fail2ban -n {lines} --no-pager --output short-iso ",
+    }
+    result = {}
+    for name, cmd in services.items():
+        stdout, stderr = _ssh(cmd)
+        result[name] = stdout if stdout else f"No entries: {stderr}"
+    return result

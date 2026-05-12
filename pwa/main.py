@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.status import router as status_router
+from api.clients import router as clients_router
+from api.logs import router as logs_router
 
-app = FastAPI(title="VPN SRE API", version="0.1.0")
+app = FastAPI(title="VPN SRE API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,8 +14,10 @@ app.add_middleware(
 )
 
 app.include_router(status_router)
+app.include_router(clients_router)
+app.include_router(logs_router)
 
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.3.0"}
