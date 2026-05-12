@@ -9,6 +9,9 @@ from config import (
     MOLDOVA_IP,
     MOLDOVA_USER,
     IPIP_INTERFACE,
+    BRIDGE_IP,
+    BRIDGE_USER,
+    BRIDGE_AWG_INTERFACE,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +46,63 @@ def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
     )
     return result.stdout.strip(), result.stderr.strip()
 
+def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
+    """Run command on Bridge via SSH."""
+    result = subprocess.run(
+        [
+            "ssh",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=5",
+            f"{BRIDGE_USER}@{BRIDGE_IP}",
+            cmd,
+        ],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    return result.stdout.strip(), result.stderr.strip()
+
+
+def get_bridge_status_data() -> tuple[list[PeerStatus] | None, str | None]:
+    """Fetch AWG peers from Bridge."""
+    stdout, stderr = _ssh_bridge(f"sudo awg show {BRIDGE_AWG_INTERFACE}")
+    if not stdout or "interface" not in stdout.lower():
+        return None, stderr or "No data from Bridge"
+
+    peers = []
+    current = None
+    for line in stdout.split("\n"):
+        line = line.strip()
+        if line.startswith("peer:"):
+            if current:
+                peers.append(current)
+            current = PeerStatus(public_key=line.split(": ", 1)[1])
+        elif current and "latest handshake:" in line:
+            current.handshake = line.split(": ", 1)[1]
+        elif current and "transfer:" in line:
+            current.transfer = line.split(": ", 1)[1]
+        elif current and "endpoint:" in line:
+            current.endpoint = line.split(": ", 1)[1]
+    if current:
+        peers.append(current)
+
+    return peers, None
+
+
+def get_bridge_client_names() -> dict:
+    """Parse client names from awg0.conf on Bridge."""
+    stdout, _ = _ssh_bridge(
+        f"sudo cat /etc/amnezia/amneziawg/{BRIDGE_AWG_INTERFACE}.conf"
+    )
+    names = {}
+    current_name = None
+    for line in stdout.splitlines():
+        line = line.strip()
+        if line.startswith("### "):
+            current_name = line[4:].strip()
+        elif line.startswith("PublicKey") and current_name:
+            key = line.split("=", 1)[1].strip()
+            names[key[:12]] = current_name
+            current_name = None
+    return names
 
 # ----------------------------------------------------------------------
 # AWG status
