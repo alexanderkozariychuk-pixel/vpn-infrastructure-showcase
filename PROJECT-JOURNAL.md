@@ -1151,6 +1151,40 @@ pwa/
 
 ---
 
+## 2026-05-12
+
+### 🛠 Done Today
+
+#### Client migration — 11 new configs generated for Bridge tunnel
+
+Generated and distributed AWG configs for 11 clients.
+
+#### PWA Day 2 — /api/clients and /api/logs
+
+**New endpoints:**
+- `GET /api/clients` — peer list from Bridge awg0.conf, dynamic name resolution
+- `GET /api/clients/{name}` — single client lookup
+- `GET /api/logs` — AWG + sshd + fail2ban logs from Moldova as line arrays
+- `GET /api/logs/{service}` — single service logs, up to 200 lines
+
+**Architecture:**
+- `_ssh_bridge()` helper added to net_manager — separate SSH connection to Bridge
+- Client names parsed from `### Name` comments in awg0.conf
+- Logs returned as `string[]` not raw string
+- Removed `--since 24h` filter — AWG logs are sparse (service rarely restarts)
+
+**Version:** 0.3.0
+
+**Committed and pushed to GitHub.**
+
+### 📋 Plans for Tomorrow (2026-05-13)
+
+- PWA Day 3: JWT authentication — `/api/auth/token` endpoint
+- No write operations until auth is in place
+- Continue monitoring Bridge client connections
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
