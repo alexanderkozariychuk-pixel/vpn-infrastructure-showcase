@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+from auth.jwt import require_auth
 from services.net_manager import get_bridge_status_data, get_bridge_client_names
 
 router = APIRouter()
@@ -24,7 +25,7 @@ def _classify_handshake(handshake: str) -> str:
 
 
 @router.get("/api/clients")
-async def get_clients():
+async def get_clients(_: dict = Depends(require_auth)):
     peers, err = await run_sync(get_bridge_status_data)
     if err:
         return {"ok": False, "error": err}
@@ -58,7 +59,7 @@ async def get_clients():
 
 
 @router.get("/api/clients/{name}")
-async def get_client(name: str):
+async def get_client(name: str, _: dict = Depends(require_auth)):
     peers, err = await run_sync(get_bridge_status_data)
     if err:
         return {"ok": False, "error": err}
