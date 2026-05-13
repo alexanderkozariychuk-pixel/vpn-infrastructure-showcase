@@ -1185,6 +1185,37 @@ Generated and distributed AWG configs for 11 clients.
 
 ---
 
+## 2026-05-13
+
+### 🛠 Done Today
+
+#### PWA Day 3 — JWT Authentication
+
+**New endpoints:**
+- `POST /api/auth/token` — login with username/password, returns Bearer token (24h TTL)
+- `GET /api/auth/verify` — token validation
+
+**All endpoints now protected:**
+- `/api/status`, `/api/health`, `/api/clients`, `/api/logs` — require Bearer token
+- Unauthenticated requests return `401 Unauthorized`
+
+**Implementation:**
+- `auth/jwt.py` — token creation, validation, `require_auth` dependency
+- `api/auth.py` — login endpoint, single admin user from env
+- Password hashing: argon2 (bcrypt 5.0 incompatible with passlib 1.7.4)
+- JWT: python-jose, HS256, 24h expiry
+
+**Version:** 0.4.0
+**Committed and pushed.**
+
+### 📋 Plans for Tomorrow (2026-05-14)
+
+- PWA Day 4: `/api/analyze` — AI analysis endpoint (reuse from bot)
+- PWA Day 5: minimal HTML frontend
+- Deploy PWA to Bulgaria via Docker
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
