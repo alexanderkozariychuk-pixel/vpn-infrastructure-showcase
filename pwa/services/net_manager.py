@@ -313,3 +313,26 @@ def get_logs(lines: int = 50) -> dict:
         stdout, stderr = _ssh(cmd)
         result[name] = stdout if stdout else f"No entries: {stderr}"
     return result
+
+
+def get_analysis_data() -> tuple[str, str]:
+    """Collect logs and metrics for AI analysis."""
+    # Logs from Moldova
+    logs_stdout, _ = _ssh(
+        f"sudo journalctl -u {AWG_SERVICE} -n 30 --no-pager --output short-iso"
+    )
+
+    # Metrics from both nodes
+    local_m, remote_m, _ = get_system_health()
+    net_q = get_network_quality()
+
+    metrics = (
+        f"Bulgaria — CPU: {local_m['cpu']}, RAM: {local_m['ram']}, "
+        f"Disk: {local_m['disk']}\n"
+        f"Moldova — CPU: {remote_m['cpu']}, RAM: {remote_m['ram']}, "
+        f"Disk: {remote_m['disk']}\n"
+        f"IPIP tunnel — Loss: {net_q['loss']}, "
+        f"RX: {net_q['rx']} pkts, TX: {net_q['tx']} pkts"
+    )
+
+    return logs_stdout or "No logs", metrics

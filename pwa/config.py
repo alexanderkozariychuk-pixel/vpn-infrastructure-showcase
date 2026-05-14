@@ -14,3 +14,7 @@ API_SECRET = os.getenv("API_SECRET", "changeme")
 BRIDGE_IP = os.getenv("BRIDGE_IP", "212.67.14.85")
 BRIDGE_USER = os.getenv("BRIDGE_USER", "vpnadmin")
 BRIDGE_AWG_INTERFACE = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
+
+# LLM
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
