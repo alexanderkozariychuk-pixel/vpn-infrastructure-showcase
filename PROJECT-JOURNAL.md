@@ -1216,6 +1216,38 @@ Generated and distributed AWG configs for 11 clients.
 
 ---
 
+## 2026-05-14
+
+### 🛠 Done Today
+
+#### PWA Day 4 — /api/analyze
+
+- `POST /api/analyze` — collects metrics from Bulgaria + Moldova + IPIP tunnel quality, fetches AWG logs, sends to Gemini via OpenRouter
+- Protected by JWT
+- Reuses AsyncOpenAI pattern from bot
+- Response: structured plain text (STATS / ISSUES / FIX)
+- version 0.5.0, pushed to GitHub
+
+#### Current PWA API state
+✅ GET  /                    — health check
+✅ POST /api/auth/token      — JWT login
+✅ GET  /api/auth/verify     — token validation
+✅ GET  /api/status          — AWG peers from Moldova
+✅ GET  /api/health          — Bulgaria + Moldova metrics
+✅ GET  /api/clients         — Bridge clients with names
+✅ GET  /api/clients/{name}  — single client
+✅ GET  /api/logs            — AWG + sshd + fail2ban logs
+✅ GET  /api/logs/{service}  — single service logs
+✅ POST /api/analyze         — AI analysis via Gemini
+
+### 📋 Plans for Tomorrow (2026-05-15)
+
+- HTML frontend — minimal SRE dashboard
+- Docker deploy на Bulgaria
+- Nginx + domain
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
