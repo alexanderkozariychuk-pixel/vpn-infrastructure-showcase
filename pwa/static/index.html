@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VPN SRE Panel</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 { color: #58a6ff; margin-bottom: 20px; font-size: 1.2rem; }
+    h2 { color: #8b949e; font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      border-radius: 4px;
+      width: 100%;
+      margin-bottom: 10px;
+      font-family: inherit;
+    }
+
+    button {
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    button:hover { background: #2ea043; }
+    button.secondary { background: #21262d; border: 1px solid #30363d; }
+    button.secondary:hover { background: #30363d; }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .dot-green { background: #3fb950; }
+    .dot-yellow { background: #d29922; }
+    .dot-red { background: #f85149; }
+
+    .metric { margin-bottom: 6px; font-size: 0.85rem; }
+    .metric span { color: #58a6ff; }
+
+    .client-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.85rem;
+    }
+    .client-row:last-child { border-bottom: none; }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+    }
+    .badge-active { background: #1a4d2e; color: #3fb950; }
+    .badge-idle { background: #3d2e00; color: #d29922; }
+    .badge-inactive { background: #2d1217; color: #f85149; }
+
+    #analyze-output {
+      white-space: pre-wrap;
+      font-size: 0.82rem;
+      color: #8b949e;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    #login-screen, #main-screen { display: none; }
+    #login-screen.active, #main-screen.active { display: block; }
+
+    .error { color: #f85149; font-size: 0.85rem; margin-top: 8px; }
+    .loading { color: #8b949e; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="card" style="max-width: 320px; margin: 80px auto;">
+    <h1>⚡ VPN SRE Panel</h1>
+    <input type="text" id="username" placeholder="Username" value="admin">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <div class="error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main-screen">
+  <h1>⚡ VPN SRE Panel <span style="font-size:0.8rem; color:#8b949e;" id="user-label"></span></h1>
+
+  <div class="grid">
+    <!-- Health -->
+    <div class="card">
+      <h2>Infrastructure</h2>
+      <div id="health-data" class="loading">Loading...</div>
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>AWG Status</h2>
+      <div id="status-data" class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Clients -->
+  <div class="card">
+    <h2>Clients</h2>
+    <div id="clients-data" class="loading">Loading...</div>
+  </div>
+
+  <!-- Analyze -->
+  <div class="card">
+    <h2>AI Analysis</h2>
+    <button onclick="runAnalyze()">▶ Run Analysis</button>
+    <button class="secondary" onclick="logout()" style="float:right">Logout</button>
+    <div id="analyze-output"></div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:8000';
+  let token = localStorage.getItem('sre_token');
+
+  // --- Auth ---
+  async function login() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    try {
+      const res = await fetch(`${API}/api/auth/token`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        token = data.access_token;
+        localStorage.setItem('sre_token', token);
+        showMain();
+      } else {
+        document.getElementById('login-error').textContent = 'Invalid credentials';
+      }
+    } catch(e) {
+      document.getElementById('login-error').textContent = 'Connection error';
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('sre_token');
+    token = null;
+    showLogin();
+  }
+
+  function headers() {
+    return {'Authorization': `Bearer ${token}`};
+  }
+
+  // --- Screens ---
+  function showLogin() {
+    document.getElementById('login-screen').className = 'active';
+    document.getElementById('main-screen').className = '';
+  }
+
+  function showMain() {
+    document.getElementById('login-screen').className = '';
+    document.getElementById('main-screen').className = 'active';
+    loadAll();
+  }
+
+  // --- Data ---
+  async function loadAll() {
+    loadHealth();
+    loadStatus();
+    loadClients();
+  }
+
+  async function loadHealth() {
+    try {
+      const res = await fetch(`${API}/api/health`, {headers: headers()});
+      if (res.status === 401) { logout(); return; }
+      const d = await res.json();
+      document.getElementById('health-data').innerHTML = `
+        <div class="metric">🇧🇬 Bulgaria</div>
+        <div class="metric">CPU: <span>${d.bulgaria.cpu}</span></div>
+        <div class="metric">RAM: <span>${d.bulgaria.ram}</span></div>
+        <div class="metric">Disk: <span>${d.bulgaria.disk}</span></div>
+        <br>
+        <div class="metric">🇲🇩 Moldova</div>
+        <div class="metric">CPU: <span>${d.moldova.cpu || 'N/A'}</span></div>
+        <div class="metric">RAM: <span>${d.moldova.ram || 'N/A'}</span></div>
+        <div class="metric">Disk: <span>${d.moldova.disk || 'N/A'}</span></div>
+        <br>
+        <div class="metric">🔗 IPIP Tunnel</div>
+        <div class="metric">Loss: <span>${d.tunnel.loss}</span></div>
+      `;
+    } catch(e) {
+      document.getElementById('health-data').textContent = 'Error loading health';
+    }
+  }
+
+  async function loadStatus() {
+    try {
+      const res = await fetch(`${API}/api/status`, {headers: headers()});
+      const d = await res.json();
+      document.getElementById('status-data').innerHTML = `
+        <div class="metric">Interface: <span>${d.interface}</span></div>
+        <div class="metric">Total peers: <span>${d.total_peers}</span></div>
+        <div class="metric">Active: <span style="color:#3fb950">${d.active_peers}</span></div>
+        <div class="metric">Inactive: <span style="color:#f85149">${d.total_peers - d.active_peers}</span></div>
+      `;
+    } catch(e) {
+      document.getElementById('status-data').textContent = 'Error loading status';
+    }
+  }
+
+  async function loadClients() {
+    try {
+      const res = await fetch(`${API}/api/clients`, {headers: headers()});
+      const d = await res.json();
+      const rows = d.clients.map(c => `
+        <div class="client-row">
+          <span>${c.name}</span>
+          <span class="badge badge-${c.status}">${c.status}</span>
+        </div>
+      `).join('');
+      document.getElementById('clients-data').innerHTML = rows;
+    } catch(e) {
+      document.getElementById('clients-data').textContent = 'Error loading clients';
+    }
+  }
+
+  async function runAnalyze() {
+    document.getElementById('analyze-output').textContent = 'Analyzing...';
+    try {
+      const res = await fetch(`${API}/api/analyze`, {
+        method: 'POST',
+        headers: headers()
+      });
+      const d = await res.json();
+      document.getElementById('analyze-output').textContent = d.analysis;
+    } catch(e) {
+      document.getElementById('analyze-output').textContent = 'Error running analysis';
+    }
+  }
+
+  // --- Init ---
+  if (token) {
+    showMain();
+  } else {
+    showLogin();
+  }
+
+  // Auto-refresh every 30s
+  setInterval(() => { if (token) loadAll(); }, 30000);
+</script>
+
+</body>
+</html>
