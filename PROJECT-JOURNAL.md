@@ -1248,6 +1248,49 @@ Generated and distributed AWG configs for 11 clients.
 
 ---
 
+## 2026-05-15
+
+### 🛠 Done Today
+
+#### PWA Day 5 — Minimal HTML Frontend
+
+Single-page SRE dashboard — one HTML file, no frameworks.
+
+**Features:**
+- Login form → JWT token → localStorage
+- Auto-logout on 401
+- Auto-refresh every 30 seconds
+- Infrastructure card: Bulgaria + Moldova CPU/RAM/Disk, IPIP loss
+- AWG Status card: total/active/inactive peers
+- Clients list: name + active/idle/inactive badge
+- AI Analysis: button → Gemini response inline
+- Dark terminal theme (#0d1117)
+
+**Technical:**
+- FastAPI serves static files via `StaticFiles`
+- `GET /` returns `index.html`
+- version 0.6.0, pushed to GitHub
+
+#### PWA API — complete for MVP
+✅ POST /api/auth/token
+✅ GET  /api/auth/verify
+✅ GET  /api/status
+✅ GET  /api/health
+✅ GET  /api/clients
+✅ GET  /api/clients/{name}
+✅ GET  /api/logs
+✅ GET  /api/logs/{service}
+✅ POST /api/analyze
+✅ GET  /→ index.html
+
+### 📋 Plans for Tomorrow (2026-05-16)
+
+- Deploy PWA to Bulgaria via Docker
+- Nginx reverse proxy + domain
+- Bot: fix Logs button (journalctl returns no entries)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
