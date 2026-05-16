@@ -1291,6 +1291,26 @@ Single-page SRE dashboard — one HTML file, no frameworks.
 
 ---
 
+## 2026-05-16
+
+### 🛠 Done Today
+
+#### Bridge — routing persistence verified
+
+- `rc-local.service` active since 2026-05-09, never failed
+- `/etc/rc.local` contains correct `ip rule` and `ip route` commands
+- Service starts after `awg-quick@awg1.service` — correct dependency order
+- Live test skipped — 20 active clients, no downtime acceptable
+- Real persistence test deferred to planned maintenance window
+
+### 📋 📋 Plans for Tomorrow (2026-05-17)
+
+- Deploy PWA to Bulgaria (Docker + Nginx)
+- Bot: fix Logs button
+- Bridge: test rc.local on reboot during low-traffic window
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
