@@ -1311,11 +1311,29 @@ Single-page SRE dashboard — one HTML file, no frameworks.
 
 ---
 
+## 2026-05-17
+
+### 🛠 Done Today
+
+#### PostgreSQL — deployed on Bulgaria
+
+- Docker container `pwa-postgres` running on Bulgaria
+- Image: postgres:16-alpine
+- Database: `vpn_sre`, user: `sre_user`
+- Port: 127.0.0.1:5432 (not exposed externally)
+- Healthcheck: pg_isready, status: healthy
+- Separate docker-compose at `/opt/pwa/docker-compose.yml`
+- Isolated network `pwa` — separate from monitoring stack
+
+### 📋 Next Steps
+
+- SQLAlchemy + Alembic setup in pwa/
+- User model: id, username, email, password_hash, created_at
+- First migration
+- Registration endpoint: POST /api/client/register
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
-- Migrate all clients from Moldova to Russian Bridge
-- Complete automation of deployment and configuration processes
 - Migrate monitoring stack to a dedicated VPS in the Netherlands
-- Implement automatic failover using residential proxy pool
 - Prepare detailed portfolio materials for Junior DevOps / Linux SysAdmin positions
