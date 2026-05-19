@@ -1332,6 +1332,87 @@ Single-page SRE dashboard — one HTML file, no frameworks.
 - First migration
 - Registration endpoint: POST /api/client/register
 
+---
+
+## 2026-05-18
+
+### 🛠 Done Today
+
+#### PWA — PostgreSQL + SQLAlchemy + Alembic
+
+**Setup:**
+- SQLAlchemy 2.0 async + asyncpg driver
+- Alembic migrations configured for async PostgreSQL
+- SSH tunnel to Bulgaria for local migration runs
+
+**Models:**
+- `User`: id (UUID), username, email, password_hash, is_active, created_at
+
+**Migration:**
+- First migration: `create users table` applied to Bulgaria PostgreSQL
+- Table verified: `users` + `alembic_version` in `vpn_sre` database
+
+**Security fix:**
+- Removed hardcoded credentials from `db/base.py` and `alembic.ini`
+- DATABASE_URL moved to `.env` (gitignored)
+
+### 📋 Plans for Tomorrow
+
+- Registration endpoint: `POST /api/client/register`
+- Login endpoint: `POST /api/client/token`
+- Separate auth for clients vs SRE admin
+
+---
+
+## 2026-05-19
+
+### 🛠 Done Today
+
+#### Critical Incident — Bulgaria exit node broken
+
+**Root cause:**
+Provider blocking raw IPIP and GRE protocols on Bulgaria exit node.
+FOU decapsulation stopped working, clean IPIP and GRE both blocked.
+
+**Diagnostic chain:**
+- Bridge awg0/awg1: handshake OK, client traffic arriving ✅
+- Moldova awg1: receiving traffic from Bridge ✅
+- Moldova → Bulgaria IPIP: traffic not forwarding ❌
+- Bulgaria: IPIP decapsulation broken ❌
+- All clients affected including Moldova-direct ones ❌
+
+**Temporary fix — bypass Bulgaria:**
+Client (AWG) → Bridge → Moldova → ens3 NAT → Internet
+
+Changes on Moldova:
+- Default route in table 100 changed to direct ISP gateway
+- MASQUERADE on ens3 for client subnets
+- Forward rules between VPN interfaces and ens3
+
+**Result:** All clients working via Moldova direct exit ✅
+
+#### Client configs — mass generation
+
+- Generated keys for new clients
+- Mass generation script: auto-creates .conf files with PSK
+- Fixed `awg set` fopen error — added peers manually to awg0.conf + restart
+- All client .conf files ready for distribution
+
+**Current architecture:**
+Client (AmneziaWG) → Bridge (AWG server)
+Bridge → Moldova (AWG client)
+Moldova → ISP (NAT) → Internet
+Bulgaria: temporarily excluded
+
+### 📋 Plans
+
+- Investigate Bulgaria tunnel options: WireGuard site-to-site or SSH tunnel
+- Restore Bulgaria as exit node when stable solution found
+- Monitor Moldova load — now handling all exit traffic
+- Continue PWA: registration endpoint
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
