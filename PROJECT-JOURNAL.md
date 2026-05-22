@@ -1404,12 +1404,107 @@ Bridge → Moldova (AWG client)
 Moldova → ISP (NAT) → Internet
 Bulgaria: temporarily excluded
 
+---
+
+## 2026-05-20
+
+### 🛠 Done Today
+
+#### Critical incident — Bulgaria IPIP broken, full infrastructure recovery
+
+**Root cause:** Cloud4Box Bulgaria blocks outgoing UDP — asymmetric filtering.
+Moldova → Bulgaria UDP worked, Bulgaria → Moldova UDP blocked by provider.
+Same issue confirmed with multiple ports (5555, 4789) and protocols (GRE, IPIP).
+
+**Attempts that failed:**
+- FOU+IPIP restoration — decapsulation worked but responses lost
+- SSH reverse tunnel + socat UDP→TCP proxy
+- AWG server on Bulgaria (handshake established, no data flow)
+- AWG client Moldova → Bulgaria AWG (same asymmetric issue)
+
+**Solution — new exit node:**
+- Cancelled Cloud4Box Bulgaria (4-5 days remaining, not renewed)
+- Provisioned AEZA Stockholm: 2C/4GB, 1Gbit, ~900 RUB/month
+- Ping SPb → Stockholm: ~62ms
+
+**Stockholm setup:**
+- AmneziaWG installed (binaries + DKMS module from Moldova)
+- AWG server on port 9999, subnet 10.100.0.0/30
+- Moldova → Stockholm AWG tunnel: handshake instant, 0% packet loss
+- Root cause of previous failure: AEZA uses 10.0.0.1 as ISP gateway —
+  conflicted with our tunnel subnet 10.0.0.0/30
+  Fixed by switching to 10.100.0.0/30
+
+**Temporary architecture (end of day):**
+Client (AWG) → Bridge:8443 → Moldova → ens3 NAT → Internet
+
+Stockholm connected but not yet in routing chain.
+
+**Client configs:**
+- Mass generation for 14 clients on Bridge
+- AWG conf lost after Bridge reboot — regenerated
+
+---
+
+## 2026-05-21
+
+### 🛠 Done Today
+
+#### IPIP FOU tunnel Moldova → Stockholm
+
+**Setup:**
+- FOU+IPIP tunnel between Moldova and Stockholm (port 5555)
+- Key issue: AEZA gateway 10.0.0.1 conflicted with IPIP subnet
+  Fixed: removed `10.0.0.1 dev enp0s3` static route on Stockholm
+- rp_filter disabled on Stockholm (was dropping asymmetric traffic)
+- NAT configured on Stockholm: MASQUERADE on enp0s3
+
+**Routing on Moldova:**
+- Table 101: `default dev ipip0`
+- `ip rule from 10.77.77.2 lookup 101 priority 85`
+- All Bridge clients exit via Stockholm
+
+**Test results:**
+- Ping Moldova → Stockholm: 63ms, 0% packet loss
+- Speed: 15-20 Mbps (Moldova 1C/1GB bottleneck on double tunneling)
+
+**Observation:**
+When AWG Moldova→Stockholm was used instead of IPIP:
+Moldova CPU saturated → speed dropped → mobile handshake failed.
+IPIP is kernel-space — near-zero CPU overhead on Moldova.
+
+**Current architecture:**
+Client (AWG) → Bridge:8443/UDP
+Bridge → Moldova awg1:51820/UDP
+Moldova → IPIP/FOU → Stockholm → Internet
+
 ### 📋 Plans
 
 - Investigate Bulgaria tunnel options: WireGuard site-to-site or SSH tunnel
 - Restore Bulgaria as exit node when stable solution found
 - Monitor Moldova load — now handling all exit traffic
 - Continue PWA: registration endpoint
+
+---
+
+## 2026-05-22
+
+### 🛠 Done Today
+
+#### Client configs — 12 new configs generated
+
+Generated and distributed AWG configs for:
+Vika, Dasha, Danil, Danil-Mac, Kris-Vanya, Vanya-iPhone, Vanya-iPad,
+My-Mac, Artem, Yana, Mama, Father — all on Bridge:8443, subnet 10.88.88.20-31
+
+Total peers on Bridge: 16 (4 test + 12 clients)
+
+### 📋 Plans
+
+- Make IPIP persistent on Moldova and Stockholm (rc.local / systemd)
+- Monitor client connections stability
+- Ubuntu Server on old laptop — specs pending
+- PWA: continue deployment to Bulgaria/Stockholm
 
 ---
 
