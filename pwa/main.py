@@ -7,8 +7,9 @@ from api.clients import router as clients_router
 from api.logs import router as logs_router
 from api.auth import router as auth_router
 from api.analyze import router as analyze_router
+from api.register import router as register_router
 
-app = FastAPI(title="VPN SRE API", version="0.6.0")
+app = FastAPI(title="VPN SRE API", version="0.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +23,7 @@ app.include_router(status_router)
 app.include_router(clients_router)
 app.include_router(logs_router)
 app.include_router(analyze_router)
+app.include_router(register_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -33,4 +35,4 @@ async def root():
 
 @app.get("/api")
 async def api_root():
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0"}
