@@ -1508,6 +1508,61 @@ Total peers on Bridge: 16 (4 test + 12 clients)
 
 ---
 
+## 2026-05-23
+
+### 🛠 Done Today
+
+#### Client configs — regenerated with correct obfuscation params
+
+All 12 client configs regenerated with Bridge awg0 parameters:
+Jc=3, Jmin=50, Jmax=1000, S1=72, S2=146, H1-H4 matching Bridge.
+Previous script used wrong obfuscation values — fixed.
+
+#### IPIP persistence — systemd services on both nodes
+
+Moldova `/etc/systemd/system/ipip-tunnel.service`:
+- Loads fou + ipip modules
+- Creates FOU socket port 5555
+- Brings up ipip0 tunnel to Stockholm
+- Adds default route to table 101
+- Adds ip rule from 10.77.77.2 lookup 101 priority 85
+- Enabled, active
+
+Stockholm `/etc/systemd/system/ipip-tunnel.service`:
+- Mirror config, reverse direction
+- NAT MASQUERADE on enp0s3
+- Routes for client subnets via ipip0
+- rp_filter disabled
+- Enabled, active
+
+Tunnel verified: ping Moldova → Stockholm 63ms, 0% packet loss.
+
+#### PWA Day 6 — /api/client/register
+
+- `POST /api/client/register` — creates client in PostgreSQL
+- `GET /api/client/list` — lists all registered clients
+- Fields: username, email, password (argon2), is_active, created_at
+- Duplicate username/email returns 409
+- JWT protected (admin only)
+- Local PostgreSQL via Docker for development
+- version 0.7.0, pushed to GitHub
+
+#### Hardware — old laptop specs for first residential node
+
+CPU: AMD E2-1800 APU, 1.70 GHz (2 cores)
+RAM: 4 GB
+Arch: x64
+OS: Windows 10 Pro (to be replaced with Ubuntu Server 24.04)
+
+### 📋 Plans for Tomorrow (2026-05-24)
+
+- Install Ubuntu Server 24.04 on old laptop
+- Basic hardening: SSH key, UFW, fail2ban
+- AWG install (DKMS build)
+- Connect as first residential node to Moldova
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
