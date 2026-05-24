@@ -1563,6 +1563,50 @@ OS: Windows 10 Pro (to be replaced with Ubuntu Server 24.04)
 
 ---
 
+## 2026-05-24
+
+### 🛠 Done Today
+
+#### PWA — Full SPA Dashboard v2
+
+Complete rewrite of `static/index.html`. Single-page app with hash routing, no framework.
+
+**Views:**
+
+Landing — grid background, animated badge, system status indicator, Sign In / Admin buttons.
+
+Login — unified screen, routes to client portal or admin panel based on username.
+
+Client Portal:
+- Overview — connection status, active peers, infrastructure health card
+- My Config — config block with copy button, QR placeholder, download button, setup instructions
+- Payment — current plan info + "503 / in development" placeholder for crypto billing
+
+Admin SRE Panel:
+- Dashboard — active/total peers, exit node info, IPIP tunnel health, Bridge + Moldova metrics, active clients list. Auto-refresh every 30s.
+- Clients — full AWG peers table with status badges
+- Logs — AWG / SSH / fail2ban tabs, Moldova journalctl
+- AI Analyze — Gemini analysis button + output block
+
+**Design:**
+- Brand: Sovereign
+- Dark terminal aesthetic (#080c0f base)
+- Fonts: JetBrains Mono + Unbounded
+- Noise texture + scanline overlay
+- CSS variables throughout
+- Mobile responsive (sidebar hidden on small screens)
+
+**Version:** 0.7.0 (index.html only, API unchanged)
+
+### 📋 Plans
+
+- Connect old laptop (Ubuntu Server) to router via ethernet — first residential node
+- Deploy PWA to Bridge (Beget) — Russian IP, accessible without VPN
+- Docker + Nginx setup on Bridge
+- Sovereign domain purchase (Cloudflare Registrar)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
