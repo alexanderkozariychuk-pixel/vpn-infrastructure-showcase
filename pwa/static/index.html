@@ -3,285 +3,1233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VPN SRE Panel</title>
+  <title>Sovereign — Secure Access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Unbounded:wght@300;400;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #080c0f;
+      --bg-2: #0d1318;
+      --bg-3: #111920;
+      --border: #1e2d38;
+      --border-bright: #2a4055;
+      --text: #c8d8e4;
+      --text-dim: #5a7a8a;
+      --text-bright: #e8f4ff;
+      --accent: #00d4ff;
+      --accent-dim: #006a80;
+      --accent-glow: rgba(0, 212, 255, 0.15);
+      --green: #00ff88;
+      --green-dim: #008044;
+      --yellow: #ffd04d;
+      --red: #ff4d6a;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-display: 'Unbounded', sans-serif;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Courier New', monospace;
-      background: #0d1117;
-      color: #c9d1d9;
+      font-family: var(--font-mono);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* NOISE TEXTURE */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    /* SCANLINE */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* VIEWS */
+    .view { display: none; min-height: 100vh; }
+    .view.active { display: flex; flex-direction: column; }
+
+    /* ── LANDING ─────────────────────────────────────── */
+    #view-landing {
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .landing-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      opacity: 0.3;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
+    }
+
+    .landing-content {
+      position: relative;
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 600px;
+    }
+
+    .landing-badge {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      padding: 4px 12px;
+      margin-bottom: 32px;
+      animation: pulse-border 3s infinite;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { border-color: var(--accent-dim); }
+      50% { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    }
+
+    .landing-title {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 8vw, 72px);
+      font-weight: 700;
+      color: var(--text-bright);
+      line-height: 1;
+      margin-bottom: 8px;
+      letter-spacing: -2px;
+    }
+
+    .landing-title span {
+      color: var(--accent);
+      text-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .landing-sub {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 40px;
+    }
+
+    .landing-desc {
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text-dim);
+      margin-bottom: 48px;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .landing-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      padding: 12px 28px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--text-bright);
+      box-shadow: 0 0 24px var(--accent-glow);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      padding: 12px 28px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .landing-status {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── LOGIN ───────────────────────────────────────── */
+    #view-login {
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 380px;
       padding: 20px;
     }
 
-    h1 { color: #58a6ff; margin-bottom: 20px; font-size: 1.2rem; }
-    h2 { color: #8b949e; font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .login-header {
+      margin-bottom: 32px;
+    }
 
-    .card {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      padding: 16px;
+    .login-back {
+      font-size: 11px;
+      color: var(--text-dim);
+      cursor: pointer;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+      display: inline-block;
+      transition: color 0.2s;
+    }
+
+    .login-back:hover { color: var(--accent); }
+
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--text-bright);
+      letter-spacing: -1px;
+    }
+
+    .login-title span { color: var(--accent); }
+
+    .field {
       margin-bottom: 16px;
     }
 
-    input {
-      background: #0d1117;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
-      padding: 8px 12px;
-      border-radius: 4px;
+    .field label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .field input {
       width: 100%;
-      margin-bottom: 10px;
-      font-family: inherit;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
     }
 
-    button {
-      background: #238636;
-      color: #fff;
+    .field input:focus {
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 1px var(--accent-dim);
+    }
+
+    .field input::placeholder { color: var(--text-dim); }
+
+    .login-error {
+      font-size: 11px;
+      color: var(--red);
+      margin-bottom: 16px;
+      min-height: 16px;
+    }
+
+    .btn-full {
+      width: 100%;
+      background: var(--accent);
+      color: var(--bg);
       border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
       cursor: pointer;
-      font-family: inherit;
-      font-size: 0.9rem;
+      transition: all 0.2s;
+      margin-top: 8px;
     }
 
-    button:hover { background: #2ea043; }
-    button.secondary { background: #21262d; border: 1px solid #30363d; }
-    button.secondary:hover { background: #30363d; }
+    .btn-full:hover { background: var(--text-bright); }
+    .btn-full:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .status-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      margin-right: 6px;
+    /* ── APP SHELL ───────────────────────────────────── */
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
     }
-    .dot-green { background: #3fb950; }
-    .dot-yellow { background: #d29922; }
-    .dot-red { background: #f85149; }
 
-    .metric { margin-bottom: 6px; font-size: 0.85rem; }
-    .metric span { color: #58a6ff; }
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+    }
 
-    .client-row {
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .sidebar-logo-name {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-logo-name span { color: var(--accent); }
+
+    .sidebar-logo-sub {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .nav-section {
+      padding: 0 12px;
+      margin-bottom: 8px;
+    }
+
+    .nav-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 0 8px;
+      margin-bottom: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 2px solid transparent;
+    }
+
+    .nav-item:hover { color: var(--text); background: var(--bg-3); }
+
+    .nav-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .nav-icon { font-size: 14px; width: 16px; text-align: center; }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      padding: 16px 12px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .user-name { font-size: 11px; color: var(--text); flex: 1; }
+
+    .logout-btn {
+      font-size: 11px;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+    .logout-btn:hover { color: var(--red); }
+
+    /* MAIN */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+    }
+
+    .page-header {
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--text-bright);
+      letter-spacing: -0.5px;
+    }
+
+    .page-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    /* PAGES */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* CARDS */
+    .card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+    /* STAT CARDS */
+    .stat {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: -1px;
+    }
+
+    .stat-value.green { color: var(--green); }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.yellow { color: var(--yellow); }
+
+    .stat-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* METRIC ROW */
+    .metric {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 6px 0;
-      border-bottom: 1px solid #21262d;
-      font-size: 0.85rem;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
     }
-    .client-row:last-child { border-bottom: none; }
 
+    .metric:last-child { border-bottom: none; }
+    .metric-label { color: var(--text-dim); }
+    .metric-value { color: var(--text-bright); font-weight: 500; }
+    .metric-value.green { color: var(--green); }
+    .metric-value.yellow { color: var(--yellow); }
+    .metric-value.red { color: var(--red); }
+
+    /* CLIENT TABLE */
+    .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+    .table th {
+      text-align: left;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .table tr:last-child td { border-bottom: none; }
+    .table tr:hover td { background: var(--bg-3); }
+
+    /* BADGES */
     .badge {
+      display: inline-block;
       padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 0.75rem;
+      font-size: 10px;
+      letter-spacing: 1px;
     }
-    .badge-active { background: #1a4d2e; color: #3fb950; }
-    .badge-idle { background: #3d2e00; color: #d29922; }
-    .badge-inactive { background: #2d1217; color: #f85149; }
 
-    #analyze-output {
+    .badge-active { background: rgba(0,255,136,0.1); color: var(--green); }
+    .badge-idle { background: rgba(255,208,77,0.1); color: var(--yellow); }
+    .badge-inactive { background: rgba(255,77,106,0.1); color: var(--red); }
+
+    /* CONFIG BLOCK */
+    .config-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 16px;
+      font-size: 11px;
+      line-height: 1.8;
+      color: var(--text-dim);
+      position: relative;
+      overflow: auto;
+    }
+
+    .config-key { color: var(--accent); }
+    .config-val { color: var(--text); }
+
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+    /* QR placeholder */
+    .qr-placeholder {
+      width: 160px;
+      height: 160px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      flex-shrink: 0;
+    }
+
+    /* PAYMENT PAGE */
+    .wip-banner {
+      border: 1px solid var(--border-bright);
+      padding: 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .wip-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(0,212,255,0.02) 10px,
+        rgba(0,212,255,0.02) 20px
+      );
+    }
+
+    .wip-code {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--border-bright);
+      display: block;
+      margin-bottom: 16px;
+      letter-spacing: -2px;
+    }
+
+    .wip-title {
+      font-size: 13px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .wip-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 8px;
+      opacity: 0.6;
+    }
+
+    /* LOADING */
+    .loading {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .loading::after {
+      content: '';
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0% { content: ''; }
+      33% { content: '.'; }
+      66% { content: '..'; }
+      100% { content: '...'; }
+    }
+
+    /* ACTIONS ROW */
+    .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+    .btn-sm {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 7px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-sm:hover { border-color: var(--accent-dim); color: var(--accent); }
+    .btn-sm.danger:hover { border-color: var(--red); color: var(--red); }
+
+    /* ADMIN ANALYZE */
+    .analyze-output {
       white-space: pre-wrap;
-      font-size: 0.82rem;
-      color: #8b949e;
-      margin-top: 10px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.7;
+      color: var(--text-dim);
+      margin-top: 12px;
     }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-    #login-screen, #main-screen { display: none; }
-    #login-screen.active, #main-screen.active { display: block; }
-
-    .error { color: #f85149; font-size: 0.85rem; margin-top: 8px; }
-    .loading { color: #8b949e; font-size: 0.85rem; }
+    /* RESPONSIVE */
+    @media (max-width: 700px) {
+      .sidebar { display: none; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .main-content { padding: 16px; }
+    }
   </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="card" style="max-width: 320px; margin: 80px auto;">
-    <h1>⚡ VPN SRE Panel</h1>
-    <input type="text" id="username" placeholder="Username" value="admin">
-    <input type="password" id="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-    <div class="error" id="login-error"></div>
+<!-- ═══════════════════════════════════════════
+     LANDING
+════════════════════════════════════════════ -->
+<div id="view-landing" class="view active">
+  <div class="landing-grid"></div>
+  <div class="landing-content">
+    <div class="landing-badge">Encrypted Access Network</div>
+    <h1 class="landing-title">Sover<span>ei</span>gn</h1>
+    <p class="landing-sub">Private · Secure · Resilient</p>
+    <p class="landing-desc">
+      Multi-hop VPN infrastructure. Your traffic exits through Stockholm,
+      your identity stays yours.
+    </p>
+    <div class="landing-actions">
+      <button class="btn-primary" onclick="showView('login', 'client')">Sign In</button>
+      <button class="btn-ghost" onclick="showView('login', 'admin')">Admin</button>
+    </div>
+  </div>
+  <div class="landing-status">
+    <div class="status-dot"></div>
+    All systems operational
   </div>
 </div>
 
-<!-- MAIN -->
-<div id="main-screen">
-  <h1>⚡ VPN SRE Panel <span style="font-size:0.8rem; color:#8b949e;" id="user-label"></span></h1>
-
-  <div class="grid">
-    <!-- Health -->
-    <div class="card">
-      <h2>Infrastructure</h2>
-      <div id="health-data" class="loading">Loading...</div>
+<!-- ═══════════════════════════════════════════
+     LOGIN
+════════════════════════════════════════════ -->
+<div id="view-login" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-back" onclick="showView('landing')">← Back</div>
+      <div class="login-title">Sign<span> in</span></div>
     </div>
-
-    <!-- Status -->
-    <div class="card">
-      <h2>AWG Status</h2>
-      <div id="status-data" class="loading">Loading...</div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="inp-user" placeholder="username" autocomplete="username">
     </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="inp-pass" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-full" id="login-btn" onclick="doLogin()">Authenticate</button>
   </div>
+</div>
 
-  <!-- Clients -->
-  <div class="card">
-    <h2>Clients</h2>
-    <div id="clients-data" class="loading">Loading...</div>
+<!-- ═══════════════════════════════════════════
+     DASHBOARD (CLIENT)
+════════════════════════════════════════════ -->
+<div id="view-dashboard" class="view">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-name">Sover<span>ei</span>gn</div>
+        <div class="sidebar-logo-sub">Client Portal</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Menu</div>
+        <div class="nav-item active" onclick="showPage('client', 'overview')">
+          <span class="nav-icon">◈</span> Overview
+        </div>
+        <div class="nav-item" onclick="showPage('client', 'config')">
+          <span class="nav-icon">⌗</span> My Config
+        </div>
+        <div class="nav-item" onclick="showPage('client', 'payment')">
+          <span class="nav-icon">◎</span> Payment
+        </div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="user-chip">
+          <div class="user-avatar" id="client-avatar">?</div>
+          <div class="user-name" id="client-name">—</div>
+          <div class="logout-btn" onclick="doLogout()" title="Sign out">⏻</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- OVERVIEW -->
+      <div class="page active" id="client-page-overview">
+        <div class="page-header">
+          <div class="page-title">Overview</div>
+          <div class="page-sub">Your connection status</div>
+        </div>
+        <div class="grid-3" style="margin-bottom:16px">
+          <div class="stat">
+            <div class="stat-label">Status</div>
+            <div class="stat-value green" id="cl-status">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Exit Node</div>
+            <div class="stat-value accent" style="font-size:14px;padding-top:6px">Stockholm</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Network</div>
+            <div class="stat-value accent" style="font-size:14px;padding-top:6px">AWG</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Infrastructure Status</div>
+          <div id="cl-infra-status" class="loading">Fetching</div>
+        </div>
+      </div>
+
+      <!-- CONFIG -->
+      <div class="page" id="client-page-config">
+        <div class="page-header">
+          <div class="page-title">My Config</div>
+          <div class="page-sub">AmneziaWG connection file</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Connection Details</div>
+          <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+            <div class="qr-placeholder">QR CODE<br>COMING SOON</div>
+            <div style="flex:1;min-width:220px">
+              <div class="config-block" id="cl-config-block">
+                <button class="copy-btn" onclick="copyConfig()">Copy</button>
+                <span class="loading">Loading config</span>
+              </div>
+              <div class="actions">
+                <button class="btn-sm" onclick="downloadConfig()">↓ Download .conf</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Setup Instructions</div>
+          <div class="metric"><span class="metric-label">1. Download</span><span class="metric-value">AmneziaWG app (iOS / Android / Windows)</span></div>
+          <div class="metric"><span class="metric-label">2. Import</span><span class="metric-value">Scan QR or import .conf file</span></div>
+          <div class="metric"><span class="metric-label">3. Connect</span><span class="metric-value">Toggle the connection</span></div>
+          <div class="metric"><span class="metric-label">Support</span><span class="metric-value">Telegram: @sovereign_support</span></div>
+        </div>
+      </div>
+
+      <!-- PAYMENT -->
+      <div class="page" id="client-page-payment">
+        <div class="page-header">
+          <div class="page-title">Payment</div>
+          <div class="page-sub">Subscription management</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Current Plan</div>
+          <div class="metric"><span class="metric-label">Plan</span><span class="metric-value">Personal</span></div>
+          <div class="metric"><span class="metric-label">Status</span><span class="metric-value green">Active</span></div>
+          <div class="metric"><span class="metric-label">Expires</span><span class="metric-value yellow">—</span></div>
+        </div>
+        <div class="wip-banner">
+          <span class="wip-code">503</span>
+          <div class="wip-title">Payment module in development</div>
+          <div class="wip-sub">Crypto billing coming soon · Contact admin to renew</div>
+        </div>
+      </div>
+
+    </main>
   </div>
+</div>
 
-  <!-- Analyze -->
-  <div class="card">
-    <h2>AI Analysis</h2>
-    <button onclick="runAnalyze()">▶ Run Analysis</button>
-    <button class="secondary" onclick="logout()" style="float:right">Logout</button>
-    <div id="analyze-output"></div>
+<!-- ═══════════════════════════════════════════
+     ADMIN PANEL
+════════════════════════════════════════════ -->
+<div id="view-admin" class="view">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-name">Sover<span>ei</span>gn</div>
+        <div class="sidebar-logo-sub">SRE Panel</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Infrastructure</div>
+        <div class="nav-item active" onclick="showPage('admin', 'dash')">
+          <span class="nav-icon">◈</span> Dashboard
+        </div>
+        <div class="nav-item" onclick="showPage('admin', 'clients'); loadAdminClients()">
+          <span class="nav-icon">⊹</span> Clients
+        </div>
+        <div class="nav-item" onclick="showPage('admin', 'logs'); loadLogs()">
+          <span class="nav-icon">≡</span> Logs
+        </div>
+        <div class="nav-item" onclick="showPage('admin', 'analyze')">
+          <span class="nav-icon">◎</span> AI Analyze
+        </div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="user-chip">
+          <div class="user-avatar">A</div>
+          <div class="user-name">admin</div>
+          <div class="logout-btn" onclick="doLogout()" title="Sign out">⏻</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="admin-page-dash">
+        <div class="page-header">
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="admin-last-update">Loading...</div>
+        </div>
+        <div class="grid-3" style="margin-bottom:16px">
+          <div class="stat">
+            <div class="stat-label">Active Peers</div>
+            <div class="stat-value green" id="adm-active">—</div>
+            <div class="stat-sub" id="adm-total">of — total</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Exit Node</div>
+            <div class="stat-value accent" style="font-size:13px;padding-top:8px">Stockholm</div>
+            <div class="stat-sub">185.104.151.175</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">IPIP Tunnel</div>
+            <div class="stat-value" id="adm-tunnel" style="font-size:13px;padding-top:8px">—</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Bridge Node</div>
+            <div id="adm-bridge" class="loading">Fetching</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Moldova Node</div>
+            <div id="adm-moldova" class="loading">Fetching</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Active Clients</div>
+          <div id="adm-active-list" class="loading">Fetching</div>
+        </div>
+      </div>
+
+      <!-- CLIENTS -->
+      <div class="page" id="admin-page-clients">
+        <div class="page-header">
+          <div class="page-title">Clients</div>
+          <div class="page-sub">All registered users</div>
+        </div>
+        <div class="card">
+          <div class="card-title">AWG Peers on Bridge</div>
+          <div id="adm-clients-table" class="loading">Fetching</div>
+        </div>
+      </div>
+
+      <!-- LOGS -->
+      <div class="page" id="admin-page-logs">
+        <div class="page-header">
+          <div class="page-title">Logs</div>
+          <div class="page-sub">Moldova node — last 50 entries</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn-sm" onclick="loadLogs('awg')">AWG</button>
+          <button class="btn-sm" onclick="loadLogs('sshd')">SSH</button>
+          <button class="btn-sm" onclick="loadLogs('fail2ban')">Fail2ban</button>
+        </div>
+        <div class="config-block" id="adm-logs" style="max-height:500px;overflow-y:auto">
+          <span class="loading">Select a service</span>
+        </div>
+      </div>
+
+      <!-- ANALYZE -->
+      <div class="page" id="admin-page-analyze">
+        <div class="page-header">
+          <div class="page-title">AI Analysis</div>
+          <div class="page-sub">Gemini-powered infrastructure review</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Run Analysis</div>
+          <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px">
+            Collects metrics from all nodes and generates an SRE report.
+          </p>
+          <button class="btn-sm" onclick="runAnalyze()" id="analyze-btn">▶ Analyze Now</button>
+          <div class="analyze-output" id="adm-analyze-out"></div>
+        </div>
+      </div>
+
+    </main>
   </div>
 </div>
 
 <script>
-  const API = 'http://localhost:8000';
-  let token = localStorage.getItem('sre_token');
+const API = '';
+let token = localStorage.getItem('sov_token');
+let loginMode = 'client';
+let autoRefreshTimer = null;
 
-  // --- Auth ---
-  async function login() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    try {
-      const res = await fetch(`${API}/api/auth/token`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username, password})
-      });
-      const data = await res.json();
-      if (data.access_token) {
-        token = data.access_token;
-        localStorage.setItem('sre_token', token);
-        showMain();
+// ── ROUTING ──────────────────────────────────────
+function showView(view, mode) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.getElementById('login-error') && (document.getElementById('login-error').textContent = '');
+  if (mode) loginMode = mode;
+}
+
+function showPage(panel, page) {
+  const prefix = panel === 'admin' ? 'admin' : 'client';
+  document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .page`)
+    .forEach(p => p.classList.remove('active'));
+  document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .nav-item`)
+    .forEach(n => n.classList.remove('active'));
+  document.getElementById(`${prefix}-page-${page}`)?.classList.add('active');
+  event?.currentTarget?.classList.add('active');
+}
+
+// ── AUTH ─────────────────────────────────────────
+async function doLogin() {
+  const username = document.getElementById('inp-user').value.trim();
+  const password = document.getElementById('inp-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  if (!username || !password) { err.textContent = 'Fill in all fields'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Authenticating...';
+  try {
+    const res = await fetch(`${API}/api/auth/token`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      token = data.access_token;
+      localStorage.setItem('sov_token', token);
+      localStorage.setItem('sov_user', username);
+      if (loginMode === 'admin' || username === 'admin') {
+        showView('admin');
+        loadAdminDash();
+        startAutoRefresh();
       } else {
-        document.getElementById('login-error').textContent = 'Invalid credentials';
+        showView('dashboard');
+        document.getElementById('client-name').textContent = username;
+        document.getElementById('client-avatar').textContent = username[0].toUpperCase();
+        loadClientOverview();
       }
-    } catch(e) {
-      document.getElementById('login-error').textContent = 'Connection error';
+    } else {
+      err.textContent = 'Invalid credentials';
     }
+  } catch(e) {
+    err.textContent = 'Connection error';
   }
+  btn.disabled = false;
+  btn.textContent = 'Authenticate';
+}
 
-  function logout() {
-    localStorage.removeItem('sre_token');
-    token = null;
-    showLogin();
-  }
+function doLogout() {
+  localStorage.removeItem('sov_token');
+  localStorage.removeItem('sov_user');
+  token = null;
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  showView('landing');
+}
 
-  function headers() {
-    return {'Authorization': `Bearer ${token}`};
-  }
+function hdrs() { return {'Authorization': `Bearer ${token}`}; }
 
-  // --- Screens ---
-  function showLogin() {
-    document.getElementById('login-screen').className = 'active';
-    document.getElementById('main-screen').className = '';
-  }
-
-  function showMain() {
-    document.getElementById('login-screen').className = '';
-    document.getElementById('main-screen').className = 'active';
-    loadAll();
-  }
-
-  // --- Data ---
-  async function loadAll() {
-    loadHealth();
-    loadStatus();
-    loadClients();
-  }
-
-  async function loadHealth() {
-    try {
-      const res = await fetch(`${API}/api/health`, {headers: headers()});
-      if (res.status === 401) { logout(); return; }
-      const d = await res.json();
-      document.getElementById('health-data').innerHTML = `
-        <div class="metric">🇧🇬 Bulgaria</div>
-        <div class="metric">CPU: <span>${d.bulgaria.cpu}</span></div>
-        <div class="metric">RAM: <span>${d.bulgaria.ram}</span></div>
-        <div class="metric">Disk: <span>${d.bulgaria.disk}</span></div>
-        <br>
-        <div class="metric">🇲🇩 Moldova</div>
-        <div class="metric">CPU: <span>${d.moldova.cpu || 'N/A'}</span></div>
-        <div class="metric">RAM: <span>${d.moldova.ram || 'N/A'}</span></div>
-        <div class="metric">Disk: <span>${d.moldova.disk || 'N/A'}</span></div>
-        <br>
-        <div class="metric">🔗 IPIP Tunnel</div>
-        <div class="metric">Loss: <span>${d.tunnel.loss}</span></div>
+// ── CLIENT DATA ───────────────────────────────────
+async function loadClientOverview() {
+  const el = document.getElementById('cl-infra-status');
+  const statusEl = document.getElementById('cl-status');
+  try {
+    const res = await fetch(`${API}/api/status`, {headers: hdrs()});
+    if (res.status === 401) { doLogout(); return; }
+    const d = await res.json();
+    if (d.ok) {
+      statusEl.textContent = 'Online';
+      el.innerHTML = `
+        <div class="metric"><span class="metric-label">Interface</span><span class="metric-value">${d.interface}</span></div>
+        <div class="metric"><span class="metric-label">Node</span><span class="metric-value">${d.node}</span></div>
+        <div class="metric"><span class="metric-label">Active Peers</span><span class="metric-value green">${d.active_peers}</span></div>
+        <div class="metric"><span class="metric-label">Total Peers</span><span class="metric-value">${d.total_peers}</span></div>
       `;
-    } catch(e) {
-      document.getElementById('health-data').textContent = 'Error loading health';
     }
+  } catch(e) {
+    statusEl.textContent = 'Unknown';
+    el.textContent = 'Could not fetch status';
   }
 
-  async function loadStatus() {
-    try {
-      const res = await fetch(`${API}/api/status`, {headers: headers()});
-      const d = await res.json();
-      document.getElementById('status-data').innerHTML = `
-        <div class="metric">Interface: <span>${d.interface}</span></div>
-        <div class="metric">Total peers: <span>${d.total_peers}</span></div>
-        <div class="metric">Active: <span style="color:#3fb950">${d.active_peers}</span></div>
-        <div class="metric">Inactive: <span style="color:#f85149">${d.total_peers - d.active_peers}</span></div>
-      `;
-    } catch(e) {
-      document.getElementById('status-data').textContent = 'Error loading status';
-    }
-  }
+  // Populate client config placeholder
+  const user = localStorage.getItem('sov_user') || '?';
+  document.getElementById('cl-config-block').innerHTML = `
+    <button class="copy-btn" onclick="copyConfig()">Copy</button>
+    <span class="config-key">[Interface]</span><br>
+    <span class="config-key">PrivateKey</span> <span style="color:var(--text-dim)"># stored on your device</span><br>
+    <span class="config-key">Address</span> = <span class="config-val"># your VPN IP</span><br>
+    <span class="config-key">DNS</span> = <span class="config-val">1.1.1.1, 1.0.0.1</span><br><br>
+    <span class="config-key">[Peer]</span><br>
+    <span class="config-key">Endpoint</span> = <span class="config-val">212.67.14.85:8443</span><br>
+    <span class="config-key">AllowedIPs</span> = <span class="config-val">0.0.0.0/0</span><br>
+    <span style="color:var(--text-dim)"># Contact admin for your personal config file</span>
+  `;
+}
 
-  async function loadClients() {
-    try {
-      const res = await fetch(`${API}/api/clients`, {headers: headers()});
-      const d = await res.json();
-      const rows = d.clients.map(c => `
-        <div class="client-row">
-          <span>${c.name}</span>
-          <span class="badge badge-${c.status}">${c.status}</span>
-        </div>
-      `).join('');
-      document.getElementById('clients-data').innerHTML = rows;
-    } catch(e) {
-      document.getElementById('clients-data').textContent = 'Error loading clients';
-    }
-  }
+function copyConfig() {
+  const text = document.getElementById('cl-config-block').innerText;
+  navigator.clipboard.writeText(text);
+}
 
-  async function runAnalyze() {
-    document.getElementById('analyze-output').textContent = 'Analyzing...';
-    try {
-      const res = await fetch(`${API}/api/analyze`, {
-        method: 'POST',
-        headers: headers()
-      });
-      const d = await res.json();
-      document.getElementById('analyze-output').textContent = d.analysis;
-    } catch(e) {
-      document.getElementById('analyze-output').textContent = 'Error running analysis';
-    }
-  }
+function downloadConfig() {
+  alert('Contact admin to receive your personal .conf file');
+}
 
-  // --- Init ---
+// ── ADMIN DATA ────────────────────────────────────
+async function loadAdminDash() {
+  document.getElementById('admin-last-update').textContent =
+    'Last updated: ' + new Date().toLocaleTimeString();
+
+  // Status
+  fetch(`${API}/api/status`, {headers: hdrs()}).then(r => r.json()).then(d => {
+    if (!d.ok) return;
+    document.getElementById('adm-active').textContent = d.active_peers;
+    document.getElementById('adm-total').textContent = `of ${d.total_peers} total`;
+
+    const activeList = d.peers.filter(p => p.handshake !== 'never');
+    document.getElementById('adm-active-list').innerHTML = activeList.length
+      ? activeList.map(p => `
+          <div class="metric">
+            <span class="metric-label">${p.public_key}</span>
+            <span class="metric-value green">${p.handshake}</span>
+          </div>`).join('')
+      : '<div style="color:var(--text-dim);font-size:12px">No active peers</div>';
+  }).catch(() => {});
+
+  // Health
+  fetch(`${API}/api/health`, {headers: hdrs()}).then(r => r.json()).then(d => {
+    if (!d.ok) return;
+    const b = d.bulgaria || {};
+    const m = d.moldova || {};
+    const t = d.tunnel || {};
+
+    document.getElementById('adm-bridge').innerHTML = `
+      <div class="metric"><span class="metric-label">CPU</span><span class="metric-value">${b.cpu || '—'}</span></div>
+      <div class="metric"><span class="metric-label">RAM</span><span class="metric-value">${b.ram || '—'}</span></div>
+      <div class="metric"><span class="metric-label">Disk</span><span class="metric-value">${b.disk || '—'}</span></div>
+    `;
+    document.getElementById('adm-moldova').innerHTML = `
+      <div class="metric"><span class="metric-label">CPU</span><span class="metric-value">${m.cpu || '—'}</span></div>
+      <div class="metric"><span class="metric-label">RAM</span><span class="metric-value">${m.ram || '—'}</span></div>
+      <div class="metric"><span class="metric-label">Disk</span><span class="metric-value">${m.disk || '—'}</span></div>
+    `;
+
+    const loss = t.loss || '0%';
+    const lossNum = parseFloat(loss);
+    document.getElementById('adm-tunnel').textContent = lossNum === 0 ? '✓ Healthy' : `⚠ Loss ${loss}`;
+    document.getElementById('adm-tunnel').style.color = lossNum === 0 ? 'var(--green)' : 'var(--yellow)';
+  }).catch(() => {});
+}
+
+async function loadAdminClients() {
+  const el = document.getElementById('adm-clients-table');
+  el.innerHTML = '<span class="loading">Fetching</span>';
+  try {
+    const res = await fetch(`${API}/api/clients`, {headers: hdrs()});
+    const d = await res.json();
+    if (!d.ok) { el.textContent = 'Error'; return; }
+    el.innerHTML = `
+      <table class="table">
+        <thead><tr>
+          <th>Name</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
+        </tr></thead>
+        <tbody>
+          ${d.clients.map(c => `<tr>
+            <td>${c.name}</td>
+            <td><span class="badge badge-${c.status}">${c.status}</span></td>
+            <td>${c.handshake}</td>
+            <td style="color:var(--text-dim)">${c.transfer || '—'}</td>
+            <td style="color:var(--text-dim)">${c.endpoint || '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { el.textContent = 'Error loading clients'; }
+}
+
+async function loadLogs(service = 'awg') {
+  const el = document.getElementById('adm-logs');
+  el.innerHTML = '<span class="loading">Fetching</span>';
+  try {
+    const res = await fetch(`${API}/api/logs/${service}`, {headers: hdrs()});
+    const d = await res.json();
+    if (!d.ok) { el.textContent = 'Error'; return; }
+    el.innerHTML = (d.lines || []).map(l =>
+      `<div style="padding:1px 0;border-bottom:1px solid var(--border)">${escHtml(l)}</div>`
+    ).join('') || '<div style="color:var(--text-dim)">No entries</div>';
+  } catch(e) { el.textContent = 'Error loading logs'; }
+}
+
+async function runAnalyze() {
+  const out = document.getElementById('adm-analyze-out');
+  const btn = document.getElementById('analyze-btn');
+  out.textContent = 'Analyzing infrastructure...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/api/analyze`, {method:'POST', headers: hdrs()});
+    const d = await res.json();
+    out.textContent = d.analysis || 'No response';
+  } catch(e) { out.textContent = 'Error running analysis'; }
+  btn.disabled = false;
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => {
+    const adminDash = document.getElementById('admin-page-dash');
+    if (adminDash?.classList.contains('active')) loadAdminDash();
+  }, 30000);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── INIT ──────────────────────────────────────────
+(function init() {
   if (token) {
-    showMain();
-  } else {
-    showLogin();
+    const user = localStorage.getItem('sov_user') || '';
+    if (user === 'admin') {
+      showView('admin');
+      loadAdminDash();
+      startAutoRefresh();
+    } else {
+      showView('dashboard');
+      document.getElementById('client-name').textContent = user;
+      document.getElementById('client-avatar').textContent = (user[0] || '?').toUpperCase();
+      loadClientOverview();
+    }
   }
-
-  // Auto-refresh every 30s
-  setInterval(() => { if (token) loadAll(); }, 30000);
+})();
 </script>
-
 </body>
 </html>
