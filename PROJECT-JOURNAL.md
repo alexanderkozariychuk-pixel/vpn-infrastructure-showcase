@@ -1607,6 +1607,51 @@ Admin SRE Panel:
 
 ---
 
+## 2026-05-25
+
+### 🛠 Done Today
+
+#### PWA — Production Deploy on Bridge
+
+**Docker setup:**
+- Dockerfile: python:3.12-slim + openssh-client
+- docker-compose: sovereign-pwa + sovereign-postgres
+- SSH keys mounted read-only for Moldova/Stockholm access
+- Secrets: JWT_SECRET and POSTGRES_PASSWORD generated via openssl
+
+**Deploy:**
+- Rsync code to Bridge /opt/pwa/
+- docker compose build + up -d
+- Alembic migration applied in container
+- API verified: POST /api/auth/token returns JWT token
+
+**Nginx:**
+- Reverse proxy on port 80
+- Proxies to uvicorn on 127.0.0.1:8000
+- Default site disabled
+- Site accessible via browser ✅
+
+**Current stack on Bridge:**
+Nginx :80 → uvicorn :8000 (sovereign-pwa)
+↓
+PostgreSQL :5432 (sovereign-postgres)
+
+#### PWA — Sovereign SPA Dashboard v2
+
+Complete frontend rewrite — full SPA with hash routing.
+Landing, Login, Client Portal (Overview / Config / Payment), Admin SRE Panel.
+Brand name: Sovereign. Dark terminal aesthetic.
+Deployed to production as static/index.html.
+
+### 📋 Plans for Tomorrow
+
+- Buy domain on Cloudflare Registrar
+- Configure DNS → Bridge IP
+- SSL via Let's Encrypt (certbot + nginx)
+- Residential node (old laptop): WiFi setup + basic hardening
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
