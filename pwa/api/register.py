@@ -20,33 +20,27 @@ class UserResponse(BaseModel):
     username: str
     email: str
     is_active: bool
+    is_subscribed: bool
+    peer_ip: str | None
 
 
-@router.post("/api/client/register", response_model=UserResponse)
+class AssignPeerRequest(BaseModel):
+    username: str
+    peer_ip: str
+
+
+@router.post("/api/client/register", response_model=UserResponse, status_code=201)
 async def register(
     req: RegisterRequest,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_auth),  # только admin может регистрировать
 ):
-    # Проверяем уникальность username
-    result = await db.execute(
-        select(User).where(User.username == req.username)
-    )
+    result = await db.execute(select(User).where(User.username == req.username))
     if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Username '{req.username}' already exists",
-        )
+        raise HTTPException(status_code=409, detail=f"Username '{req.username}' already exists")
 
-    # Проверяем уникальность email
-    result = await db.execute(
-        select(User).where(User.email == req.email)
-    )
+    result = await db.execute(select(User).where(User.email == req.email))
     if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Email '{req.email}' already registered",
-        )
+        raise HTTPException(status_code=409, detail=f"Email already registered")
 
     user = User(
         username=req.username,
@@ -62,6 +56,8 @@ async def register(
         username=user.username,
         email=user.email,
         is_active=user.is_active,
+        is_subscribed=user.is_subscribed,
+        peer_ip=user.peer_ip,
     )
 
 
@@ -78,6 +74,47 @@ async def list_clients(
             username=u.username,
             email=u.email,
             is_active=u.is_active,
+            is_subscribed=u.is_subscribed,
+            peer_ip=u.peer_ip,
         )
         for u in users
     ]
+
+
+@router.post("/api/admin/assign-peer")
+async def assign_peer(
+    req: AssignPeerRequest,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_auth),
+):
+    result = await db.execute(select(User).where(User.username == req.username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{req.username}' not found")
+
+    user.peer_ip = req.peer_ip
+    user.is_subscribed = True
+    await db.commit()
+
+    return {"ok": True, "username": user.username, "peer_ip": user.peer_ip}
+
+
+@router.get("/api/client/me")
+async def get_me(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    username = payload.get("sub")
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "ok": True,
+        "username": user.username,
+        "email": user.email,
+        "is_subscribed": user.is_subscribed,
+        "peer_ip": user.peer_ip,
+        "subscribed_until": user.subscribed_until,
+    }
