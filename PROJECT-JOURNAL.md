@@ -1652,6 +1652,64 @@ Deployed to production as static/index.html.
 
 ---
 
+## 2026-05-26
+
+### 🛠 Done Today
+
+#### PWA — Client Registration System
+
+**New API endpoints:**
+- `POST /api/client/register` — public, no auth required. Creates account in DB.
+- `GET /api/client/me` — returns subscription status, peer_ip, subscribed_until
+- `POST /api/admin/assign-peer` — admin manually assigns peer_ip to user, sets is_subscribed=true
+- `POST /api/auth/token` — now works for both admin (env) and DB clients
+
+**DB migration:**
+- Added fields to `users` table: `is_subscribed`, `peer_ip`, `subscribed_until`
+
+**Business logic:**
+- Registration creates account only — no AWG peer generated
+- AWG peer assigned manually by admin after payment (future: auto after billing)
+- Existing clients added manually via assign-peer endpoint
+
+#### PWA — Frontend Updates
+
+**Landing:**
+- Added "Create Account" button
+- Tagline: "Path always exists." with hover → "Путь всегда существует."
+
+**Register page:**
+- Username, email, password, confirm password
+- Validation: duplicate check, password match, min length
+- Success → auto-redirect to login
+
+**Mobile adaptation:**
+- Hamburger menu (☰) for sidebar navigation on mobile
+- Sidebar slides in from left with overlay
+- Grid adapts to single column on small screens
+
+#### Deploy — Production on Bridge
+
+**Fixed persistent deploy workflow:**
+- Never use `docker compose down -v` — loses DB volume
+- Correct deploy: `docker compose build pwa && docker compose up -d --force-recreate pwa`
+- Migrations run automatically via `entrypoint.sh` on container start
+- `.env` on server managed separately, not overwritten by rsync
+
+**Current stack:**
+Nginx :80 → uvicorn :8000 (sovereign-pwa)
+sovereign-pwa → sovereign-postgres (persistent volume)
+Migrations: auto on startup via alembic upgrade head
+
+### 📋 Plans
+
+- Buy domain on Cloudflare
+- SSL via Let's Encrypt
+- Update client portal to show real config from DB
+- Residential node (laptop): connect via ethernet, complete setup
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
