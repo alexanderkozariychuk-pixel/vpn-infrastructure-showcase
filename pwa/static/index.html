@@ -713,10 +713,10 @@
     <div class="landing-badge">Encrypted Access Network</div>
     <h1 class="landing-title">Sover<span>ei</span>gn</h1>
     <p class="landing-sub">Private · Secure · Resilient</p>
-    <p class="landing-desc">
-      Multi-hop VPN infrastructure. Your traffic exits through Stockholm,
-      your identity stays yours.
-    </p>
+    <p class="landing-desc" id="landing-tagline"
+      onmouseenter="this.textContent='Путь всегда существует.'"
+      onmouseleave="this.textContent='Path always exists.'" 
+      style="cursor:default;transition:opacity 0.3s">Path always exists.</p>
     <div class="landing-actions">
       <button class="btn-primary" onclick="showView('login', 'client')">Sign In</button>
       <button class="btn-ghost" onclick="showView('register')">Create Account</button>
