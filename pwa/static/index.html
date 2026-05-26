@@ -719,6 +719,7 @@
     </p>
     <div class="landing-actions">
       <button class="btn-primary" onclick="showView('login', 'client')">Sign In</button>
+      <button class="btn-ghost" onclick="showView('register')">Create Account</button>
       <button class="btn-ghost" onclick="showView('login', 'admin')">Admin</button>
     </div>
   </div>
@@ -751,6 +752,41 @@
   </div>
 </div>
 
+
+<!-- ═══════════════════════════════════════════
+     REGISTER
+════════════════════════════════════════════ -->
+<div id="view-register" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-back" onclick="showView('landing')">← Back</div>
+      <div class="login-title">Create<span> account</span></div>
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="reg-user" placeholder="username" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label>Confirm Password</label>
+      <input type="password" id="reg-pass2" placeholder="••••••••" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')doRegister()">
+    </div>
+    <div class="login-error" id="reg-error"></div>
+    <div id="reg-success" style="font-size:11px;color:var(--green);margin-bottom:16px;min-height:16px"></div>
+    <button class="btn-full" id="reg-btn" onclick="doRegister()">Create Account</button>
+    <div style="margin-top:16px;font-size:11px;color:var(--text-dim);text-align:center">
+      Already have an account? <span style="color:var(--accent);cursor:pointer" onclick="showView('login','client')">Sign in</span>
+    </div>
+  </div>
+</div>
 <!-- ═══════════════════════════════════════════
      DASHBOARD (CLIENT)
 ════════════════════════════════════════════ -->
@@ -995,7 +1031,8 @@ let autoRefreshTimer = null;
 function showView(view, mode) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
-  document.getElementById('login-error') && (document.getElementById('login-error').textContent = '');
+  if (view === 'login') { document.getElementById('login-error') && (document.getElementById('login-error').textContent = ''); }
+  if (view === 'register') { document.getElementById('reg-error') && (document.getElementById('reg-error').textContent = ''); document.getElementById('reg-success') && (document.getElementById('reg-success').textContent = ''); }
   if (mode) loginMode = mode;
 }
 
@@ -1010,6 +1047,47 @@ function showPage(panel, page) {
 }
 
 // ── AUTH ─────────────────────────────────────────
+
+async function doRegister() {
+  const username = document.getElementById('reg-user').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-pass').value;
+  const password2 = document.getElementById('reg-pass2').value;
+  const btn = document.getElementById('reg-btn');
+  const err = document.getElementById('reg-error');
+  const ok = document.getElementById('reg-success');
+  err.textContent = '';
+  ok.textContent = '';
+
+  if (!username || !email || !password) { err.textContent = 'Fill in all fields'; return; }
+  if (password !== password2) { err.textContent = 'Passwords do not match'; return; }
+  if (password.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account...';
+  try {
+    const res = await fetch(`${API}/api/client/register`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, email, password})
+    });
+    const data = await res.json();
+    if (res.status === 201) {
+      ok.textContent = 'Account created! Redirecting...';
+      setTimeout(() => {
+        document.getElementById('inp-user').value = username;
+        showView('login', 'client');
+      }, 1500);
+    } else {
+      err.textContent = data.detail || 'Registration failed';
+    }
+  } catch(e) {
+    err.textContent = 'Connection error';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Create Account';
+}
+
 async function doLogin() {
   const username = document.getElementById('inp-user').value.trim();
   const password = document.getElementById('inp-pass').value;
