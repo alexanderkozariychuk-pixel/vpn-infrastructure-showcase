@@ -3,7 +3,6 @@ services:
     image: postgres:16-alpine
     container_name: sovereign-postgres
     restart: unless-stopped
-    environment:
       POSTGRES_DB: vpn_sre
       POSTGRES_USER: sre_user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -17,8 +16,6 @@ services:
     container_name: sovereign-pwa
     restart: unless-stopped
     env_file: .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://sre_user:${POSTGRES_PASSWORD}@postgres:5432/vpn_sre
     volumes:
       - ~/.ssh:/root/.ssh:ro
     ports:
