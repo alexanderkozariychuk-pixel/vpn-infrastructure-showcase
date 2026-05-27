@@ -1710,6 +1710,70 @@ Migrations: auto on startup via alembic upgrade head
 
 ---
 
+## 2026-05-27
+
+### 🚨 Critical Incident — ТСПУ update broke all clients
+
+**Timeline:**
+Telegram died first → YouTube → Google. All clients lost internet progressively.
+AWG tunnel to Moldova (awg1) was active but traffic wasn't passing.
+
+**Root cause chain:**
+
+**1. MTU mismatch on Bridge awg0**
+ICMP "frag needed" messages visible in tcpdump on awg0.
+awg0 MTU was 1220 — too small, causing fragmentation and packet drops.
+
+Fix:
+- `sudo ip link set dev awg0 mtu 1300`
+- `iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`
+
+**2. Client MTU mismatch**
+Server awg0 MTU: 1300. Client awg0 MTU: 1420 (default).
+Packets returned oversized.
+
+Fix: client MTU forced to 1300. Added `MTU = 1300` recommendation for all client configs.
+
+**3. YouTube + Telegram still broken (UDP issue)**
+TCP sites worked. Video and messengers didn't.
+YouTube uses QUIC (UDP/443), Telegram is UDP-heavy.
+Large UDP packets dropped due to cumulative encapsulation overhead: AWG → AWG → IPIP/FOU.
+
+**4. Root cause: IPIP tunnel Moldova → Stockholm**
+Test: bypassed IPIP, used Moldova direct exit → YouTube and Telegram worked instantly.
+IPIP+FOU adds extra headers (IPIP + UDP), inflating packet size.
+Under DPI filtering, large UDP packets exceed MTU and get dropped.
+This is the second time IPIP failed after provider DPI update.
+
+---
+
+### 🏗 Architectural Decision — Retire IPIP
+
+**New architecture: split traffic at Bridge level**
+Free clients  (10.88.88.0/24) → awg1 → Moldova → Internet
+Paid clients  (10.99.99.0/24) → awg2 → Stockholm (direct AWG) → Internet
+
+**Why AWG instead of IPIP:**
+- AWG is obfuscated by design, more resilient to DPI than IPIP+FOU
+- No extra encapsulation overhead
+- Two independent paths, simpler to debug
+- Policy routing on Bridge: table 200 (Moldova), table 201 (Stockholm)
+
+**Current status:**
+- All clients routing through Moldova direct ✅
+- YouTube, Telegram, UDP services working ✅
+- Stockholm exit node waiting for new AWG server role
+
+### 📋 Next Steps
+
+- Stockholm: configure AWG server for direct Bridge → Stockholm tunnel
+- Bridge: create awg2 with `Table = off`, route table 201
+- Policy routing: `from 10.99.99.0/24 lookup 201`
+- Test on one paid client → migrate others
+- Update client configs: add `MTU = 1300`
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
