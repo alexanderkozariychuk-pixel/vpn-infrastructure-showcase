@@ -962,9 +962,9 @@
     <div class="landing-actions">
       <button class="btn-primary" onclick="showView('login', 'client')" data-i18n="btn-signin">Sign In</button>
       <button class="btn-ghost" onclick="showView('register')" data-i18n="btn-create">Create Account</button>
-      <button class="btn-ghost" onclick="showView('login', 'admin')" data-i18n="btn-admin">Admin</button>
     </div>
   </div>
+  <div style="position:absolute;bottom:12px;right:20px;font-size:9px;color:var(--border);cursor:pointer;letter-spacing:2px" onclick="showView('login', 'admin')">admin</div>
   <div class="landing-status">
     <div class="status-dot"></div>
     All systems operational
@@ -1402,8 +1402,7 @@ const translations = {
     'page-config': 'My Config',
     'page-config-sub': 'AmneziaWG connection file',
     'card-conn': 'Connection Details',
-    'qr-soon': 'QR CODE
-COMING SOON',
+    'qr-soon': 'QR CODE\nCOMING SOON',
     'btn-download': '↓ Download .conf',
     'card-setup': 'Setup Instructions',
     'setup-1-label': '1. Download',
@@ -1495,8 +1494,7 @@ COMING SOON',
     'page-config': 'Мой конфиг',
     'page-config-sub': 'Файл подключения AmneziaWG',
     'card-conn': 'Данные подключения',
-    'qr-soon': 'QR КОД
-СКОРО',
+    'qr-soon': 'QR КОД\nСКОРО',
     'btn-download': '↓ Скачать .conf',
     'card-setup': 'Инструкция по подключению',
     'setup-1-label': '1. Скачать',
@@ -1558,6 +1556,10 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
+  const langBtn = document.getElementById('lang-btn');
+  if (langBtn) langBtn.textContent = currentLang.toUpperCase();
+  const themeBtn = document.getElementById('theme-btn');
+  if (themeBtn) themeBtn.textContent = document.body.classList.contains('light') ? '◑' : '◐';
 }
 
 function toggleLang() {
@@ -1570,7 +1572,6 @@ function toggleLang() {
 (function initLang() {
   const saved = localStorage.getItem('sov_lang') || 'ru';
   currentLang = saved;
-  document.getElementById('lang-btn').textContent = currentLang.toUpperCase();
 })();
 
 
@@ -1593,8 +1594,6 @@ function toggleTheme() {
   const saved = localStorage.getItem('sov_theme');
   if (saved === 'light') {
     document.body.classList.add('light');
-    const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = '◑';
   }
 })();
 
@@ -1897,8 +1896,8 @@ function escHtml(s) {
       loadClientOverview();
     }
   }
-})();
   applyTranslations();
+})();
 </script>
 </body>
 </html>
