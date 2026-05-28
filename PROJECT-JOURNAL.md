@@ -1774,6 +1774,48 @@ Paid clients  (10.99.99.0/24) → awg2 → Stockholm (direct AWG) → Internet
 
 ---
 
+## 2026-05-28
+
+### 🛠 Done Today
+
+#### PWA — Plans Page
+
+Pricing page added to client portal:
+
+- Basic — 350 ₽/mo, first month 250 ₽, 1 device
+- Extended — 750 ₽/mo, 2 devices + allowlist bypass (infrastructure in dev, button disabled)
+- Family — 600 ₽/mo, 3 devices
+- Footer banner "crypto billing coming soon"
+- "Get Started" buttons — placeholder for Heleket API
+
+#### PWA — UI Updates
+
+- Light theme: warm background #f5f0eb, accent color terracotta #c45000 (opposite spectrum from blue)
+- Theme toggle button ◐/◑ — fixed position, persists in localStorage
+- Language toggle EN/RU — default RU, persists in localStorage
+- Tagline "Path always exists." intentionally untranslated
+- Admin button removed from landing — replaced with subtle hidden link in bottom-right corner
+
+#### DB — configs and payments tables
+
+- `configs`: user_id, name, peer_ip, private_key, public_key, preshared_key, is_active
+- `payments`: user_id, plan, amount, currency, status, heleket_invoice_id, paid_at
+- `users`: added plan field
+- Migration applied on Bridge
+
+#### Deploy — stable workflow
+
+Created `deploy.sh` — excludes `.env` from rsync, recreates only pwa container without touching DB volume.
+
+### 📋 Plans
+
+- Bridge → Stockholm AWG tunnel (awg2, subnet 10.99.99.0/24)
+- Heleket API integration
+- Auto-provisioning configs after payment
+- Residential node (laptop): connect via ethernet, complete setup
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
