@@ -1816,6 +1816,61 @@ Created `deploy.sh` — excludes `.env` from rsync, recreates only pwa container
 
 ---
 
+## 2026-05-29
+
+### 🛠 Done Today
+
+#### PWA — i18n across the whole portal
+
+- Language (RU/EN) and theme toggles moved to top-level — now work on every screen (landing, client portal, admin), not just the landing page
+- Default language: RU
+- Entire client portal and admin interface now translatable (nav, pages, plans, features, statuses)
+- Tagline "Path always exists." remains untranslated by design
+- Font size increased +3px site-wide for readability
+
+#### PWA — Overview redesign
+
+- SVG route map embedded inline (self-contained, no external dependency — resilient under allowlist/blocking)
+- Entry node St. Petersburg → two vectors: Stockholm (primary, solid line, animated packets, pulsing node) and Chisinau (fallback, dashed, slower packet)
+- Cities placed by real relative geographic position
+- Animation via SMIL — works without JS or internet
+- Exit Node block: Primary Stockholm / Fallback Chisinau
+- Status block: per-node status scaffold (Stockholm / Chisinau)
+- Speed block: real latency measurement (median of 4 samples), throughput scaffolded
+- Network block removed (not needed by clients)
+
+#### PWA — Payment section rework
+
+- "Plans" removed from sidebar — integrated into Payment
+- Sub-tabs: Subscription / Order History / Support
+- Subscription tab: Current Plan (real data from /api/client/me) + plan selection
+- Order History and Support: "in development" placeholders
+- Telegram removed entirely (unreachable in RF without VPN — all flows stay on-site)
+
+#### Backend — Cryptobilling in development
+
+- `services/heleket.py` — signature (md5(base64(body)+key)), invoice creation, webhook verification. Slash-escaping gotcha handled.
+- `api/payment.py` — POST /api/payment/create (server-side price table, never trusts client amounts), POST /api/payment/webhook (signature verify, idempotent, activates subscription on paid)
+- Auto-provisioning of AWG peer after payment marked as TODO (next step)
+- Endpoints dormant until registered in main.py
+- Frontend selectPlan() wired to create invoice and redirect
+
+### 📋 Pending for billing launch
+
+- Register payment router in main.py
+- Domain + HTTPS for webhook url_callback
+- Heleket credentials in .env
+- Payment currency selection
+- Auto-provisioning service (generate AWG peer on Bridge, save Config, expose in portal)
+
+### 📋 Other Pending
+
+- Bridge → Stockholm awg2 tunnel (subnet 10.99.99.0/24, table 201)
+- Residential node: ethernet connect + hardening + AWG
+- Multi-config support for clients with multiple devices
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
