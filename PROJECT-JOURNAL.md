@@ -1871,6 +1871,27 @@ Created `deploy.sh` — excludes `.env` from rsync, recreates only pwa container
 
 ---
 
+## 2026-05-30
+
+### 🛠 Done Today
+
+#### PWA — Overview map replaced with real region map
+
+- Dropped the hand-drawn SVG blobs (rendered incorrectly — SVG text used CSS vars and dropped out)
+- New map rendered from real Natural Earth border data: recognizable Baltic / Scandinavia region
+- Cities at real relative positions: St. Petersburg (entry), Stockholm (primary), Chisinau (fallback)
+- Two versions (dark / light) embedded as base64 — fully self-contained, no external load
+- City labels overlaid in HTML — localizable RU/EN, theme-colored
+- Primary node pulse + animated packet along the St. Petersburg → Stockholm route
+- Page size grew to ~248 KB (cost of embedded maps — acceptable for offline resilience)
+
+### 📋 Tomorrow
+
+- Remove leftover static labels that don't change
+- Check map rendering on mobile (most users are on phones)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
