@@ -118,3 +118,33 @@ async def get_me(
         "peer_ip": user.peer_ip,
         "subscribed_until": user.subscribed_until,
     }
+
+@router.get("/api/client/payments")
+async def my_payments(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    username = payload.get("sub")
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await db.execute(
+        select(Payment).where(Payment.user_id == user.id).order_by(Payment.created_at.desc())
+    )
+    rows = result.scalars().all()
+    return {
+        "ok": True,
+        "payments": [
+            {
+                "plan": p.plan,
+                "amount": p.amount,
+                "currency": p.currency,
+                "status": p.status,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "paid_at": p.paid_at.isoformat() if p.paid_at else None,
+            }
+            for p in rows
+        ],
+    }
