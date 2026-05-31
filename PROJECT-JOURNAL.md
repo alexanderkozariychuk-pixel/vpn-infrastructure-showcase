@@ -1892,6 +1892,33 @@ Created `deploy.sh` — excludes `.env` from rsync, recreates only pwa container
 
 ---
 
+## 2026-05-31
+
+### 🛠 Done Today
+
+#### PWA — Map labels fixed
+
+- Found the duplicate-labels bug: the embedded map PNG still had baked-in Russian city names (from an earlier render), with HTML overlay labels stacked on top — hence duplicates in a different font that didn't translate
+- Re-rendered both maps (dark + light) completely label-free — only nodes and routes baked in
+- City labels are now HTML overlay only: localized RU/EN and theme-colored
+
+#### PWA — Order History (real data)
+
+- New endpoint `GET /api/client/payments` — returns the current user's payments (plan, amount, currency, status, dates), newest first
+- Order History sub-tab no longer a placeholder: loads on open, renders a table (date / plan / amount / status)
+- Statuses localized and color-coded: paid green, pending yellow, error red; empty state "No orders yet"
+
+### 📋 Pending
+
+- Domain (sovrn.nexus chosen) — deferred
+- Register payment router in main.py + Heleket credentials (waiting on domain + currency decision)
+- Auto-provisioning AWG peer after payment
+- Multi-config support in "My Config" (clients with several devices)
+- Bridge → Stockholm awg2 tunnel
+- Residential node: ethernet + hardening + AWG
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
