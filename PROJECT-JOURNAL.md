@@ -1919,6 +1919,37 @@ Created `deploy.sh` — excludes `.env` from rsync, recreates only pwa container
 
 ---
 
+## 2026-06-01
+
+### 🛠 Done Today
+
+#### Residential Node — AWG tunnel to Stockholm
+
+**Goal:** residential laptop (home RF IP) → AWG → Stockholm → Internet
+
+**Steps completed:**
+
+- SSH access to residential node established over WiFi
+- amneziawg PPA added, DKMS module built and loaded (weak CPU, ~5 min compile time — expected)
+- AWG keypair generated for residential node
+- Peer added to Stockholm AWG server, dedicated subnet for residential nodes
+- Client config created on residential node matching Stockholm obfuscation params
+- Stockholm: ip_forward enabled, MASQUERADE configured, route to residential subnet added via PostUp in AWG config
+- iptables rules saved persistently
+- Autostart enabled on both nodes (awg-quick@awg0 systemd service)
+- Verified after reboot: tunnel comes up automatically, exit IP confirmed as Stockholm ✅
+
+**Current chain:**
+Residential node (home RF IP) → AWG → Stockholm → Internet
+
+### 📋 Tomorrow
+
+- AWG server on residential node (phones connect to it as first hop)
+- First test client config via residential → Stockholm chain
+- Final target: Phone → Residential (RF IP) → Stockholm → Internet
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
