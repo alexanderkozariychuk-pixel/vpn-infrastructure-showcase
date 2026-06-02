@@ -1950,6 +1950,55 @@ Residential node (home RF IP) → AWG → Stockholm → Internet
 
 ---
 
+## 2026-06-02
+
+### 🛠 Done Today
+
+#### Residential Node — AWG server setup (partial)
+
+- AWG server (awg1) brought up on residential node, port 7443, custom obfuscation params
+- Port forwarding configured on home router (UDP 7443 → residential node)
+- Test client peer added, handshake established between phone and residential node
+- Routing phone→residential→Stockholm not completed — requires clean approach
+- ip_forward enabled and persisted on residential node
+
+#### Moldova — Emergency maintenance
+
+- Disk was at 100% — syslog/kern.log consumed 10+ GB
+- Freed 16 GB via log truncation and journald vacuum
+- Disk now at 37%, RAM usage normal
+- Log rotation configured: journald max 200 MB / 7 days, logrotate max 100 MB / 3 rotations
+
+#### Infrastructure — 5 new client configs
+
+- Generated 5 new AWG keypairs (client7–client11)
+- Peers added to Bridge awg0 (subnet .37–.41)
+- Client configs created with correct obfuscation params and MTU 1300
+- client7 and client8 distributed as promo configs
+
+#### Auto-provisioning — Architecture designed + provisioner.py written
+
+- Full billing→provisioning cycle designed for Basic plan
+- `services/provisioner.py` written and syntax-verified:
+  - Generates AWG keypair + PSK locally
+  - Finds free IP from pool
+  - Adds peer to Bridge via SSH (awg set + appends to config file)
+  - Saves encrypted Config to DB (Fernet symmetric encryption)
+  - Activates user subscription (30 days)
+  - Returns decrypted .conf for client portal
+
+### 📋 Plan — next 2 days (auto-provisioning completion)
+
+1. Copy `provisioner.py` to `services/` in project
+2. Generate `FERNET_KEY`, add to `.env` on server and locally
+3. Add `cryptography` to `requirements.txt`
+4. Wire `provision_basic()` into `api/payment.py` webhook (on `paid` status)
+5. Create `api/config.py` — `GET /api/client/config` endpoint
+6. Update `index.html` — "My Config" page shows real config data from DB
+7. Register payment + config routers in `main.py`
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
