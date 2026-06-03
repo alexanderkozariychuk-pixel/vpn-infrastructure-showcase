@@ -13,8 +13,8 @@
       --bg-3: #111920;
       --border: #1e2d38;
       --border-bright: #2a4055;
-      --text: #c8d8e4;
-      --text-dim: #5a7a8a;
+      --text: #d8eaf6;
+      --text-dim: #7a9fb5;
       --text-bright: #e8f4ff;
       --accent: #00d4ff;
       --accent-dim: #006a80;
@@ -704,8 +704,8 @@
       --bg-3: #e4ddd6;
       --border: #ccc5bb;
       --border-bright: #b8ae9f;
-      --text: #3a3028;
-      --text-dim: #8a7d6e;
+      --text: #1e1810;
+      --text-dim: #5a4e42;
       --text-bright: #1a1208;
       --accent: #c45000;
       --accent-dim: #8a3800;
@@ -889,6 +889,8 @@
     .subtab:hover { color: var(--text); }
     .subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .paytab-panel { display: none; }
+    .setup-panel { display: none; }
+    .setup-panel.active { display: block; }
     .paytab-panel.active { display: block; }
 
 
@@ -1014,7 +1016,7 @@
   <div class="landing-content">
     <div class="landing-badge" data-i18n="badge">Encrypted Access Network</div>
     <h1 class="landing-title">Sover<span>ei</span>gn</h1>
-    <p class="landing-sub" data-i18n="landing-sub">Private · Secure · Resilient</p>
+    <p class="landing-sub" data-i18n="landing-sub" style="font-size:11px;letter-spacing:2px">Private · Secure · Resilient</p>
     <p class="landing-desc" id="landing-tagline"
       onmouseenter="this.textContent='Путь всегда существует.'"
       onmouseleave="this.textContent='Path always exists.'" 
@@ -1103,10 +1105,7 @@
       </div>
       <div class="nav-section">
         <div class="nav-label">Menu</div>
-        <div class="nav-item active" onclick="showPage('client', 'overview')">
-          <span class="nav-icon">◈</span> <span data-i18n="nav-overview">Overview</span>
-        </div>
-        <div class="nav-item" onclick="showPage('client', 'config')">
+        <div class="nav-item active" onclick="showPage('client', 'config')">
           <span class="nav-icon">⌗</span> <span data-i18n="nav-config">My Config</span>
         </div>
         <div class="nav-item" onclick="showPage('client', 'payment')">
@@ -1125,88 +1124,72 @@
     <main class="main-content">
 
       <!-- OVERVIEW -->
-      <div class="page active" id="client-page-overview">
-        <div class="page-header">
-          <div class="page-title" data-i18n="page-overview">Overview</div>
-          <div class="page-sub" data-i18n="page-overview-sub">Your connection status</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title" data-i18n="card-route">Connection Route</div>
-          <div class="route-map" id="route-map">
-            <img class="route-map-img" id="route-map-img" alt="" />
-            <!-- localizable labels + animation overlay (coords are % of image) -->
-            <div class="map-label" style="left:76.1%;top:20.4%" data-i18n="node-spb">St. Petersburg</div>
-            <div class="map-label primary" style="left:37.7%;top:23.4%" data-i18n="node-stockholm">Stockholm</div>
-            <div class="map-label" style="left:71.4%;top:85.0%" data-i18n="node-chisinau">Chisinau</div>
-            <div class="map-pulse" style="left:37.7%;top:23.4%"></div>
-            <div class="map-packet"></div>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title" data-i18n="stat-exit">Exit Node</div>
-            <div class="metric">
-              <span class="metric-label" data-i18n="exit-primary">Primary</span>
-              <span class="metric-value accent" data-i18n="node-stockholm">Stockholm</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label" data-i18n="exit-fallback">Fallback</span>
-              <span class="metric-value" data-i18n="node-chisinau">Chisinau</span>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title" data-i18n="stat-status">Status</div>
-            <div id="node-status">
-              <div class="metric">
-                <span class="metric-label" data-i18n="node-stockholm">Stockholm</span>
-                <span class="metric-value" id="st-stockholm"><span class="loading" data-i18n="status-checking">Checking</span></span>
-              </div>
-              <div class="metric">
-                <span class="metric-label" data-i18n="node-chisinau">Chisinau</span>
-                <span class="metric-value" id="st-chisinau"><span class="loading" data-i18n="status-checking">Checking</span></span>
-              </div>
-            </div>
-            <div class="card-title" style="margin-top:16px" data-i18n="stat-speed">Speed</div>
-            <div class="metric">
-              <span class="metric-label" id="speed-result" data-i18n="speed-idle">Not measured</span>
-              <button class="btn-sm" onclick="runSpeedTest()" id="speed-btn" data-i18n="btn-speedtest">Measure</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       
       <!-- CONFIG -->
-      <div class="page" id="client-page-config">
+      <div class="page active" id="client-page-config">
         <div class="page-header">
           <div class="page-title" data-i18n="page-config">My Config</div>
           <div class="page-sub" data-i18n="page-config-sub">AmneziaWG connection file</div>
         </div>
-        <div class="card">
-          <div class="card-title" data-i18n="card-conn">Connection Details</div>
-          <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
-            <div class="qr-placeholder">QR CODE<br>COMING SOON</div>
-            <div style="flex:1;min-width:220px">
-              <div class="config-block" id="cl-config-block">
-                <button class="copy-btn" onclick="copyConfig()">Copy</button>
-                <span class="loading">Loading config</span>
-              </div>
-              <div class="actions">
-                <button class="btn-sm" onclick="downloadConfig()">↓ Download .conf</button>
+
+        <!-- no subscription state -->
+        <div id="config-no-sub" style="display:none">
+          <div class="wip-banner">
+            <span class="wip-code">—</span>
+            <div class="wip-title" data-i18n="config-no-sub-title">No active subscription</div>
+            <div class="wip-sub" data-i18n="config-no-sub-sub">Subscribe to get your personal config</div>
+          </div>
+          <div class="actions" style="justify-content:center;margin-top:16px">
+            <button class="btn-sm" onclick="showPage('client','payment');showPayTab('sub')" data-i18n="btn-go-plans">Choose a plan →</button>
+          </div>
+        </div>
+
+        <!-- has subscription -->
+        <div id="config-has-sub" style="display:none">
+          <div class="card">
+            <div class="card-title" data-i18n="card-conn">Connection Details</div>
+            <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+              <div class="qr-placeholder" id="cl-qr">QR CODE<br>COMING SOON</div>
+              <div style="flex:1;min-width:220px">
+                <div class="config-block" id="cl-config-block">
+                  <button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">Copy</button>
+                  <span class="loading" data-i18n="hist-loading">Loading</span>
+                </div>
+                <div class="actions">
+                  <button class="btn-sm" onclick="downloadConfig()" data-i18n="btn-download">↓ Download .conf</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="card">
-          <div class="card-title" data-i18n="card-setup">Setup Instructions</div>
-          <div class="metric"><span class="metric-label">1. Download</span><span class="metric-value">AmneziaWG app (iOS / Android / Windows)</span></div>
-          <div class="metric"><span class="metric-label">2. Import</span><span class="metric-value">Scan QR or import .conf file</span></div>
-          <div class="metric"><span class="metric-label">3. Connect</span><span class="metric-value">Toggle the connection</span></div>
-          <div class="metric"><span class="metric-label">Support</span><span class="metric-value">Telegram: @sovereign_support</span></div>
-        </div>
+          <div class="card">
+            <div class="card-title" data-i18n="card-setup">Setup Instructions</div>
+            <div class="subtabs" style="margin-bottom:16px">
+              <div class="subtab active" data-setuptab="ios" onclick="showSetupTab('ios')" data-i18n="setup-tab-ios">iOS</div>
+              <div class="subtab" data-setuptab="android" onclick="showSetupTab('android')" data-i18n="setup-tab-android">Android</div>
+              <div class="subtab" data-setuptab="windows" onclick="showSetupTab('windows')" data-i18n="setup-tab-windows">Windows</div>
+            </div>
+            <div class="setup-panel active" id="setup-ios">
+              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="ios-step-1">Open App Store, find AmneziaWG, install</span></div>
+              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="ios-step-2">Open AmneziaWG → tap + → Add from file</span></div>
+              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="ios-step-3">Download your .conf file above and select it</span></div>
+              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="ios-step-4">Allow VPN configuration when prompted</span></div>
+              <div class="metric"><span class="metric-label">5</span><span class="metric-value" data-i18n="ios-step-5">Toggle the connection — done</span></div>
+              <div class="metric" style="margin-top:4px"><span class="metric-label" data-i18n="setup-note">Note</span><span class="metric-value" style="color:var(--text-dim)" data-i18n="ios-note">If toggle turns off immediately — check VPN permissions in iOS Settings</span></div>
+            </div>
+            <div class="setup-panel" id="setup-android">
+              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="and-step-1">Open Google Play or RuStore, find AmneziaWG, install</span></div>
+              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="and-step-2">Open AmneziaWG → tap + → Import from file</span></div>
+              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="and-step-3">Download your .conf file above and select it</span></div>
+              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="and-step-4">Allow VPN configuration when prompted</span></div>
+              <div class="metric"><span class="metric-label">5</span><span class="metric-value" data-i18n="and-step-5">Toggle the connection — done</span></div>
+            </div>
+            <div class="setup-panel" id="setup-windows">
+              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="win-step-1">Download AmneziaWG from amnezia.org</span></div>
+              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="win-step-2">Install and open the application</span></div>
+              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="win-step-3">Click Add tunnel → select your .conf file</span></div>
+              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="win-step-4">Click Activate — done</span></div>
+            </div>
+          </div>
       </div>
 
 
@@ -1471,6 +1454,29 @@ const translations = {
     'feat-basic-incl': 'Basic plan included',
     'feat-allowlist': 'Allowlist bypass config',
     'feat-residential': 'Residential exit node',
+    'setup-tab-ios': 'iOS',
+    'setup-tab-android': 'Android',
+    'setup-tab-windows': 'Windows',
+    'setup-note': 'Note',
+    'ios-step-1': 'Open App Store, find AmneziaWG, install',
+    'ios-step-2': 'Open AmneziaWG → tap + → Add from file or archive',
+    'ios-step-3': 'Download your .conf file above and select it',
+    'ios-step-4': 'Allow VPN configuration when prompted',
+    'ios-step-5': 'Toggle the connection — done',
+    'ios-note': 'If the toggle turns off immediately — check that VPN is allowed in iOS Settings',
+    'and-step-1': 'Open Google Play or RuStore, find AmneziaWG, install',
+    'and-step-2': 'Open AmneziaWG → tap + → Import from file',
+    'and-step-3': 'Download your .conf file above and select it',
+    'and-step-4': 'Allow VPN configuration when prompted',
+    'and-step-5': 'Toggle the connection — done',
+    'win-step-1': 'Download AmneziaWG from amnezia.org',
+    'win-step-2': 'Install and open the application',
+    'win-step-3': 'Click Add tunnel → select your .conf file',
+    'win-step-4': 'Click Activate — done',
+    'config-no-sub-title': 'No active subscription',
+    'config-no-sub-sub': 'Subscribe to get your personal config',
+    'btn-go-plans': 'Choose a plan →',
+    'btn-copy': 'Copy',
     'hist-title': 'Order history',
     'hist-loading': 'Loading',
     'hist-empty': 'No orders yet',
@@ -1610,6 +1616,29 @@ const translations = {
     'feat-basic-incl': 'Базовый тариф включён',
     'feat-allowlist': 'Конфиг обхода белых списков',
     'feat-residential': 'Резидентный выходной узел',
+    'setup-tab-ios': 'iOS',
+    'setup-tab-android': 'Android',
+    'setup-tab-windows': 'Windows',
+    'setup-note': 'Важно',
+    'ios-step-1': 'Откройте App Store, найдите AmneziaWG, установите',
+    'ios-step-2': 'Откройте AmneziaWG → нажмите + → Добавить из файла',
+    'ios-step-3': 'Скачайте ваш .conf файл выше и выберите его',
+    'ios-step-4': 'Разрешите настройку VPN при запросе',
+    'ios-step-5': 'Включите переключатель — готово',
+    'ios-note': 'Если переключатель сразу отключается — проверьте настройки VPN в iOS Настройках',
+    'and-step-1': 'Откройте Google Play или RuStore, найдите AmneziaWG, установите',
+    'and-step-2': 'Откройте AmneziaWG → нажмите + → Импорт из файла',
+    'and-step-3': 'Скачайте ваш .conf файл выше и выберите его',
+    'and-step-4': 'Разрешите настройку VPN при запросе',
+    'and-step-5': 'Включите переключатель — готово',
+    'win-step-1': 'Скачайте AmneziaWG с сайта amnezia.org',
+    'win-step-2': 'Установите и откройте приложение',
+    'win-step-3': 'Нажмите Добавить туннель → выберите ваш .conf файл',
+    'win-step-4': 'Нажмите Активировать — готово',
+    'config-no-sub-title': 'Нет активной подписки',
+    'config-no-sub-sub': 'Оформите подписку чтобы получить конфиг',
+    'btn-go-plans': 'Выбрать тариф →',
+    'btn-copy': 'Скопировать',
     'hist-title': 'История заказов',
     'hist-loading': 'Загрузка',
     'hist-empty': 'Заказов пока нет',
@@ -1791,6 +1820,16 @@ function toggleTheme() {
 // ── ROUTING ──────────────────────────────────────
 
 
+
+function showSetupTab(tab) {
+  document.querySelectorAll('.setup-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-setuptab]').forEach(s => s.classList.remove('active'));
+  const panel = document.getElementById('setup-' + tab);
+  if (panel) panel.classList.add('active');
+  const tabEl = document.querySelector(`[data-setuptab="${tab}"]`);
+  if (tabEl) tabEl.classList.add('active');
+}
+
 function showPayTab(tab) {
   document.querySelectorAll('.paytab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.subtab').forEach(s => s.classList.remove('active'));
@@ -1883,6 +1922,7 @@ function showView(view, mode) {
 
 function showPage(panel, page) {
   closeSidebar();
+  if (panel === 'client' && page === 'config') loadClientConfigPage();
   const prefix = panel === 'admin' ? 'admin' : 'client';
   document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .page`)
     .forEach(p => p.classList.remove('active'));
@@ -1963,7 +2003,7 @@ async function doLogin() {
         document.getElementById('client-name').textContent = username;
         document.getElementById('client-avatar').textContent = username[0].toUpperCase();
         applyTranslations();
-        loadClientOverview();
+        loadClientConfigPage();
         loadClientMe();
       }
     } else {
@@ -2012,6 +2052,57 @@ async function runSpeedTest() {
   btn.disabled = false;
 }
 
+
+let _configText = '';
+
+async function loadClientConfigPage() {
+  const noSub = document.getElementById('config-no-sub');
+  const hasSub = document.getElementById('config-has-sub');
+  const block = document.getElementById('cl-config-block');
+  if (!noSub || !hasSub) return;
+  try {
+    const res = await fetch(`${API}/api/client/config`, {headers: hdrs()});
+    if (res.status === 401) { doLogout(); return; }
+    if (res.status === 402) {
+      noSub.style.display = 'block';
+      hasSub.style.display = 'none';
+      return;
+    }
+    const d = await res.json();
+    if (d.ok && d.config) {
+      noSub.style.display = 'none';
+      hasSub.style.display = 'block';
+      _configText = d.config;
+      // render config with syntax highlighting
+      const lines = d.config.split('\n').map(line => {
+        if (line.startsWith('[')) return `<span class="config-key">${line}</span>`;
+        if (line.includes(' = ')) {
+          const [k, ...v] = line.split(' = ');
+          return `<span class="config-key">${k}</span> = <span class="config-val">${v.join(' = ')}</span>`;
+        }
+        return `<span style="color:var(--text-dim)">${line}</span>`;
+      });
+      block.innerHTML = `<button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">${t('btn-copy')}</button>` + lines.join('<br>');
+    }
+  } catch(e) {
+    if (block) block.innerHTML = '<span style="color:var(--red)">—</span>';
+  }
+}
+
+function copyConfig() {
+  if (_configText) navigator.clipboard.writeText(_configText);
+}
+
+function downloadConfig() {
+  if (!_configText) return;
+  const user = localStorage.getItem('sov_user') || 'sovereign';
+  const blob = new Blob([_configText], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sovereign-${user}.conf`;
+  a.click();
+}
+
 async function loadClientMe() {
   try {
     const res = await fetch(`${API}/api/client/me`, {headers: hdrs()});
@@ -2045,19 +2136,8 @@ async function loadClientOverview() {
     if (chi) { chi.textContent = t('status-offline'); chi.className = 'metric-value red'; }
   }
 
-  // Populate client config placeholder
-  const user = localStorage.getItem('sov_user') || '?';
-  document.getElementById('cl-config-block').innerHTML = `
-    <button class="copy-btn" onclick="copyConfig()">Copy</button>
-    <span class="config-key">[Interface]</span><br>
-    <span class="config-key">PrivateKey</span> <span style="color:var(--text-dim)"># stored on your device</span><br>
-    <span class="config-key">Address</span> = <span class="config-val"># your VPN IP</span><br>
-    <span class="config-key">DNS</span> = <span class="config-val">1.1.1.1, 1.0.0.1</span><br><br>
-    <span class="config-key">[Peer]</span><br>
-    <span class="config-key">Endpoint</span> = <span class="config-val">212.67.14.85:8443</span><br>
-    <span class="config-key">AllowedIPs</span> = <span class="config-val">0.0.0.0/0</span><br>
-    <span style="color:var(--text-dim)"># Contact admin for your personal config file</span>
-  `;
+  // Load real config from API
+  await loadClientConfigPage();
 }
 
 function copyConfig() {
@@ -2190,7 +2270,7 @@ function escHtml(s) {
       showView('dashboard');
       document.getElementById('client-name').textContent = user;
       document.getElementById('client-avatar').textContent = (user[0] || '?').toUpperCase();
-      loadClientOverview();
+      loadClientConfigPage();
       loadClientMe();
     }
   }

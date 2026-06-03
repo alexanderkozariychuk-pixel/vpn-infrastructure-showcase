@@ -1,0 +1,217 @@
+"""
+services/provisioner.py — Auto-provisioning of AWG peers after payment.
+
+Flow (Basic plan):
+  1. Generate AWG keypair + PSK
+  2. Find next free IP in the Basic pool (10.88.88.42–10.88.88.99)
+  3. Add peer to Bridge awg0 via SSH (awg set)
+  4. Save Config row to DB (private key encrypted with Fernet)
+  5. Mark user as subscribed
+"""
+import os
+import subprocess
+import logging
+from datetime import datetime, timedelta, timezone
+from cryptography.fernet import Fernet
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from db.models import User, Config, Payment
+
+logger = logging.getLogger(__name__)
+
+BRIDGE_USER = os.getenv("BRIDGE_USER", "vpnadmin")
+BRIDGE_IP   = os.getenv("BRIDGE_IP", "")
+BRIDGE_AWG  = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
+BRIDGE_PUB  = os.getenv("BRIDGE_PUBLIC_KEY", "kCq1FK/tYvvB68h9luTRX5PAV0a2pIn2klbyNUKRMm0=")
+BRIDGE_ENDPOINT = os.getenv("BRIDGE_ENDPOINT", "212.67.14.85:8443")
+
+# Obfuscation params matching Bridge awg0
+AWG_PARAMS = {
+    "Jc": "3", "Jmin": "50", "Jmax": "1000",
+    "S1": "72", "S2": "146",
+    "H1": "1163059398", "H2": "1787455160",
+    "H3": "970047041",  "H4": "133143559",
+}
+
+# IP pools per plan
+POOLS = {
+    "Basic":  ("10.88.88", 42, 99),   # 10.88.88.42 – 10.88.88.99
+    "Family": ("10.88.88", 100, 149), # reserved for future
+}
+
+# Fernet key for encrypting private keys in DB
+_fernet_key = os.getenv("FERNET_KEY", "")
+_fernet = Fernet(_fernet_key.encode()) if _fernet_key else None
+
+
+# ── helpers ────────────────────────────────────────────────────────────
+
+def _awg_genkey() -> str:
+    return subprocess.check_output(["awg", "genkey"]).decode().strip()
+
+def _awg_pubkey(priv: str) -> str:
+    return subprocess.check_output(
+        ["awg", "pubkey"], input=priv.encode()
+    ).decode().strip()
+
+def _awg_genpsk() -> str:
+    return subprocess.check_output(["awg", "genpsk"]).decode().strip()
+
+def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
+    result = subprocess.run(
+        ["ssh",
+         "-o", "StrictHostKeyChecking=no",
+         "-o", "ConnectTimeout=5",
+         f"{BRIDGE_USER}@{BRIDGE_IP}",
+         cmd],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    return result.stdout.strip(), result.stderr.strip()
+
+def _encrypt(plain: str) -> str:
+    if not _fernet:
+        return plain  # fallback: store plain if key not set (dev only)
+    return _fernet.encrypt(plain.encode()).decode()
+
+def _decrypt(cipher: str) -> str:
+    if not _fernet:
+        return cipher
+    return _fernet.decrypt(cipher.encode()).decode()
+
+
+# ── find free IP ───────────────────────────────────────────────────────
+
+async def _find_free_ip(db: AsyncSession, plan: str) -> str | None:
+    """Return next available VPN IP for the given plan."""
+    prefix, start, end = POOLS.get(plan, ("10.88.88", 42, 99))
+    result = await db.execute(select(Config.peer_ip))
+    used = {row[0] for row in result.fetchall() if row[0]}
+    for i in range(start, end + 1):
+        candidate = f"{prefix}.{i}"
+        if candidate not in used:
+            return candidate
+    return None
+
+
+# ── add peer to Bridge ────────────────────────────────────────────────
+
+def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> bool:
+    """Add peer to Bridge awg0 in memory and persist to config file."""
+
+    # 1. add in memory (no PSK via set — Bridge supports it)
+    psk_file = f"/tmp/psk_{peer_ip.replace('.','_')}"
+    cmd_psk  = f"echo '{psk}' > {psk_file}"
+    cmd_set  = (
+        f"sudo awg set {BRIDGE_AWG} "
+        f"peer {pub} "
+        f"preshared-key {psk_file} "
+        f"allowed-ips {peer_ip}/32 && "
+        f"rm -f {psk_file}"
+    )
+    stdout, stderr = _ssh_bridge(f"{cmd_psk} && {cmd_set}")
+    if stderr and "error" in stderr.lower():
+        logger.error("awg set failed: %s", stderr)
+        return False
+
+    # 2. persist to config file
+    block = (
+        f"\n\n### {client_name}\n"
+        f"[Peer]\n"
+        f"PublicKey = {pub}\n"
+        f"PresharedKey = {psk}\n"
+        f"AllowedIPs = {peer_ip}/32\n"
+    )
+    # escape single quotes for bash
+    block_escaped = block.replace("'", "'\\''")
+    cmd_append = f"echo '{block_escaped}' | sudo tee -a /etc/amnezia/amneziawg/{BRIDGE_AWG}.conf > /dev/null"
+    _ssh_bridge(cmd_append)
+    return True
+
+
+# ── build client config text ──────────────────────────────────────────
+
+def _build_conf(priv: str, psk: str, peer_ip: str) -> str:
+    params = "\n".join(f"{k} = {v}" for k, v in AWG_PARAMS.items())
+    return (
+        f"[Interface]\n"
+        f"PrivateKey = {priv}\n"
+        f"Address = {peer_ip}/32\n"
+        f"DNS = 1.1.1.1\n"
+        f"MTU = 1300\n"
+        f"{params}\n\n"
+        f"[Peer]\n"
+        f"PublicKey = {BRIDGE_PUB}\n"
+        f"PresharedKey = {psk}\n"
+        f"Endpoint = {BRIDGE_ENDPOINT}\n"
+        f"AllowedIPs = 0.0.0.0/0\n"
+        f"PersistentKeepalive = 25\n"
+    )
+
+
+# ── main entry point ──────────────────────────────────────────────────
+
+async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> bool:
+    """
+    Full auto-provisioning for Basic plan:
+      generate keys → find free IP → add to Bridge → save Config → activate user.
+    Returns True on success.
+    """
+    try:
+        priv = _awg_genkey()
+        pub  = _awg_pubkey(priv)
+        psk  = _awg_genpsk()
+    except Exception as e:
+        logger.error("Key generation failed: %s", e)
+        return False
+
+    peer_ip = await _find_free_ip(db, "Basic")
+    if not peer_ip:
+        logger.error("No free IPs in Basic pool")
+        return False
+
+    client_name = f"auto-{user.username}"
+    ok = _add_peer_to_bridge(pub, psk, peer_ip, client_name)
+    if not ok:
+        logger.error("Failed to add peer to Bridge for user %s", user.username)
+        return False
+
+    # save Config to DB
+    conf_text = _build_conf(priv, psk, peer_ip)
+    config = Config(
+        user_id=user.id,
+        name="Basic",
+        peer_ip=peer_ip,
+        private_key=_encrypt(priv),
+        public_key=pub,
+        preshared_key=_encrypt(psk),
+        is_active=True,
+    )
+    db.add(config)
+
+    # activate subscription
+    now = datetime.now(timezone.utc)
+    user.is_subscribed = True
+    user.plan = "Basic"
+    user.peer_ip = peer_ip
+    user.subscribed_until = now + timedelta(days=30)
+    payment.status = "paid"
+    payment.paid_at = now
+
+    await db.commit()
+    logger.info("Provisioned Basic for user %s → %s", user.username, peer_ip)
+    return True
+
+
+async def get_client_config(user: User, db: AsyncSession) -> str | None:
+    """Return decrypted .conf text for the user's active config."""
+    result = await db.execute(
+        select(Config)
+        .where(Config.user_id == user.id, Config.is_active == True)
+        .order_by(Config.created_at.desc())
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        return None
+    priv = _decrypt(config.private_key)
+    psk  = _decrypt(config.preshared_key)
+    return _build_conf(priv, psk, config.peer_ip)
