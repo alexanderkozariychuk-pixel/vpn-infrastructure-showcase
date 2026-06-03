@@ -1999,6 +1999,59 @@ Residential node (home RF IP) → AWG → Stockholm → Internet
 
 ---
 
+## 2026-06-03
+
+### 🛠 Done Today — Auto-provisioning deployed (v0.8.0)
+
+#### Backend wiring
+- `services/provisioner.py` deployed: generates AWG keys, finds free IP from pool, adds peer to Bridge via SSH, saves encrypted Config to DB, activates subscription
+- `api/payment.py`: `provision_basic()` wired into webhook on paid status; Basic plan price set to 200 RUB/mo
+- `api/config.py`: `GET /api/client/config` + `/raw` download endpoint
+- `main.py`: payment + config routers registered, version bumped to 0.8.0
+- `.env`: added FERNET_KEY, BRIDGE_PUBLIC_KEY, BRIDGE_ENDPOINT (local + server)
+- Migrations applied on server
+
+#### Manual config seeding (test data)
+- 3 existing users granted Basic plan manually (simulating paid subscription)
+- Inserted Config rows with real AWG keys (private key + PSK Fernet-encrypted)
+- Verified: config displays in portal, downloads correctly as .conf
+
+#### Frontend — major portal cleanup
+- Removed Overview page (deferred for later, more detailed rework)
+- "My Config" is now the default landing page after login
+- Setup instructions rebuilt as tabbed (iOS / Android / Windows), iOS default
+- Contrast improved in both light and dark themes
+- Landing tagline font reduced (was competing with site name on mobile)
+- Config page now shows real config from API, or "no subscription" / "config being prepared" states
+
+#### Payment section rework
+- Fixed critical bug: payment page rendered empty — root cause was an unbalanced `</div>` causing the payment page to nest inside the config page
+- `showPayTab` rewritten to use direct style.display manipulation instead of CSS class toggling
+- Support moved out of payment sub-tabs into its own sidebar section
+- Plans reworked: Basic = "Popular" at 200 RUB/mo; Extended = "in development" only (details removed); Family removed entirely
+
+### 📋 Plan — next session
+
+1. **Moldova — disk + reboot prep**
+   - Investigate disk consumption (verify log rotation took effect)
+   - Audit auto-start after reboot: IPIP tunnel, AWG (awg0 + awg1), routing tables, PostUp persistence
+   - Confirm everything survives reboot before rebooting; schedule reboot at night
+
+2. **"Forgot password" on login**
+   - Design reset flow — depends on email availability (linked to #4)
+   - Options: email-based reset (needs SMTP) or manual admin reset initially
+
+3. **Order History tab — not switching**
+   - Likely same class of bug as payment page after support subtab removal — check showPayTab logic
+
+4. **Support localization**
+   - Telegram rejected (users can't reach it during config/infra problems)
+   - Phase 1: feedback form → tickets to support email
+   - Phase 2: on-site AI consultant for setup/support, with escalation to human operator
+   - Start with form + email first
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
