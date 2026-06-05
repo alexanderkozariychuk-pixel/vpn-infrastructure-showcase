@@ -2052,6 +2052,45 @@ Residential node (home RF IP) → AWG → Stockholm → Internet
 
 ---
 
+## 2026-06-04
+
+### 🛠 Done — Moldova disk growth diagnosed and fixed
+
+- Disk was filling ~3 GB per 16 hours despite log rotation being configured
+- Root cause: two leftover debug iptables LOG rules logging every packet from a tunnel source IP
+  - one in `mangle PREROUTING`, one in `nat PREROUTING`
+  - they flooded kern.log/syslog faster than rotation could trim
+- Removed both rules, truncated the bloated logs
+- Disk back to 37%, growth stopped
+- Confirmed no LOG rules remain in any table
+
+## 2026-06-05
+
+### 🔍 Analysis — Moldova reboot-readiness audit
+
+Goal: confirm what survives a reboot before scheduling one (uptime was 69 days).
+
+Findings:
+- AWG autostart: `awg-quick@awg0` and `awg-quick@awg1` both enabled ✓
+- `ip_forward` persistent via sysctl.d ✓
+- **NAT/forwarding restored via AWG PostUp hooks** (MASQUERADE out main iface + FORWARD rules live in awg0/awg1 configs) — this is why the box survives reboots without netfilter-persistent
+- Debug LOG rules (the disk-fillers) are not in any PostUp → won't return after reboot ✓
+- IPIP tunnel confirmed dead (0 bytes over 5s sample; 109 GB counter was historical)
+- Policy routing via custom table was redundant — it pointed to the same gateway as the main table since IPIP was retired
+
+Actions:
+- Disabled and stopped `ipip-tunnel.service` so it no longer recreates the dead tunnel or hijacks the custom routing table on boot
+- Verified after changes: free clients still exit via Moldova, AWG peers intact (18 on awg0)
+
+Conclusion: **Moldova is reboot-safe.** Everything critical auto-restores. Reboot can be done at night.
+
+### 📋 Tomorrow evening
+
+- Clear zombie processes on Moldova (reboot will handle them, or kill parent)
+- Run the same reboot-readiness + disk/process analysis on Bridge (production entry node)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
