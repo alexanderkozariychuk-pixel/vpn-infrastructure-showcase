@@ -2091,6 +2091,25 @@ Conclusion: **Moldova is reboot-safe.** Everything critical auto-restores. Reboo
 
 ---
 
+## 2026-06-06
+
+### 🔍 Bridge — new clients 37/38 not working
+
+- Symptom: the two newest peers had an endpoint and tiny transfer but NO completed handshake (no "latest handshake" line)
+- Root cause: when peers 7–11 were added in an earlier session, the preshared-key step failed silently (process substitution doesn't work over SSH), so the peers were registered WITHOUT a PSK while the client configs HAD one → PSK mismatch → handshake never completes
+- Fix: set preshared-key for all five peers (37–41) via temp-file method
+- Pending: verify handshake after client reconnect
+- TODO: persist PSKs to awg0.conf so they survive reboot
+
+### 📋 Tomorrow
+
+- Verify client 37 handshake after reconnect
+- Persist PSKs into awg0.conf
+- Clear zombie processes on Moldova
+- Run reboot-readiness + disk/process analysis on Bridge
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
