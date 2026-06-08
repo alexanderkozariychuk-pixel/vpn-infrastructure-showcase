@@ -1,158 +1,158 @@
 # Multi-Hop Obfuscated VPN Infrastructure
 
-[![Lint](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml/badge.svg)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase/actions/workflows/lint.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)
-![Shell](https://img.shields.io/badge/Shell-bash-4EAA25.svg?logo=gnu-bash&logoColor=white)
-![Ansible](https://img.shields.io/badge/Ansible-EE0000.svg?logo=ansible&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED.svg?logo=docker&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624.svg?logo=linux&logoColor=black)
-[![Terraform](https://img.shields.io/badge/Terraform-1.10-844FBA?logo=terraform)](https://terraform.io)
-[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus)](https://prometheus.io)
-[![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana)](https://grafana.com)
-[![WireGuard](https://img.shields.io/badge/WireGuard-88171A?logo=wireguard)](https://wireguard.com)
-
+![Linux](https://img.shields.io/badge/Linux-Ubuntu_24.04-FCC624.svg?logo=linux&logoColor=black)
+[![WireGuard](https://img.shields.io/badge/AmneziaWG-88171A?logo=wireguard)](https://github.com/amnezia-vpn/amneziawg)
 
 ---
 
-**Censorship-resistant multi-hop VPN** with Policy-Based Routing, AmneziaWG and Xray.
+**Production-grade censorship-resistant VPN** with multi-hop routing, AmneziaWG obfuscation, and a self-hosted client portal with automated peer provisioning.
 
 ---
 
 ## Table of Contents
+
 - [Project Overview](#project-overview)
 - [Architecture](#architecture)
-- [Current Status](#current-status-)
+- [Current Status](#current-status)
 - [Tech Stack](#tech-stack)
-- [Key Features](#key-features)
+- [Client Portal](#client-portal)
+- [Auto-Provisioning](#auto-provisioning)
 - [Next Steps](#next-steps)
-- [Setup](#setup)
-- [Automation and Scripts](#automation-and-scripts)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Project Overview
-Multi-hop VPN infrastructure for stable, private connectivity, designed to bypass DPI restrictions and provide monitoring and failover capabilities.
+
+Sovereign is a production VPN service targeting users behind DPI-based censorship and allowlist filtering. The infrastructure is designed around AmneziaWG — a fork of WireGuard with traffic obfuscation parameters that defeat deep packet inspection — running across multiple VPS nodes and a residential home node.
+
+The project includes a full client-facing PWA portal (registration, authentication, automated config delivery, subscription management) and a billing scaffold ready for crypto payment integration.
 
 ---
 
 ## Architecture
 
-See detailed architecture in [`docs/architecture.md`](docs/architecture.md).
+```
+Standard tier (free / basic):
+  Device → Bridge (St. Petersburg, RF IP) → Moldova (relay) → Internet
+
+Premium tier (allowlist bypass):
+  Device → Residential node (home RF IP) → Stockholm → Internet
+```
+
+### Nodes
+
+| Node | Location | Provider | Role |
+|------|----------|----------|------|
+| Bridge | St. Petersburg | Beget | Entry node, AWG server for clients, hosts PWA |
+| Moldova | Chișinău | Cloud4Box | Relay, standard-tier exit via NAT |
+| Stockholm | Stockholm | AEZA | Exit node for residential chain |
+| Residential | Home (RF) | ISP (dynamic IP) | Ubuntu 24.04 laptop — AWG server for premium clients, AWG client to Stockholm |
+
+### Routing logic
+
+All nodes run AmneziaWG with unique obfuscation parameters (Jc, Jmin, Jmax, S1, S2, H1–H4) generated per server. Client configs include matching parameters — standard WireGuard clients cannot connect.
+
+Standard-tier clients connect to Bridge on port 8443 and exit through Moldova's IP. The residential node (home ISP address) serves as a first hop that is indistinguishable from normal home traffic, providing the highest resilience against allowlist filtering. Traffic from the residential node exits through Stockholm.
 
 ---
 
-## Current Status (as of April 14, 2026) ✅
+## Current Status
 
-| Component                    | Status              | Details |
-|-----------------------------|---------------------|---------|
-| **Moldova Entry Node**      | Fully Operational   | Main working node, serving 10+ client devices |
-| **Russian Bridge Node**     | Terraform module ready | Awaiting provisioning (Yandex Cloud) |
-| **France Exit Node**        | Terraform module ready | Awaiting provisioning (Aeza) |
-| **VPN Tunnel**              | Operational         | AmneziaWG multi‑hop chain (Russia → Moldova → France) |
-| **Client Configurations**   | 10+ clients         | Generated and tested |
-| **Policy-Based Routing**    | Implemented         | Selective routing logic developed and tested |
-| **Monitoring Stack**        | Active              | Uptime Kuma + Prometheus + Grafana (hosted on Moldova) |
-| **Alerts**                  | Working             | Telegram notifications configured |
-| **Custom Metrics**          | Developed           | `awg_status.py` collects AmneziaWG metrics and pushes to Uptime Kuma |
-
-## Monitoring & Live Status
-
-| Uptime Kuma Dashboard | AmneziaWG Status |
-|----------------------|------------------|
-| ![Uptime Kuma](docs/screenshots/uptime-kuma-overview.png) | ![AmneziaWG Status](docs/screenshots/awg-show.png) |
-
-*Current monitoring overview and real-time AmneziaWG tunnel status showing active peers and traffic.*
-
-**Key Features:**
-- Three-hop chain (Russia → Moldova → France)
-- Server-side Policy-Based Routing
-- Strong obfuscation (AmneziaWG + Xray)
-- Full automation (Ansible + Python)
+| Component | Status | Details |
+|-----------|--------|---------|
+| Bridge (St. Petersburg) | ✅ Operational | Entry node, 20+ active client peers |
+| Moldova | ✅ Operational | Relay, standard-tier NAT exit |
+| Stockholm | ✅ Operational | Primary exit for residential chain |
+| Residential node | ✅ Operational | AWG server :7443 + client to Stockholm |
+| Client portal (PWA) | ✅ v0.8.0 deployed | Registration, auth, config delivery, subscription |
+| Auto-provisioning | ✅ Implemented | Key generation, SSH peer addition, encrypted DB storage |
+| Crypto billing (Heleket) | 🔧 Scaffolded | Awaiting domain + credentials |
+| Client configs | ✅ 20+ peers | Standard tier (Bridge → Moldova) |
 
 ---
 
 ## Tech Stack
-- **Networking**: AmneziaWG (primary), WireGuard, Xray (optional fallback)
-- **Monitoring**: Prometheus, Node Exporter, Uptime Kuma, Alertmanager
-- **Automation**: Terraform (Yandex Cloud, Aeza), Ansible, Python (Aeza API, 4VPS.SU API)
 
-## Key Features
-- DPI bypass via obfuscation layer
-- Multi-client VPN configuration
-- Observability with metrics and alerts
-- Failover testing scripts
+**Infrastructure:**
+- AmneziaWG — obfuscated WireGuard fork, custom parameters per node
+- Ubuntu 24.04 on all nodes
+- Policy-based routing (ip rule / ip route / custom tables)
+- iptables MASQUERADE for NAT at exit nodes
+
+**Backend (PWA):**
+- FastAPI (Python 3.12) — async REST API
+- PostgreSQL — users, configs (Fernet-encrypted keys), payments
+- Alembic — database migrations
+- Docker Compose — container orchestration on Bridge
+- Cryptography (Fernet) — symmetric encryption of private keys at rest
+
+**Frontend:**
+- Vanilla JS single-page application (no framework)
+- Self-hosted, served from Bridge via Nginx
+- RU/EN i18n, dark/light themes
+- Tabbed setup instructions (iOS / Android / Windows)
+
+**Billing:**
+- Heleket crypto payment gateway (scaffolded)
+- Webhook verification (MD5 signature with PHP-compatible serialization)
+- Server-side price table — client amounts never trusted
+
+---
+
+## Client Portal
+
+The PWA is accessible at the Bridge node's IP. It provides:
+
+- Registration and JWT-based authentication
+- **My Config** — displays the user's personal AmneziaWG `.conf` with syntax highlighting; one-click copy and download
+- **Payment** — current subscription status, plan selection (Basic / Extended), order history
+- **Support** — contact information
+- **Admin SRE panel** — peer status, traffic, logs from Moldova, AI-assisted infrastructure analysis
+
+After a successful payment, `provision_basic()` automatically:
+1. Generates a fresh AWG keypair and PSK locally
+2. Finds the next available IP from the Basic pool (`10.88.88.42–99`)
+3. Adds the peer to Bridge via SSH (`awg set` + appends to `awg0.conf`)
+4. Saves the encrypted config to PostgreSQL
+5. Activates the 30-day subscription
+
+---
+
+## Auto-Provisioning
+
+`services/provisioner.py` handles the full lifecycle of a new paid client without manual intervention. Private keys and PSKs are encrypted with Fernet (AES-128-CBC) before storage. The decrypted `.conf` is generated on-demand at `GET /api/client/config` and never stored in plaintext.
+
+SSH access from the PWA container to Bridge uses the same key-based auth as manual administration, scoped to the `vpnadmin` user.
 
 ---
 
 ## Next Steps
-- Provision Russian Bridge node on Yandex Cloud with Policy-Based Routing
-- Migrate all clients from Moldova Entry node to the new Russian Bridge
-- Prepare Moldova node for receiving and forwarding traffic from Russian Bridge
-- Complete automation of VPS provisioning and base hardening
-- Migrate monitoring stack to a dedicated VPS in the Netherlands
-- Final audit and polishing of project documentation and structure
 
-Detailed weekly plans and progress tracking are available in [`PROJECT-JOURNAL.md`](PROJECT-JOURNAL.md).
-
----
-
-## Setup
-See detailed setup instructions in [`docs/setup-tutorial.md`](docs/setup-tutorial.md).
+- Purchase domain (`sovrn.nexus`) and configure DNS — required for HTTPS and Heleket `url_callback`
+- Activate Heleket credentials and complete billing integration
+- Complete residential chain routing: Phone → Residential → Stockholm (routing fix in progress)
+- PostgreSQL automated backups
+- Support form with email ticket delivery (`sovereign.support@gmail.com`)
+- "Forgot password" flow (requires SMTP)
+- Per-client iptables isolation (clients cannot reach each other's subnets)
+- Uptime Kuma monitoring for all nodes
 
 ---
 
-## Automation and Scripts
+## Troubleshooting
 
-All automation scripts are organized in the [`scripts/`](scripts/) directory with a clear separation of concerns.
+The main real-world challenge driving this project is **allowlist-based filtering** on Russian mobile networks — only pre-approved domains/IPs are accessible, UDP is throttled or blocked entirely.
 
-### Script Overview
+Key lessons from production:
 
-| Category              | Script                              | Description |
-|-----------------------|-------------------------------------|-----------|
-| **Installation**      | `install/install-amneziawg.sh`      | One-click installation of AmneziaWG on a fresh Ubuntu server |
-| **Installation**      | `install/install-monitoring.sh`     | Deploy full monitoring stack (Uptime Kuma, Prometheus, Node Exporter, Alertmanager) via Docker |
-| **Installation**      | `install/provision-new-vps.sh`      | Base setup for a new VPS: create user, configure SSH keys, harden security, set up firewall |
-| **Monitoring**        | `monitors/awg-status.py`            | Collect AmneziaWG metrics (peers, traffic, handshake age) and push to Uptime Kuma |
-| **Monitoring**        | `monitors/healthcheck.sh`           | Verify AmneziaWG, Xray and critical ports health |
-| **Utilities**         | `utils/rotate-keys.sh`              | Rotate keys for an existing client and restart the service |
-| **Utilities**         | `utils/backup-configs.sh`           | Create timestamped backup of all critical configuration files |
-| **Utilities**         | `utils/generate-config.sh`          | Generate client configuration files |
-| **Providers**         | `providers/aeza/create-aeza-vps.py` | Provision VPS on Aeza using official API |
-| **Providers**         | `providers/fourvps/create-vps.py`   | Provision VPS on 4VPS.SU (supports discovery mode) |
+- **Cloudflare proxy (orange cloud) is throttled to 16 KB/s** by Russian ISPs as of mid-2025. The site must resolve directly to a Russian IP — not through any CDN.
+- **Standard WireGuard is blocked** by DPI on most Russian mobile networks. AmneziaWG with randomized obfuscation parameters passes as generic UDP traffic.
+- **Debug iptables LOG rules** in PREROUTING can silently consume gigabytes of disk within hours on a relay node. Keep `iptables-save` clean.
+- **Process substitution (`<(...)`) fails** when piped through SSH. Use temp files for passing secrets to `awg set preshared-key`.
 
-> **Note**: Provider scripts allow programmatic VPS creation and are the foundation for full Infrastructure as Code (IaC) in this project.
-
-For detailed usage instructions, see [`docs/setup-tutorial.md`](docs/setup-tutorial.md).
-
----
-
-### Planned automation
-
-- **Ansible playbooks** for configuring AmneziaWG and monitoring on all nodes (see `ansible/` directory).
-- **CI/CD** (GitHub Actions) for automated testing of scripts and playbooks (planned).
-- **Terraform** already in use for Yandex Cloud and Aeza; further provider integrations may be added.
-
-> All server configuration will be handled by Ansible, making the setup repeatable and version‑controlled.
----
-
-## Troubleshooting & Real-World Challenges
-
-One of the main motivations behind this project was solving real connectivity problems in restrictive networks.
-
-### Key Challenge Faced
-
-During testing, mobile networks with strict **whitelist-based restrictions** were encountered — only pre-approved websites were accessible, while UDP traffic was heavily throttled or blocked.
-
-This project addresses the following real-world issues:
-- Deep Packet Inspection (DPI) behavior and protocol blocking
-- UDP traffic instability on mobile networks
-- Whitelist-based internet access limitations
-- Multi-hop VPN stability under censorship conditions
-
-Detailed analysis, solutions and lessons learned are documented in:
-
-→ [`docs/troubleshooting.md`](docs/troubleshooting.md)
+Detailed notes are tracked in [`PROJECT-JOURNAL.md`](PROJECT-JOURNAL.md).
