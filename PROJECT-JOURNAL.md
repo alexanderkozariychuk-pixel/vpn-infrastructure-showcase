@@ -2110,6 +2110,54 @@ Conclusion: **Moldova is reboot-safe.** Everything critical auto-restores. Reboo
 
 ---
 
+## 2026-06-08
+
+### 🛠 Done Today
+
+#### Documentation — README fully rewritten
+
+- README updated to reflect current state (was dated April 2026 with wrong architecture)
+- Removed: France exit node, Xray, IPIP tunnel, Yandex Cloud, Prometheus/Grafana/Alertmanager
+- Added: actual 4-node topology, PWA section, auto-provisioning section
+- Badges trimmed from 13 to 6 (only what's actually in use)
+- Troubleshooting section rewritten with real production lessons
+- Tech stack table reflects actual deployed components
+
+#### Repository audit
+
+- Full tree audit: identified outdated components, security concerns, and noise
+- Proposed clean structure for employer-facing portfolio
+- Key finding: venv dirs committed (thousands of files), retired stacks still present (Xray, IPIP, Yandex)
+
+---
+
+## 2026-06-09
+
+### 🛠 Done Today
+
+#### 🛠 Repository cleanup and restructuring
+
+Restructuring repo to reflect current project state and clean up for portfolio use:
+
+**Remove:**
+- `configs/3x-ui/`, `configs/xray/`, `configs/monitoring/` — retired stacks
+- `infrastructure/ansible/roles/xray-relay/`, `fou-backbone/`, `outline/` — retired
+- `infrastructure/terraform/yandex/`, `yc-backend-setup/` — Yandex Cloud not used
+- `scripts/providers/fourvps/` — retired provider
+- `monitoring/ai-bot-monitoring/*.tar.gz` — binary artifacts
+- `monitoring/dashboards/` — empty directory
+
+**Add:**
+- `docs/runbook.md` — incident response procedures (what to do when X)
+- `tests/test_api.py` — basic pytest for /api/health
+
+**Update:**
+- `docs/architecture.md` — current 4-node topology
+- `docs/troubleshooting.md` — updated with production lessons
+- `scripts/README.md` — mark which scripts are production-active
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
