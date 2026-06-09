@@ -1,5 +1,0 @@
-yandex_token     = "t1.9e9...TOKEN..."
-yandex_cloud_id  = "b1g..."
-yandex_folder_id = "b1g..."
-server_name      = "ru-bridge-01"
-ssh_public_key   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... PUBLIC_KEY"

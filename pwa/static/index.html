@@ -1111,6 +1111,9 @@
         <div class="nav-item" onclick="showPage('client', 'payment')">
           <span class="nav-icon">◎</span> <span data-i18n="nav-payment">Payment</span>
         </div>
+        <div class="nav-item" onclick="showPage('client', 'support')">
+          <span class="nav-icon">✆</span> <span data-i18n="nav-support">Support</span>
+        </div>
       </div>
       <div class="sidebar-bottom">
         <div class="user-chip">
@@ -1190,6 +1193,7 @@
               <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="win-step-4">Click Activate — done</span></div>
             </div>
           </div>
+        </div>
       </div>
 
 
@@ -1204,11 +1208,10 @@
         <div class="subtabs">
           <div class="subtab active" data-paytab="sub" onclick="showPayTab('sub')" data-i18n="pay-tab-sub">Subscription</div>
           <div class="subtab" data-paytab="history" onclick="showPayTab('history')" data-i18n="pay-tab-history">Order History</div>
-          <div class="subtab" data-paytab="support" onclick="showPayTab('support')" data-i18n="pay-tab-support">Support</div>
         </div>
 
         <!-- TAB: Subscription -->
-        <div class="paytab-panel active" id="paytab-sub">
+        <div class="paytab-panel" id="paytab-sub" style="display:block">
           <!-- Block 1: current plan -->
           <div class="card">
             <div class="card-title" data-i18n="card-plan">Current Plan</div>
@@ -1220,11 +1223,12 @@
           <!-- Block 2: plan selection -->
           <div class="card-title" style="margin:8px 0 16px;padding:0" data-i18n="choose-plan">Choose a plan</div>
           <div class="plans-grid">
-            <div class="plan-card">
+            <div class="plan-card featured">
+              <div class="plan-badge" data-i18n="badge-popular">Popular</div>
               <div class="plan-name" data-i18n="plan-basic-name">Basic</div>
               <div class="plan-desc" data-i18n="plan-basic-desc">1 device · Standard exit</div>
-              <div class="plan-price">350 <span>₽/mo</span></div>
-              <div class="plan-promo" data-i18n="plan-basic-promo">First month — 250 ₽</div>
+              <div class="plan-price">200 <span data-i18n="per-mo">₽/mo</span></div>
+              <div class="plan-promo">&nbsp;</div>
               <ul class="plan-features">
                 <li data-i18n="feat-1dev">1 device config</li>
                 <li data-i18n="feat-home">Works on home WiFi</li>
@@ -1234,60 +1238,49 @@
               <button class="plan-btn" onclick="selectPlan('Basic')" data-i18n="btn-get-started">Get Started →</button>
             </div>
 
-            <div class="plan-card featured">
-              <div class="plan-badge" data-i18n="badge-popular">Popular</div>
+            <div class="plan-card">
               <div class="plan-name" data-i18n="plan-ext-name">Extended</div>
-              <div class="plan-desc" data-i18n="plan-ext-desc">2 devices · Allowlist bypass</div>
-              <div class="plan-price">750 <span>₽/mo</span></div>
+              <div class="plan-desc" data-i18n="plan-ext-dev">In development</div>
+              <div class="plan-price" style="color:var(--text-dim)">—</div>
               <div class="plan-promo" style="color:var(--yellow)" data-i18n="plan-ext-promo">Infrastructure in development</div>
               <ul class="plan-features">
-                <li data-i18n="feat-2dev">2 device configs</li>
-                <li data-i18n="feat-basic-incl">Basic plan included</li>
-                <li class="wip" data-i18n="feat-allowlist">Allowlist bypass config</li>
-                <li class="wip" data-i18n="feat-residential">Residential exit node</li>
+                <li class="wip" data-i18n="feat-soon">Coming soon</li>
               </ul>
               <button class="plan-btn wip-btn" disabled data-i18n="btn-coming-soon">Coming Soon</button>
             </div>
-
-            <div class="plan-card">
-              <div class="plan-name" data-i18n="plan-fam-name">Family</div>
-              <div class="plan-desc" data-i18n="plan-fam-desc">3 devices · Best value</div>
-              <div class="plan-price">600 <span>₽/mo</span></div>
-              <div class="plan-promo">&nbsp;</div>
-              <ul class="plan-features">
-                <li data-i18n="feat-3dev">3 device configs</li>
-                <li data-i18n="feat-home">Works on home WiFi</li>
-                <li data-i18n="feat-mobile">Works on mobile network</li>
-                <li data-i18n="feat-stockholm">Stockholm exit node</li>
-              </ul>
-              <button class="plan-btn" onclick="selectPlan('Family')" data-i18n="btn-get-started">Get Started →</button>
-            </div>
           </div>
-
           <div class="card" style="text-align:center;padding:20px">
             <div id="pay-status" style="font-size:13px;color:var(--text-dim);letter-spacing:1px" data-i18n="pay-coming">Payment integration coming soon</div>
           </div>
         </div>
 
         <!-- TAB: Order History -->
-        <div class="paytab-panel" id="paytab-history">
+        <div class="paytab-panel" id="paytab-history" style="display:none">
           <div class="card">
             <div class="card-title" data-i18n="hist-title">Order history</div>
             <div id="hist-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
           </div>
         </div>
 
-        <!-- TAB: Support -->
-        <div class="paytab-panel" id="paytab-support">
-          <div class="wip-banner">
-            <span class="wip-code">WIP</span>
-            <div class="wip-title" data-i18n="wip-support-title">Support</div>
-            <div class="wip-sub" data-i18n="wip-support-sub">Support section in development</div>
-          </div>
+                </div>
+      </div>
+
+          
+      <!-- SUPPORT -->
+      <div class="page" id="client-page-support">
+        <div class="page-header">
+          <div class="page-title" data-i18n="nav-support">Support</div>
+          <div class="page-sub" data-i18n="support-sub">We're here to help</div>
+        </div>
+        <div class="card">
+          <div class="card-title" data-i18n="support-card-title">Contact us</div>
+          <div class="metric"><span class="metric-label" data-i18n="support-email">Email</span><span class="metric-value">support@sovrn.nexus</span></div>
+          <div class="metric"><span class="metric-label" data-i18n="support-hours">Hours</span><span class="metric-value" data-i18n="support-hours-val">Daily, 10:00–22:00 MSK</span></div>
+          <div class="metric" style="margin-top:8px"><span class="metric-value" style="color:var(--text-dim)" data-i18n="support-note">Describe your issue in detail — device, app version, and what's not working. We'll respond as soon as possible.</span></div>
         </div>
       </div>
 
-          </main>
+      </main>
   </div>
 </div>
 
@@ -1435,6 +1428,16 @@ function updateMapImage() {
 // ── i18n ──────────────────────────────────────────
 const translations = {
   en: {
+    'nav-support': 'Support',
+    'support-sub': "We're here to help",
+    'support-card-title': 'Contact us',
+    'support-email': 'Email',
+    'support-hours': 'Hours',
+    'support-hours-val': 'Daily, 10:00–22:00 MSK',
+    'support-note': "Describe your issue in detail — device, app version, and what's not working. We'll respond as soon as possible.",
+    'per-mo': '₽/mo',
+    'plan-ext-dev': 'In development',
+    'feat-soon': 'Coming soon',
     'pay-tab-sub': 'Subscription',
     'pay-tab-history': 'Order History',
     'pay-tab-support': 'Support',
@@ -1597,6 +1600,16 @@ const translations = {
     'analyze-desc': 'Collects metrics from all nodes and generates an SRE report.',
   },
   ru: {
+    'nav-support': 'Техподдержка',
+    'support-sub': 'Мы на связи',
+    'support-card-title': 'Связаться с нами',
+    'support-email': 'Email',
+    'support-hours': 'Часы',
+    'support-hours-val': 'Ежедневно, 10:00–22:00 МСК',
+    'support-note': 'Опишите проблему подробно — устройство, версия приложения и что не работает. Ответим в ближайшее время.',
+    'per-mo': '₽/мес',
+    'plan-ext-dev': 'В разработке',
+    'feat-soon': 'Скоро',
     'pay-tab-sub': 'Подписка',
     'pay-tab-history': 'История заказов',
     'pay-tab-support': 'Техподдержка',
@@ -1923,6 +1936,11 @@ function showView(view, mode) {
 function showPage(panel, page) {
   closeSidebar();
   if (panel === 'client' && page === 'config') loadClientConfigPage();
+  if (panel === 'client' && page === 'payment') {
+    showPayTab('sub');
+    loadClientMe();
+  }
+  if (panel === 'client' && page === 'support') { /* static page */ }
   const prefix = panel === 'admin' ? 'admin' : 'client';
   document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .page`)
     .forEach(p => p.classList.remove('active'));
@@ -2066,6 +2084,17 @@ async function loadClientConfigPage() {
     if (res.status === 402) {
       noSub.style.display = 'block';
       hasSub.style.display = 'none';
+      applyTranslations();
+      return;
+    }
+    if (res.status === 404) {
+      noSub.style.display = 'block';
+      hasSub.style.display = 'none';
+      // show "config being prepared" message
+      const title = noSub.querySelector('[data-i18n="config-no-sub-title"]');
+      const sub = noSub.querySelector('[data-i18n="config-no-sub-sub"]');
+      if (title) { title.removeAttribute('data-i18n'); title.textContent = currentLang === 'ru' ? 'Конфиг готовится' : 'Config is being prepared'; }
+      if (sub) { sub.removeAttribute('data-i18n'); sub.textContent = currentLang === 'ru' ? 'Ваш конфиг будет доступен в ближайшее время. Обратитесь в поддержку если ожидаете долго.' : 'Your config will be available shortly. Contact support if you wait too long.'; }
       return;
     }
     const d = await res.json();
@@ -2145,9 +2174,7 @@ function copyConfig() {
   navigator.clipboard.writeText(text);
 }
 
-function downloadConfig() {
-  alert('Contact admin to receive your personal .conf file');
-}
+
 
 // ── ADMIN DATA ────────────────────────────────────
 async function loadAdminDash() {

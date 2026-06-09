@@ -28,7 +28,7 @@ router = APIRouter()
 SITE_URL = os.getenv("SITE_URL", "http://212.67.14.85")
 
 PLANS = {
-    "Basic":    {"amount": "350", "currency": "RUB", "days": 30},
+    "Basic":    {"amount": "200", "currency": "RUB", "days": 30},
     "Extended": {"amount": "750", "currency": "RUB", "days": 30},
     "Family":   {"amount": "600", "currency": "RUB", "days": 30},
 }

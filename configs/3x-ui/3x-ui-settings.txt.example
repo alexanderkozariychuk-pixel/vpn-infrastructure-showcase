@@ -1,4 +1,0 @@
-Panel URL: http://<VPS_IP>:54321/<BASE_PATH>
-Default login: admin / admin
-Port: 54321
-SSL: disabled by default (use Let's Encrypt if domain available)

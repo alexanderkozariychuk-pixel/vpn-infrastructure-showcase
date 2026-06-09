@@ -1,5 +1,0 @@
----
-- name: restart monitoring
-  shell: docker compose up -d --force-recreate
-  args:
-    chdir: "{{ monitoring_dir }}"

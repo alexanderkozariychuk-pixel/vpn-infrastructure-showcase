@@ -1,7 +1,0 @@
-xray_inbound_port: 443
-xray_inbound_protocol: vless
-xray_log_level: warning
-xray_dest: "www.microsoft.com:443"
-xray_server_name: "www.microsoft.com"
-xray_fingerprint: chrome
-xray_short_id: "6ba85179e30d4fc2"
