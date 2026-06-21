@@ -2158,6 +2158,38 @@ Restructuring repo to reflect current project state and clean up for portfolio u
 
 ---
 
+## 2026-06-21
+
+### 🛠 Done Today
+
+#### Infrastructure
+- Full health check after 2-week pause: all nodes operational
+- Bridge: 31 peers, disk 17%, portal v0.8.0 responding
+- Moldova: disk stable at 37% (no growth since June 5 — LOG rule fix held)
+- Moldova reboot deferred to next session
+
+#### Repository
+- Committed `docs/runbook.md` — full incident response procedures
+- Added `docs/architecture.md` — current 4-node topology, IP addressing, provisioning flow
+- Added `tests/test_api.py` — basic pytest coverage for auth, config, payment endpoints
+- Updated `scripts/README.md` — production-active vs reference status for all scripts
+
+#### Portal — typography overhaul
+- Added `--font-body: system-ui` variable to CSS root
+- Body text switched from JetBrains Mono → system-ui across the entire portal
+- JetBrains Mono retained only for technical elements: config blocks, labels, status codes
+- Slogan font switched to system-ui with letter-spacing 4px, weight 500
+- Deployed to production
+
+### 📋 Tomorrow
+
+- Fix payment tab switching: "Subscription" / "Order History" tabs not toggling
+- Mobile layout improvements: vertical spacing, instruction blocks
+- Navigation: review icon + label clarity
+- Moldova reboot (audit was completed on 2026-06-05, confirmed safe)
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
