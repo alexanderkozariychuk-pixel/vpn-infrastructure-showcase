@@ -2190,6 +2190,56 @@ Restructuring repo to reflect current project state and clean up for portfolio u
 
 ---
 
+## 2026-06-22
+
+### 🛠 Done Today
+
+#### Portal — typography (carried over, deployed)
+- Body text switched from JetBrains Mono to system-ui across the portal
+- Monospace retained only for technical elements (config blocks, labels, status codes)
+- Slogan restyled with system-ui, increased letter-spacing
+
+#### Portal — payment tab fix
+- "Order History" tab returned 500 — root cause: `Payment` not imported in `api/register.py`
+- Fixed import, rebuilt PWA container (image-baked code, not bind-mounted)
+- `showPayTab` rewritten to use direct `style.display` instead of CSS class toggling — tab switching now reliable
+
+#### Portal — support section rebuilt
+- Replaced static contact info with a structured feedback form
+- Issue categories with conditional sub-fields:
+  - VPN won't connect → OS selector (iOS/Android/Windows/macOS)
+  - App/resource slow → service selector (YouTube/Telegram/WhatsApp/TikTok/Instagram/custom)
+  - Can't import .conf → OS selector
+  - Other → free-text field
+- Email field + submit, success confirmation screen with boutique-style copy
+- Direct contact line (sovrn.support@gmail.com) below the form
+
+#### Portal — layout bug (extended debugging)
+- Support page content was rendering at the bottom of the page, outside the app shell
+- Root cause: a single missing `</div>` in the support page — HTML parsers silently auto-corrected it, but the browser rendered the broken structure, pushing the page out of `<main>`
+- Pulled the live server file as source of truth, validated full div balance with a parser, fixed the one missing tag
+- Verified: body div depth balanced (0), all three client pages are correct siblings inside dashboard main
+- Deployed, confirmed working
+
+### 📋 Next session — email functionality (SMTP)
+
+Build three features on a shared SMTP layer (`services/mailer.py`, Gmail SMTP):
+
+1. **Support form → email** — `POST /api/support/ticket` sends formatted ticket to support inbox; wire real fetch into existing form
+2. **Forgot password** — `POST /api/auth/forgot` (token + reset link) and `POST /api/auth/reset` (token + new password); Alembic migration for `reset_token` + `reset_expires`; login-page button + reset page on frontend
+3. **Registration email** — welcome email on signup (later: subscription confirmation emails to same address)
+
+Email language follows user's interface language (RU/EN).
+
+**Prep needed:**
+- `sovrn.support@gmail.com` registered (personal account, no domain/Workspace needed)
+- App-password generated (requires 2FA enabled)
+- `.env`: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+
+**Note:** password-reset links will point to bare IP until domain is purchased — Gmail may flag; acceptable for testing.
+
+---
+
 ## Long-term Plans
 
 - Activate Russian Bridge node with full Policy-Based Routing
