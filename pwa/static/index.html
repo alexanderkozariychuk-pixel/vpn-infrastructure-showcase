@@ -25,12 +25,21 @@
       --red: #ff4d6a;
       --font-mono: 'JetBrains Mono', monospace;
       --font-display: 'Unbounded', sans-serif;
+      --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
+
+    /* Technical elements keep monospace */
+    .config-block, .config-key, .config-val,
+    .wip-code, code, pre,
+    .metric-label, .metric-value {
       font-family: var(--font-mono);
+    }
+
+    body {
+      font-family: var(--font-body);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -127,11 +136,13 @@
     }
 
     .landing-sub {
-      font-size: 14px;
-      letter-spacing: 3px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      letter-spacing: 4px;
       color: var(--text-dim);
       text-transform: uppercase;
       margin-bottom: 40px;
+      font-weight: 500;
     }
 
     .landing-desc {
@@ -156,7 +167,7 @@
       color: var(--bg);
       border: none;
       padding: 12px 28px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 15px;
       font-weight: 700;
       letter-spacing: 2px;
@@ -175,7 +186,7 @@
       color: var(--text-dim);
       border: 1px solid var(--border);
       padding: 12px 28px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 15px;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -271,7 +282,7 @@
       border: 1px solid var(--border);
       color: var(--text-bright);
       padding: 12px 14px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 16px;
       outline: none;
       transition: border-color 0.2s;
@@ -297,7 +308,7 @@
       color: var(--bg);
       border: none;
       padding: 14px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 15px;
       font-weight: 700;
       letter-spacing: 2px;
@@ -579,7 +590,7 @@
       border: 1px solid var(--border);
       color: var(--text-dim);
       padding: 4px 10px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
@@ -675,7 +686,7 @@
       border: 1px solid var(--border);
       color: var(--text-dim);
       padding: 7px 14px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 14px;
       letter-spacing: 1px;
       cursor: pointer;
@@ -848,7 +859,7 @@
       border: 1px solid var(--border);
       color: var(--text-dim);
       padding: 10px;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
       font-size: 14px;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -890,6 +901,51 @@
     .subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .paytab-panel { display: none; }
     .setup-panel { display: none; }
+
+    /* Support form */
+    .sup-field { margin-bottom: 20px; }
+    .sup-label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      font-family: var(--font-body);
+    }
+    .sup-select, .sup-input, .sup-textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: var(--font-body);
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+    .sup-select:focus, .sup-input:focus, .sup-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .sup-textarea { resize: vertical; min-height: 100px; }
+    .sup-hint { font-size: 11px; color: var(--text-dim); margin-top: 6px; font-family: var(--font-body); }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-dim);
+      padding: 6px 16px;
+      font-size: 13px;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.selected { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+
     .setup-panel.active { display: block; }
     .paytab-panel.active { display: block; }
 
@@ -899,7 +955,7 @@
     .route-map-img { width: 100%; height: auto; display: block; }
     .map-label {
       position: absolute; transform: translate(-50%, -160%);
-      font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.5px;
+      font-family: var(--font-body); font-size: 14px; letter-spacing: 0.5px;
       color: var(--text-dim); white-space: nowrap; pointer-events: none;
       text-shadow: 0 1px 3px var(--bg), 0 0 6px var(--bg);
     }
@@ -946,7 +1002,7 @@
       letter-spacing: 2px;
       cursor: pointer;
       transition: all 0.2s;
-      font-family: var(--font-mono);
+      font-family: var(--font-body);
     }
 
     .lang-toggle:hover { border-color: var(--accent-dim); color: var(--accent); }
@@ -1262,7 +1318,6 @@
           </div>
         </div>
 
-                </div>
       </div>
 
           
@@ -1272,14 +1327,87 @@
           <div class="page-title" data-i18n="nav-support">Support</div>
           <div class="page-sub" data-i18n="support-sub">We're here to help</div>
         </div>
-        <div class="card">
-          <div class="card-title" data-i18n="support-card-title">Contact us</div>
-          <div class="metric"><span class="metric-label" data-i18n="support-email">Email</span><span class="metric-value">support@sovrn.nexus</span></div>
-          <div class="metric"><span class="metric-label" data-i18n="support-hours">Hours</span><span class="metric-value" data-i18n="support-hours-val">Daily, 10:00–22:00 MSK</span></div>
-          <div class="metric" style="margin-top:8px"><span class="metric-value" style="color:var(--text-dim)" data-i18n="support-note">Describe your issue in detail — device, app version, and what's not working. We'll respond as soon as possible.</span></div>
+
+        <!-- Form state -->
+        <div id="support-form-wrap">
+          <div class="card">
+            <div class="card-title" data-i18n="sup-form-title">What's the issue?</div>
+
+            <!-- Issue type -->
+            <div class="sup-field">
+              <label class="sup-label" data-i18n="sup-type-label">Select a category</label>
+              <select class="sup-select" id="sup-type" onchange="handleIssueType(this.value)">
+                <option value="" data-i18n="sup-type-placeholder">— choose —</option>
+                <option value="no_connect" data-i18n="sup-opt-noconnect">VPN won't connect in AmneziaWG</option>
+                <option value="slow" data-i18n="sup-opt-slow">App or resource not loading / slow</option>
+                <option value="conf_file" data-i18n="sup-opt-conf">Can't import .conf file in AmneziaWG</option>
+                <option value="other" data-i18n="sup-opt-other">Something else</option>
+              </select>
+            </div>
+
+            <!-- Sub-field: OS -->
+            <div class="sup-field" id="sf-os" style="display:none">
+              <label class="sup-label" data-i18n="sup-os-label">Operating system</label>
+              <div class="chip-row">
+                <button class="chip" data-group="os" data-val="iOS" onclick="selectChip(this)">iOS</button>
+                <button class="chip" data-group="os" data-val="Android" onclick="selectChip(this)">Android</button>
+                <button class="chip" data-group="os" data-val="Windows" onclick="selectChip(this)">Windows</button>
+                <button class="chip" data-group="os" data-val="macOS" onclick="selectChip(this)">macOS</button>
+              </div>
+            </div>
+
+            <!-- Sub-field: Service -->
+            <div class="sup-field" id="sf-service" style="display:none">
+              <label class="sup-label" data-i18n="sup-service-label">Which service?</label>
+              <div class="chip-row">
+                <button class="chip" data-group="service" data-val="YouTube" onclick="selectChip(this)">YouTube</button>
+                <button class="chip" data-group="service" data-val="Telegram" onclick="selectChip(this)">Telegram</button>
+                <button class="chip" data-group="service" data-val="WhatsApp" onclick="selectChip(this)">WhatsApp</button>
+                <button class="chip" data-group="service" data-val="TikTok" onclick="selectChip(this)">TikTok</button>
+                <button class="chip" data-group="service" data-val="Instagram" onclick="selectChip(this)">Instagram</button>
+                <button class="chip" data-group="service" data-val="custom" data-i18n-val="sup-service-custom" onclick="selectChip(this)" data-i18n="sup-service-custom">My own option</button>
+              </div>
+            </div>
+
+            <!-- Sub-field: Free text (other) -->
+            <div class="sup-field" id="sf-text" style="display:none">
+              <label class="sup-label" data-i18n="sup-text-label">Tell us more</label>
+              <textarea class="sup-textarea" id="sup-text-val" rows="4" data-i18n-placeholder="sup-text-placeholder" placeholder="Please describe what's happening in a few words — we'll take it from there."></textarea>
+            </div>
+
+            <!-- Email -->
+            <div class="sup-field" id="sf-email" style="display:none">
+              <label class="sup-label" data-i18n="sup-email-label">Your email</label>
+              <input class="sup-input" type="email" id="sup-email-val" placeholder="your@email.com">
+              <div class="sup-hint" data-i18n="sup-email-hint">We'll reply here. No spam, ever.</div>
+            </div>
+
+            <!-- Submit -->
+            <div id="sf-submit" style="display:none;margin-top:20px">
+              <button class="btn-sm" onclick="submitSupportForm()" data-i18n="sup-submit">Send request →</button>
+            </div>
+          </div>
+
+          <!-- Contact line -->
+          <div style="text-align:center;margin-top:16px;color:var(--text-dim);font-size:12px">
+            <span data-i18n="sup-direct">Prefer to write directly?</span>
+            <a href="mailto:sovrn.support@gmail.com" style="color:var(--accent);margin-left:6px">sovrn.support@gmail.com</a>
+          </div>
+        </div>
+
+        <!-- Success state -->
+        <div id="support-success" style="display:none">
+          <div class="card" style="text-align:center;padding:40px 24px">
+            <div style="font-size:28px;margin-bottom:16px">✓</div>
+            <div class="card-title" data-i18n="sup-ok-title">Request received</div>
+            <div style="color:var(--text-dim);line-height:1.7;margin-top:8px" data-i18n="sup-ok-body">
+              We've got your message and will look into it shortly.<br>
+              A reply will be on its way to your email — usually within a few hours.
+            </div>
+            <button class="btn-sm" style="margin-top:24px" onclick="resetSupportForm()" data-i18n="sup-ok-new">Submit another request</button>
+          </div>
         </div>
       </div>
-
       </main>
   </div>
 </div>
@@ -1457,6 +1585,48 @@ const translations = {
     'feat-basic-incl': 'Basic plan included',
     'feat-allowlist': 'Allowlist bypass config',
     'feat-residential': 'Residential exit node',
+
+    'sup-form-title': 'What\'s the issue?',
+    'sup-type-label': 'Select a category',
+    'sup-type-placeholder': '— choose —',
+    'sup-opt-noconnect': 'VPN won\'t connect in AmneziaWG',
+    'sup-opt-slow': 'App or resource not loading / slow',
+    'sup-opt-conf': 'Can\'t import .conf file in AmneziaWG',
+    'sup-opt-other': 'Something else',
+    'sup-os-label': 'Operating system',
+    'sup-service-label': 'Which service?',
+    'sup-service-custom': 'My own option',
+    'sup-text-label': 'Tell us more',
+    'sup-text-placeholder': 'Please describe what\'s happening — we\'ll take it from there.',
+    'sup-email-label': 'Your email',
+    'sup-email-hint': 'We\'ll reply here. No spam, ever.',
+    'sup-submit': 'Send request →',
+    'sup-direct': 'Prefer to write directly?',
+    'sup-ok-title': 'Request received',
+    'sup-ok-body': 'We\'ve got your message and will look into it shortly.\nA reply will be on its way to your email — usually within a few hours.',
+    'sup-ok-new': 'Submit another request',
+
+
+    'sup-form-title': 'Что случилось?',
+    'sup-type-label': 'Выберите категорию',
+    'sup-type-placeholder': '— выберите —',
+    'sup-opt-noconnect': 'VPN не подключается в приложении AmneziaWG',
+    'sup-opt-slow': 'Приложение или ресурс не работает / медленно',
+    'sup-opt-conf': 'Невозможно выбрать файл .conf в AmneziaWG',
+    'sup-opt-other': 'Другая проблема',
+    'sup-os-label': 'Операционная система',
+    'sup-service-label': 'Какой сервис?',
+    'sup-service-custom': 'Свой вариант',
+    'sup-text-label': 'Опишите проблему',
+    'sup-text-placeholder': 'Расскажите что происходит — мы разберёмся.',
+    'sup-email-label': 'Ваш email',
+    'sup-email-hint': 'Ответим сюда. Никакого спама.',
+    'sup-submit': 'Отправить заявку →',
+    'sup-direct': 'Хотите написать напрямую?',
+    'sup-ok-title': 'Заявка получена',
+    'sup-ok-body': 'Мы получили ваш запрос и разберёмся в ближайшее время.\nОтвет придёт на вашу почту — обычно в течение нескольких часов.',
+    'sup-ok-new': 'Отправить ещё одну заявку',
+
     'setup-tab-ios': 'iOS',
     'setup-tab-android': 'Android',
     'setup-tab-windows': 'Windows',
@@ -1629,6 +1799,48 @@ const translations = {
     'feat-basic-incl': 'Базовый тариф включён',
     'feat-allowlist': 'Конфиг обхода белых списков',
     'feat-residential': 'Резидентный выходной узел',
+
+    'sup-form-title': 'What\'s the issue?',
+    'sup-type-label': 'Select a category',
+    'sup-type-placeholder': '— choose —',
+    'sup-opt-noconnect': 'VPN won\'t connect in AmneziaWG',
+    'sup-opt-slow': 'App or resource not loading / slow',
+    'sup-opt-conf': 'Can\'t import .conf file in AmneziaWG',
+    'sup-opt-other': 'Something else',
+    'sup-os-label': 'Operating system',
+    'sup-service-label': 'Which service?',
+    'sup-service-custom': 'My own option',
+    'sup-text-label': 'Tell us more',
+    'sup-text-placeholder': 'Please describe what\'s happening — we\'ll take it from there.',
+    'sup-email-label': 'Your email',
+    'sup-email-hint': 'We\'ll reply here. No spam, ever.',
+    'sup-submit': 'Send request →',
+    'sup-direct': 'Prefer to write directly?',
+    'sup-ok-title': 'Request received',
+    'sup-ok-body': 'We\'ve got your message and will look into it shortly.\nA reply will be on its way to your email — usually within a few hours.',
+    'sup-ok-new': 'Submit another request',
+
+
+    'sup-form-title': 'Что случилось?',
+    'sup-type-label': 'Выберите категорию',
+    'sup-type-placeholder': '— выберите —',
+    'sup-opt-noconnect': 'VPN не подключается в приложении AmneziaWG',
+    'sup-opt-slow': 'Приложение или ресурс не работает / медленно',
+    'sup-opt-conf': 'Невозможно выбрать файл .conf в AmneziaWG',
+    'sup-opt-other': 'Другая проблема',
+    'sup-os-label': 'Операционная система',
+    'sup-service-label': 'Какой сервис?',
+    'sup-service-custom': 'Свой вариант',
+    'sup-text-label': 'Опишите проблему',
+    'sup-text-placeholder': 'Расскажите что происходит — мы разберёмся.',
+    'sup-email-label': 'Ваш email',
+    'sup-email-hint': 'Ответим сюда. Никакого спама.',
+    'sup-submit': 'Отправить заявку →',
+    'sup-direct': 'Хотите написать напрямую?',
+    'sup-ok-title': 'Заявка получена',
+    'sup-ok-body': 'Мы получили ваш запрос и разберёмся в ближайшее время.\nОтвет придёт на вашу почту — обычно в течение нескольких часов.',
+    'sup-ok-new': 'Отправить ещё одну заявку',
+
     'setup-tab-ios': 'iOS',
     'setup-tab-android': 'Android',
     'setup-tab-windows': 'Windows',
@@ -1834,6 +2046,59 @@ function toggleTheme() {
 
 
 
+
+let _supChips = {};
+
+function handleIssueType(val) {
+  ['sf-os','sf-service','sf-text','sf-email','sf-submit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  _supChips = {};
+  if (val === 'no_connect' || val === 'conf_file') {
+    document.getElementById('sf-os').style.display = 'block';
+  } else if (val === 'slow') {
+    document.getElementById('sf-service').style.display = 'block';
+  } else if (val === 'other') {
+    document.getElementById('sf-text').style.display = 'block';
+    document.getElementById('sf-email').style.display = 'block';
+    document.getElementById('sf-submit').style.display = 'block';
+  }
+}
+
+function selectChip(el) {
+  const group = el.dataset.group;
+  document.querySelectorAll(`.chip[data-group="${group}"]`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  _supChips[group] = el.dataset.val;
+  document.getElementById('sf-email').style.display = 'block';
+  document.getElementById('sf-submit').style.display = 'block';
+}
+
+function submitSupportForm() {
+  const email = document.getElementById('sup-email-val')?.value?.trim();
+  if (!email || !email.includes('@')) {
+    document.getElementById('sup-email-val').style.borderColor = 'var(--red)';
+    return;
+  }
+  document.getElementById('support-form-wrap').style.display = 'none';
+  document.getElementById('support-success').style.display = 'block';
+}
+
+function resetSupportForm() {
+  document.getElementById('support-form-wrap').style.display = 'block';
+  document.getElementById('support-success').style.display = 'none';
+  document.getElementById('sup-type').value = '';
+  document.getElementById('sup-email-val').value = '';
+  if (document.getElementById('sup-text-val')) document.getElementById('sup-text-val').value = '';
+  ['sf-os','sf-service','sf-text','sf-email','sf-submit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  _supChips = {};
+}
+
 function showSetupTab(tab) {
   document.querySelectorAll('.setup-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('[data-setuptab]').forEach(s => s.classList.remove('active'));
@@ -1844,12 +2109,13 @@ function showSetupTab(tab) {
 }
 
 function showPayTab(tab) {
-  document.querySelectorAll('.paytab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.subtab').forEach(s => s.classList.remove('active'));
-  const panel = document.getElementById('paytab-' + tab);
-  if (panel) panel.classList.add('active');
-  const tabEl = document.querySelector(`.subtab[data-paytab="${tab}"]`);
-  if (tabEl) tabEl.classList.add('active');
+  ['sub', 'history'].forEach(t => {
+    const p = document.getElementById('paytab-' + t);
+    if (p) p.style.display = (t === tab) ? 'block' : 'none';
+  });
+  document.querySelectorAll('[data-paytab]').forEach(s => {
+    s.classList.toggle('active', s.getAttribute('data-paytab') === tab);
+  });
   if (tab === 'history') loadPaymentHistory();
 }
 
