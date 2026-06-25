@@ -2240,8 +2240,64 @@ Email language follows user's interface language (RU/EN).
 
 ---
 
-## Long-term Plans
+## 2026-06-25
 
-- Activate Russian Bridge node with full Policy-Based Routing
-- Migrate monitoring stack to a dedicated VPS in the Netherlands
-- Prepare detailed portfolio materials for Junior DevOps / Linux SysAdmin positions
+### 🛠 Bridge — recovery after payment block and reboot
+
+**Incident:**
+- Service payment was late; Bridge was blocked at 10:00 MSK, paid at 11:00
+- After restoration there was no SSH access — awg1 was intercepting part of the traffic, including inbound SSH
+- Recovered access via VNC, added `Table = off` to awg1.conf so it no longer hijacks the routing table or inbound SSH
+
+**Peers 12-16 lost after reboot:**
+- Clients 12-16 (10.88.88.42-46) had been added at runtime only (`awg set`), never written to awg0.conf
+- Their configs worked until the reboot, then the runtime state was lost — peers gone from the server, clients still holding valid configs
+- Recovery: derived public keys from the client private keys (`wg pubkey`), re-added all five peers both to runtime (`awg set`, temp-file PSK method) AND to awg0.conf
+- Verified: 31 peers in both runtime and file — now reboot-safe
+
+**Lesson reinforced:** always write peers into awg0.conf immediately after `awg set` — runtime-only peers silently vanish on reboot.
+
+---
+
+## 2026-06-26
+
+### 🛠 awg1 relay migration — Moldova → Germany (full cutover)
+
+**Cause:** the Moldova relay went down. Needed to restore client internet access urgently, without changing any client configs.
+
+**New relay (Germany, Ubuntu 26.04):**
+- AmneziaWG built from source (PPA doesn't support 26.04 yet)
+- awg0 configured as the tunnel server side:
+  - subnet 10.77.77.0/30, address 10.77.77.1/30, port 51820, MTU 1300
+  - obfuscation params copied from Bridge
+  - PSK + AllowedIPs 10.77.77.2/32 for the Bridge peer
+- ip_forward enabled and persistent
+
+**Bridge changes (awg1):**
+- Peer PublicKey swapped to the German server's key, Endpoint updated to the German node
+- awg1 already carried `Table = off` + a route into table 200 (policy routing for client traffic)
+
+**Finalization:**
+- Set up SSH key auth from workstation to the German server (was password-only)
+- Germany awg0.conf: replaced the narrow PostUp (only covered 10.88.88.0/24) with the full working rule set —
+  - MASQUERADE out the main interface
+  - FORWARD awg0 ↔ main interface (both directions)
+  - matching PostDown for all three
+- Bridge awg1.conf: added the missing `MASQUERADE -o awg1` to PostUp/PostDown (it had been added by hand at runtime and would not have survived a reboot)
+- Verified both nodes reboot-safe: AWG autostart enabled, configs parse clean, ip_forward persistent
+
+**Status:**
+- Clients exit through Germany. Bridge ↔ Germany handshake healthy, traffic flowing.
+- All previously-manual iptables rules now persisted in the configs — survives reboot.
+
+### 🗺 Infrastructure change — Moldova decommissioned
+
+- **Moldova is now fully removed from the infrastructure.**
+- The standard-tier relay/exit role has moved to the German node.
+- Architecture going forward:
+  - Client device → Bridge (RF entry, awg0) → awg1 → Germany → Internet
+  - Residential tier unchanged: Residential node → Stockholm → Internet
+- TODO: update README and docs/architecture.md to drop Moldova and reflect the German relay.
+
+**Lesson reinforced (third time):** runtime-only state — iptables rules and AWG peers alike — must be written into configs immediately. All three recent incidents (missing PSKs, lost peers 12-16, hand-added MASQUERADE) trace to the same root cause. Persisting on creation is now a hard rule.
+
