@@ -2301,3 +2301,62 @@ Email language follows user's interface language (RU/EN).
 
 **Lesson reinforced (third time):** runtime-only state — iptables rules and AWG peers alike — must be written into configs immediately. All three recent incidents (missing PSKs, lost peers 12-16, hand-added MASQUERADE) trace to the same root cause. Persisting on creation is now a hard rule.
 
+---
+
+## 2026-06-29
+
+### 🛠 Germany node — security hardening (part 1)
+
+Began hardening the German relay (was running as root with password auth).
+
+**Done:**
+- Created `sovadmin` user with sudo + passwordless sudo (avoids the SSH-password trap previously hit on Moldova)
+- Copied SSH key from root to sovadmin, verified key login + sudo both work
+- SSH hardening via drop-in `/etc/ssh/sshd_config.d/99-hardening.conf`:
+  - PermitRootLogin no
+  - PasswordAuthentication no
+  - PubkeyAuthentication yes
+- Validated with `sshd -t` before restart
+- Verified after restart: sovadmin login works, root login refused (Permission denied)
+
+**Deferred (needs full battery — UFW can cut access if done wrong):**
+- UFW firewall — must set DEFAULT_FORWARD_POLICY=ACCEPT before enabling, or it breaks client tunnel traffic; allow 22/tcp + 51820/udp
+- Fail2ban on SSH
+- Basic monitoring: disk guard (the Moldova lesson), uptime check, AWG handshake watcher
+- unattended-upgrades for security patches
+
+---
+
+## 2026-06-30
+
+### 🛠 Germany node — kernel update broke the tunnel (root cause fixed)
+
+**Incident:** German relay rebooted into a new kernel (7.0.0-27-generic). The AmneziaWG module wasn't built for it, so awg0 failed to come up and clients lost internet. iptables (NAT + FORWARD) also reset on reboot.
+
+**Immediate recovery (done before this session):**
+- /tmp module sources were gone (tmp is cleared on reboot), so re-cloned amneziawg-linux-kernel-module
+- Installed current kernel headers, rebuilt + installed module, modprobe, brought awg0 up
+- Manually restored iptables NAT/FORWARD rules
+- Created /etc/modules-load.d/amneziawg.conf for module autoload
+- Added PostUp/PostDown to awg0.conf; on Bridge restarted awg1 and added PostUp/PostDown to awg1.conf
+
+**Root-cause fix (this session) — module moved to DKMS:**
+- Diagnosed: module had been installed via plain `make install`, NOT registered in DKMS → every kernel update would break it again (this was the 4th reboot-related incident in a row)
+- Moved sources from /tmp to /usr/src/amneziawg-1.0.0 (permanent — tmp is wiped on reboot, the reason re-cloning was needed today)
+- Registered with DKMS: `dkms add` / `build` / `install` — module's own dkms.conf has AUTOINSTALL=yes
+- Now: amneziawg/1.0.0 installed under DKMS → automatically rebuilds for any future kernel
+- Cleaned up: removed duplicate MASQUERADE rule (manual rule stacked on top of PostUp), confirmed only the DKMS module remains
+
+**Reboot-readiness checklist (all green):**
+1. DKMS rebuilds module on new kernel ✓
+2. Module autoloads (modules-load.d) ✓
+3. awg0 autostart enabled ✓
+4. ip_forward persistent ✓
+5. iptables in PostUp (3 rules) ✓
+6. Config parses clean ✓
+7. Bridge↔Germany handshake alive ✓
+
+**Status:** Clients exit via Germany. The kernel-update failure mode is now permanently closed — DKMS handles module rebuilds, all rules persist in configs.
+
+**Root cause across 4 incidents:** runtime-only state that didn't survive reboot — missing PSKs, lost peers 12-16, hand-added MASQUERADE, and now a non-DKMS module. Each is now persisted at the source. The pattern is the lesson: nothing is "done" until it survives a reboot.
+
