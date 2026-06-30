@@ -2360,3 +2360,72 @@ Began hardening the German relay (was running as root with password auth).
 
 **Root cause across 4 incidents:** runtime-only state that didn't survive reboot — missing PSKs, lost peers 12-16, hand-added MASQUERADE, and now a non-DKMS module. Each is now persisted at the source. The pattern is the lesson: nothing is "done" until it survives a reboot.
 
+---
+
+## 2026-07-01
+
+### 🛠 Germany node — security hardening (completed)
+
+Finished hardening the German relay (had been running as root with password auth until the user/SSH work began).
+
+**Firewall (UFW):**
+- Staged all rules before enabling to avoid lockout
+- allow 22/tcp (SSH) + 51820/udp (AmneziaWG)
+- default deny incoming / allow outgoing
+- CRITICAL: set DEFAULT_FORWARD_POLICY="ACCEPT" before enabling — otherwise UFW breaks client tunnel forwarding
+- Verified after enable: SSH intact, handshake alive, traffic flowing
+
+**fail2ban:**
+- jail.local on sshd (bantime 1h, maxretry 5, systemd backend)
+- Immediately banned 4 brute-force IPs on startup — confirms the node was under active attack
+
+**Monitoring (local, no Telegram yet):**
+- /usr/local/bin/sov-healthcheck.sh, cron every 5 min: disk >80%, awg0 handshake staleness, module-loaded check
+- logrotate on the health log (the Moldova disk lesson)
+- Currently clean
+
+**Auto-updates:**
+- unattended-upgrades enabled for security patches
+- Automatic-Reboot explicitly disabled — kernel transitions only on manual reboot, under supervision (DKMS guarantees the module is ready, so a controlled reboot is safe)
+- Decision: "golden middle" — patches install automatically, reboot stays manual
+
+### 🛠 Bridge (Russia) — security audit & hardening
+
+Audited the production entry node for the first time since initial setup — hosts the PWA, holds all client peers, sits on a Russian public IP under constant scanning.
+
+**Audit findings:**
+- Good already: fail2ban active, unattended-upgrades enabled, PermitRootLogin no, 0 security updates pending, disk 19%
+- **Critical hole found:** SSH password authentication was effectively ON. Cloud-init's `50-cloud-init.conf` set `PasswordAuthentication yes`; since the `Include` sits at line 12 and SSH honors the FIRST value seen, it silently overrode the `no` in the main config. A higher-numbered drop-in could not win. Brute-force had been possible since the image was provisioned.
+- Public ports were actually fine: 8000/41225/53 only listen on localhost; only 22, 80 and AWG udp are truly exposed
+
+**Fixes:**
+- Disabled password auth at the source (edited 50-cloud-init.conf directly, removed the useless 99- drop-in). Verified effective `passwordauthentication no` via `sshd -T`, key access intact.
+- UFW enabled: allow 22/tcp, 80/tcp (PWA nginx), 8443/udp (awg0 clients), 51821/udp (awg1→Germany); DEFAULT_FORWARD_POLICY=ACCEPT (all client traffic forwards through here)
+- Post-enable verification (4 checks): SSH ok, PWA ok (v0.8.0), awg1→Germany handshake alive, 30 client peers intact
+- Added the same healthcheck cron (disk / awg1 handshake / PWA liveness / awg0 peer count) + logrotate
+
+**Lesson:** cloud images ship their own sshd drop-ins. Always check the EFFECTIVE config with `sshd -T` — the main config can say `no` while a cloud-init file quietly says `yes`. The audit habit found a hole that had been open for the life of the server.
+
+**Status:** Germany and Bridge are now at parity — firewall + fail2ban + auto-patching + health monitoring on both.
+
+### 🛠 SMTP email — foundation working
+
+Began the email subsystem (Gmail SMTP, personal account, no domain needed).
+
+**Done:**
+- `services/mailer.py` — best-effort SMTP wrapper (never raises into the request path), reads SMTP_* from env; dark-themed RU/EN templates for welcome / password-reset / support-ticket
+- `api/register.py` — welcome email wired into registration (best-effort try/except); added `lang` field to follow the user's interface language; preserved the `Payment` import fix
+- `.env` on Bridge: SMTP_HOST/PORT/USER/PASS/FROM (Gmail app-password)
+- Deployed (rebuilt PWA image — code is baked in)
+- Verified end-to-end: test registration → SMTP full handshake (AUTH 235 Accepted → 250 OK) → welcome email delivered to inbox
+- Cleaned up the test user from the DB
+
+**Known minor issue:** mailer's `logger.info/error` aren't surfaced in container stdout (swallowed by uvicorn's log level) — diagnosis harder until fixed, one-line change later.
+
+### 📋 Next session — remaining email features
+
+1. **Support form → email** — `POST /api/support/ticket` + wire fetch into the existing form (template `support_ticket_email` already written)
+2. **Forgot password** — `POST /api/auth/forgot` + `/api/auth/reset`; Alembic migration for reset_token + reset_expires; reset page on frontend; links point to bare IP until domain (Gmail may flag) — do this one fresh, not tired (touches the DB)
+3. Healthcheck delivery — wire the cron scripts to email on CRIT once the channel is proven
+4. UptimeRobot external monitoring (deferred by user)
+5. Update README + docs/architecture.md: Moldova → Germany relay
