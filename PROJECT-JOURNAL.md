@@ -2429,3 +2429,75 @@ Began the email subsystem (Gmail SMTP, personal account, no domain needed).
 3. Healthcheck delivery — wire the cron scripts to email on CRIT once the channel is proven
 4. UptimeRobot external monitoring (deferred by user)
 5. Update README + docs/architecture.md: Moldova → Germany relay
+
+---
+
+## 2026-07-02
+
+### 🛠 Password reset flow (complete)
+
+Built the full forgot/reset chain on the SMTP foundation.
+
+- Alembic migration `a1b2c3d4e5f6`: `reset_token` + `reset_expires` on users. Chained from the actual DB head `ebdcec96d747` — not the latest-by-date migration (the head had diverged from the newest file).
+- `POST /api/auth/forgot`: `secrets.token_urlsafe` token, 1h expiry, emails the reset link. Enumeration-safe — identical response whether or not the email exists.
+- `POST /api/auth/reset`: validates token + expiry, re-hashes with argon2, invalidates token (single-use).
+- Frontend: "Forgot password?" link, dedicated reset view, `?token=` handling on the `/reset` route.
+- Verified end-to-end: request → email → reset page → new password → login. Confirmed token is cleared after use (single-use works). Also surfaced a data issue — a user's email had a typo from registration; fixed directly in DB.
+
+### 🛠 Support form → email (complete)
+
+- `POST /api/support/ticket`: structured ticket (category, OS/service, details, email) → support inbox via the `support_ticket_email` template.
+- Frontend: `submitSupportForm` wired to the backend (optimistic UI — success screen shows immediately, delivery is best-effort server-side).
+- Verified: ticket arrived at the support inbox with all fields, dark-themed template.
+
+This completes the email subsystem: welcome, password reset, support ticket.
+
+### 🛠 PWA icons + manifest (home-screen install)
+
+- Chose a node-graph icon (multi-hop metaphor) in brand cyan on dark.
+- Full icon set generated: iOS (apple-touch, 120/152/167), Android (192/512 + maskable variants), favicons.
+- `manifest.json`: standalone display, brand colors.
+- PWA meta tags in `<head>`: apple-touch-icon, theme-color, manifest link.
+- Verified: icons + manifest serve correctly (200 image/png); installed on iPhone home screen — shows the icon instead of the bare "S". Android full install pending SSL.
+
+### 🛠 Split-tunnel — RU traffic exits locally (server-side, complete)
+
+Goal: Russian services (banks, Ozon, Gosuslugi) reachable without turning the VPN off. Client configs unchanged — all logic on Bridge.
+
+**Mechanism:**
+- ipset `ru_nets` (hash:net) holds RU prefixes; mangle rule marks client traffic destined to those IPs; `ip rule` priority 99 (before rule 100 → Germany) routes marked traffic via the main table = local RF exit.
+- Source: RIPE country-resource-list (~11.4k prefixes) + manual ranges for Yandex/VK/Gosuslugi (services sometimes hosted outside RU registration).
+
+**Rollout (staged, safety-first):**
+- Started scoped to one test client (`10.88.88.44/32`), verified: Ozon + Ozon Bank + Gosuslugi work with VPN on. (`2ip.ru` still showed Germany — correctly: it's hosted on Hetzner/DE, so it's not in the RU set. The mechanism routes by real IP location, not by domain name — working as intended.)
+- Built persistence: `sov-split.service` (systemd oneshot) restores ipset + rules on boot from `/etc/sovereign/ru_nets.ipset`.
+- **Reboot-simulation caught a silent bug:** the first restore script did manual `ipset create` + `flush` before `ipset restore`, which aborted on the pre-existing set — service reported `SUCCESS` but restored nothing. Fixed: `ipset destroy` then `ipset restore` (the dump carries its own `create`). Re-verified via `systemctl restart` (not manual run) — full restore confirmed.
+- Expanded to all clients (`10.88.88.0/24`) once persistence was proven; re-verified restore path.
+
+**Lesson reinforced:** "SUCCESS" exit status isn't proof — the restore ran, exited 0, and restored nothing. Only the reboot simulation exposed it. Test the real path, not the assumed one.
+
+### 🛠 RIPE list auto-update (complete)
+
+- `sov-update-ru-list.sh`, weekly cron (Sun 04:00): refreshes `ru_nets` from RIPE.
+- Safe by design: builds a temp set, sanity floor (refuse if < 8000 prefixes — guards against RIPE outage / garbage), then **atomic `ipset swap`** so the tunnel is never without a list mid-update. Re-adds manual service ranges, re-saves the dump for reboot persistence.
+- Tested: refreshed to 11393 entries, logged `[OK]`.
+
+### 🛠 Email alerts from healthcheck (complete)
+
+Closed the loop on monitoring — the health cron wrote to a log but never notified.
+
+- `/etc/sovereign/smtp.env` (600, root) on both nodes with SMTP creds + `ALERT_TO`. On Bridge, copied from the PWA `.env`; on Germany, added fresh.
+- `sov-alert.sh` (sender) + `sov-alert-check.sh` (reads health log, rate-limits to once per 6h per problem, sends a RECOVERED notice when clear). Hooked into the existing 5-min health cron on both nodes.
+- Alerts go to the personal inbox.
+- **Two parsing/behavior bugs found and fixed:**
+  - `smtp.env` values needed quoting — the app-password has spaces and `SMTP_FROM` has `<>`, which broke `source` (bash tried to execute parts of them).
+  - `sov-alert.sh` read the recipient from `ALERT_TO`, only set by the caller — a direct test run had `TO=` empty and silently `exit 0`. Fixed by putting `ALERT_TO` in `smtp.env` so the sender is self-sufficient.
+- Verified the full chain on both nodes: injected a test `[CRIT]` → alert email arrived (correct node label, issue, rate-limit note) → cleared the log → RECOVERED email + state reset.
+
+**Lesson:** a direct test of one component (the sender) was misleading — it only works when the caller sets a variable. The real failure mode only showed when tracing who calls what. Test the integrated path.
+
+### 📋 Still open
+- Domain + SSL (unblocks Heleket real payments, fixes bare-IP reset links, enables Android PWA install) — needs domain purchase
+- UptimeRobot external monitoring (catches whole-node-down, which the local healthcheck can't)
+- README + docs/architecture.md still reference Moldova — update to Germany relay
+- mailer logs not surfaced in container stdout (one-line fix)
