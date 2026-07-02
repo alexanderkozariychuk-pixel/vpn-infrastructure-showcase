@@ -2143,8 +2143,26 @@ function submitSupportForm() {
     document.getElementById('sup-email-val').style.borderColor = 'var(--red)';
     return;
   }
+  const issueType = document.getElementById('sup-type')?.value || 'other';
+  const details = document.getElementById('sup-text-val')?.value?.trim() || null;
+
+  const payload = {
+    issue_type: issueType,
+    os: _supChips.os || null,
+    service: _supChips.service || null,
+    details: details,
+    email: email
+  };
+
+  // optimistic UI — show success immediately; delivery is best-effort server-side
   document.getElementById('support-form-wrap').style.display = 'none';
   document.getElementById('support-success').style.display = 'block';
+
+  fetch(API + '/api/support/ticket', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(e => console.error('support ticket send failed', e));
 }
 
 function resetSupportForm() {
