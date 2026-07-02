@@ -295,6 +295,23 @@
 
     .field input::placeholder { color: var(--text-dim); }
 
+    
+    .login-forgot {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .login-forgot:hover { color: var(--accent); }
+    .login-ok {
+      color: var(--green);
+      font-size: 13px;
+      margin: 8px 0;
+      min-height: 18px;
+    }
+
     .login-error {
       font-size: 14px;
       color: var(--red);
@@ -1109,6 +1126,31 @@
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="btn-full" id="login-btn" onclick="doLogin()" data-i18n="btn-auth">Authenticate</button>
+    <div class="login-forgot" onclick="showForgotPrompt()" data-i18n="login-forgot">Forgot password?</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PASSWORD RESET
+════════════════════════════════════════════ -->
+<div id="view-reset" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-back" onclick="showView('login')" data-i18n="login-back">← Back</div>
+      <div class="login-title">Reset<span> password</span></div>
+    </div>
+    <div class="field">
+      <label data-i18n="reset-new-label">New password</label>
+      <input type="password" id="inp-reset-pass" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label data-i18n="reset-confirm-label">Confirm password</label>
+      <input type="password" id="inp-reset-confirm" placeholder="••••••••" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')doReset()">
+    </div>
+    <div class="login-error" id="reset-error"></div>
+    <div class="login-ok" id="reset-ok"></div>
+    <button class="btn-full" id="reset-btn" onclick="doReset()" data-i18n="reset-btn">Update password</button>
   </div>
 </div>
 
@@ -1692,6 +1734,10 @@ const translations = {
     'label-username': 'Username',
     'label-password': 'Password',
     'btn-auth': 'Authenticate',
+    'login-forgot': 'Forgot password?',
+    'reset-new-label': 'New password',
+    'reset-confirm-label': 'Confirm password',
+    'reset-btn': 'Update password',
     // Register
     'reg-title-1': 'Create',
     'reg-title-2': ' account',
@@ -1906,6 +1952,10 @@ const translations = {
     'label-username': 'Имя пользователя',
     'label-password': 'Пароль',
     'btn-auth': 'Войти',
+    'login-forgot': 'Забыли пароль?',
+    'reset-new-label': 'Новый пароль',
+    'reset-confirm-label': 'Подтвердите пароль',
+    'reset-btn': 'Обновить пароль',
     // Register
     'reg-title-1': 'Регистрация',
     'reg-title-2': '',
@@ -2015,6 +2065,18 @@ function toggleLang() {
 (function initLang() {
   const saved = localStorage.getItem('sov_lang') || 'ru';
   currentLang = saved;
+})();
+
+// on load: show reset view if arriving via /reset?token=
+(function initResetCheck() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('token') && window.location.pathname === '/reset') {
+    document.addEventListener('DOMContentLoaded', function() {
+      showView('reset');
+    });
+    // also try immediately in case DOM already parsed
+    if (document.readyState !== 'loading') showView('reset');
+  }
 })();
 
 
@@ -2189,6 +2251,79 @@ function toggleSidebar() {
 function closeSidebar() {
   document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('open'));
   document.querySelectorAll('.sidebar-overlay').forEach(o => o.classList.remove('open'));
+}
+
+// ── PASSWORD RESET ──
+function showForgotPrompt() {
+  const email = prompt(currentLang === 'ru'
+    ? 'Введите email вашего аккаунта:'
+    : 'Enter your account email:');
+  if (!email || !email.includes('@')) return;
+  fetch(API + '/api/auth/forgot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), lang: currentLang })
+  })
+  .then(r => r.json())
+  .then(() => {
+    alert(currentLang === 'ru'
+      ? 'Если этот email зарегистрирован, ссылка для сброса отправлена. Проверьте почту.'
+      : 'If that email is registered, a reset link has been sent. Check your inbox.');
+  })
+  .catch(() => {
+    alert(currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.');
+  });
+}
+
+function doReset() {
+  const pass = document.getElementById('inp-reset-pass').value;
+  const confirm = document.getElementById('inp-reset-confirm').value;
+  const errEl = document.getElementById('reset-error');
+  const okEl = document.getElementById('reset-ok');
+  errEl.textContent = '';
+  okEl.textContent = '';
+
+  if (pass.length < 8) {
+    errEl.textContent = currentLang === 'ru'
+      ? 'Пароль должен быть не менее 8 символов' : 'Password must be at least 8 characters';
+    return;
+  }
+  if (pass !== confirm) {
+    errEl.textContent = currentLang === 'ru' ? 'Пароли не совпадают' : 'Passwords do not match';
+    return;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const resetToken = params.get('token');
+  if (!resetToken) {
+    errEl.textContent = currentLang === 'ru' ? 'Ссылка недействительна' : 'Invalid reset link';
+    return;
+  }
+
+  fetch(API + '/api/auth/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: resetToken, new_password: pass })
+  })
+  .then(async r => {
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Reset failed');
+    okEl.textContent = currentLang === 'ru'
+      ? 'Пароль обновлён. Перенаправляем на вход…' : 'Password updated. Redirecting to sign in…';
+    setTimeout(() => { window.location.href = '/'; }, 2000);
+  })
+  .catch(e => {
+    errEl.textContent = currentLang === 'ru'
+      ? 'Ссылка недействительна или истекла' : (e.message || 'Invalid or expired reset link');
+  });
+}
+
+// on load: if URL has ?token=, show the reset view
+function checkResetToken() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('token') && window.location.pathname === '/reset') {
+    showView('reset');
+  }
 }
 
 function showView(view, mode) {

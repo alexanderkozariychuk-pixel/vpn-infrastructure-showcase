@@ -10,16 +10,15 @@ from api.analyze import router as analyze_router
 from api.register import router as register_router
 from api.payment import router as payment_router
 from api.config import router as config_router
+from api.password_reset import router as password_reset_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(auth_router)
 app.include_router(status_router)
 app.include_router(clients_router)
@@ -28,12 +27,20 @@ app.include_router(analyze_router)
 app.include_router(register_router)
 app.include_router(payment_router)
 app.include_router(config_router)
-
+app.include_router(password_reset_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
+
+
+@app.get("/reset")
+async def reset_page():
+    # serves the same SPA; frontend reads ?token= and shows the reset form
+    return FileResponse("static/index.html")
+
 
 @app.get("/api")
 async def api_root():
