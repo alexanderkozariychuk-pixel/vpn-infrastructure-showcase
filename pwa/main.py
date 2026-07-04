@@ -1,3 +1,16 @@
+import logging
+import sys
+
+# ── Logging: surface app-module logs (mailer, etc.) in container stdout ──
+# Without this, logger.info/error from our modules are swallowed — only
+# uvicorn's own logs appear. This wires the root logger to stdout at INFO
+# so `docker logs sovereign-pwa` shows email sends, resets, ticket errors.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
