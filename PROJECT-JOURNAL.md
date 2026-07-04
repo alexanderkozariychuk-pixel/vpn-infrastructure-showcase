@@ -2501,3 +2501,28 @@ Closed the loop on monitoring — the health cron wrote to a log but never notif
 - UptimeRobot external monitoring (catches whole-node-down, which the local healthcheck can't)
 - README + docs/architecture.md still reference Moldova — update to Germany relay
 - mailer logs not surfaced in container stdout (one-line fix)
+
+---
+
+## 2026-07-04
+
+### 🛠 Logging fix — surface app-module logs in container stdout
+
+Closed the diagnostic gap noted on 2026-07-01: `mailer` (and other module) logs were being swallowed — only uvicorn's own logs appeared in `docker logs`, so debugging SMTP meant execing into the container and running Python by hand.
+
+**Fix:**
+- Added `logging.basicConfig` at the top of `main.py` (before router imports, so the root logger is configured before any module logs): level INFO, stream to stdout, format includes timestamp / level / module name.
+
+**Verified:**
+- Health check after the 2-day pause: all green — 30 peers, both tunnels fresh, PWA up, split-tunnel active (11393 entries, service active), UFW active on Germany.
+- Test registration now shows the mailer line directly in `docker logs`:
+  `INFO [services.mailer] Email sent to ... : Добро пожаловать в Sovereign`
+- Confirmed the email-uniqueness constraint works as a side note — a duplicate email returns 409, no user created, no mail attempted.
+- Cleaned up the test user.
+
+**Status:** SMTP / registration / reset / support flows are now observable from `docker logs` without entering the container.
+
+### 📋 Still open
+- Domain + SSL (unblocks Heleket real payments, fixes bare-IP reset links, enables Android PWA install) — needs domain purchase
+- UptimeRobot external monitoring (catches whole-node-down)
+- README + docs/architecture.md still reference Moldova — update to Germany relay
