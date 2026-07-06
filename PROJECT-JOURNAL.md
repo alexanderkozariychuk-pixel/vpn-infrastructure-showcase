@@ -2526,3 +2526,64 @@ Closed the diagnostic gap noted on 2026-07-01: `mailer` (and other module) logs 
 - Domain + SSL (unblocks Heleket real payments, fixes bare-IP reset links, enables Android PWA install) — needs domain purchase
 - UptimeRobot external monitoring (catches whole-node-down)
 - README + docs/architecture.md still reference Moldova — update to Germany relay
+
+---
+
+## 2026-07-05
+
+### 🛠 Major incident — inter-provider connectivity loss (Beget ↔ Cloud4Box)
+
+**Symptom:** Clients lost internet. Bridge (Beget) awg1 and Germany (Cloud4Box) awg0 both showed live handshakes, but no traffic passed.
+
+**Root cause (diagnosed by layer):** IP-level connectivity between Beget and Cloud4Box disappeared — the two servers stopped being able to reach each other, while both remained reachable from the home workstation. Confirmed it wasn't AWG config: tried port changes, key regen, udp2raw — none helped because packets physically weren't crossing between the networks. The problem was below the tunnel layer.
+
+**Emergency fix (creative, under pressure):** the workstation was the only point with connectivity to both servers. Built a three-hop relay chain through the home laptop (Pop!_OS): Client → Bridge → laptop (awg-ru ↔ awg-de, NAT + forwarding + policy routing) → Germany → Internet. Service restored around 3am.
+
+**Honest assessment of that state:** the home laptop became a critical part of production — fragile (sleep, IP change, reboot all break it), non-persistent, and exposes the home IP as a transit node. Correct as a "keep it alive now" patch, unacceptable as architecture. Recognized this myself and planned a proper relay VPS.
+
+**Stopped at the right point** — as soon as it worked, not when it was "perfect." Masked suspend targets so the laptop wouldn't sleep with the lid closed, verified the chain was live, and slept a few hours instead of pushing to exhaustion.
+
+### 🗺 Decision — move off Cloud4Box
+
+Cloud4Box has now caused three incidents (disk-fill, kernel/DKMS, connectivity). Decided to drop it. Also noticed Gemini stopped working from Cloud4Box IPs (Moldova + Germany) — datacenter IP reputation likely flagged by Google.
+
+### 🛠 New relay — Aeza Vienna (45.86.245.86)
+
+- Chose Vienna over US (Charlotte) — better ping (99 vs 129ms), European connectivity to Beget likely more reliable, and for AI/YouTube/Telegram an Austrian IP is statistically no worse than US.
+- Rented, provisioned Ubuntu 26.04.
+- **Verified the important things before building:** server reaches the internet cleanly; Telegram (302), YouTube (200), Anthropic API (404 = reachable) all work from it — IP is clean, the Cloud4Box/Gemini problem is solved here.
+- **But hit an SSH access problem:** can't SSH to Vienna directly from home — connects only via ProxyJump through Germany. TCP to the port succeeds, but the SSH session times out "during banner exchange."
+
+## 2026-07-06
+
+### 🔍 Diagnosing the Vienna SSH access problem (unresolved, narrowed)
+
+Spent the session isolating why direct SSH home → Vienna fails while home → Germany works.
+
+**Ruled out, systematically:**
+- **Not IP blocking** — `nc` to ports 22 / 443 / 2222 all return `succeeded` (TCP handshake completes on every port).
+- **Not port blocking** — same, all ports open at TCP level.
+- **Not a total SSH/DPI filter at the home ISP (SkyNet)** — SSH to Germany (Cloud4Box) works fine directly. So the ISP isn't blocking "SSH" or "foreign datacenters" wholesale.
+- **Not the home-side MTU** — lowering wlan0 MTU to 1400 didn't help; direct SSH still timed out.
+- **Not the server** — healthy, sshd listening (disabled ssh.socket to get it listening on 22/443/2222; socket activation had been ignoring the `Port` directive in sshd_config, which explained the earlier "connection refused" on 2222/443).
+
+**Found (partial):** a PMTU anomaly on the SkyNet → Aeza-Vienna path. `ping -M do -s 1472` (full 1500 MTU) → 100% loss to Vienna, but the same size passes to Germany. So the path to Vienna has an MTU below 1500 while the path to Germany doesn't. This fits the "TCP handshake works, data transfer stalls" signature — small packets (SYN, ping, nc) pass; large packets (SSH banner/keyexchange) get black-holed.
+
+**But:** clamp-MSS on the server's OUTPUT (`--set-mss 1350`) did NOT fix it, and lowering the home MTU didn't either. So it's likely an asymmetric PMTU black hole (return path server→client) or something on the transit — needs a simultaneous tcpdump on both ends to pin down. Left for a rested session.
+
+**Working state / what's not on fire:**
+- Clients are online — service via Beget direct exit serves YouTube (200), Telegram (302), X (200).
+- What Beget direct does NOT reach: Instagram (000), ChatGPT (403), Gemini (blocked) — so a working outbound tunnel is still needed, specifically for AI + Instagram, not for everything.
+- Vienna server is healthy and manageable via ProxyJump: `ssh -J sovadmin@45.134.217.122 root@45.86.245.86`.
+- Reconfirmed: with the client `awg0` tunnel up, SSH to infra servers breaks (`No route to host`) — the client config routes everything into the tunnel with no exclusions for infra IPs. For infra work, bring the client tunnel down.
+
+### 💡 Strategic thread (to revisit rested)
+- Idea: run BOTH the RU-entry and the foreign-exit on Aeza (one provider) to avoid the inter-provider connectivity failure that started this. Strong idea — connectivity within one provider's backbone is near-guaranteed. Caveats: cost of two Aeza servers, RU Aeza node still under RF jurisdiction, and need to verify Aeza-SPb ↔ Aeza-Vienna actually routes before committing.
+- The same MTU/large-packet issue on the path to Vienna may also explain why the Bridge→Vienna tunnel handshake wouldn't establish — worth testing with a lowered tunnel MTU once the access path is sorted.
+
+### 📋 Open (carried)
+- Resolve Vienna direct-SSH (paired tcpdump both ends; test asymmetric PMTU; consider MSS clamp on INPUT/forward or lower tunnel MTU)
+- Decide RU-entry provider (stay Beget vs move to Aeza) — after connectivity test
+- Remove home laptop from any production path (still the emergency relay)
+- Earlier backlog still open: domain + SSL, UptimeRobot, README/architecture Moldova→Germany→(Vienna?) update
+
