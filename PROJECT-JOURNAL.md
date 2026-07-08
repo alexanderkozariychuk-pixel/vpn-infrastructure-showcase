@@ -2587,3 +2587,43 @@ Spent the session isolating why direct SSH home → Vienna fails while home → 
 - Remove home laptop from any production path (still the emergency relay)
 - Earlier backlog still open: domain + SSL, UptimeRobot, README/architecture Moldova→Germany→(Vienna?) update
 
+---
+
+## 2026-07-07
+
+### 🔍 Vienna SSH problem — ROOT CAUSE FOUND (packet-level proof)
+
+Finally pinned the three-day Vienna access problem with a paired tcpdump. The cause is **not** DPI, not IP/port blocking, not Aeza's fault, not the cross-border route as such — it's a **PMTU black hole on the path Vienna → RU networks**.
+
+**Decisive test — bought a RU node on Aeza (45.151.101.104) to test connectivity WITHIN one provider**, removing the cross-border/inter-provider variable entirely:
+- RU-Aeza → Vienna-Aeza: small packets fine (ping 0% loss), TCP handshake completes, `nc` to :22 succeeds.
+- But SSH still failed with the same "timeout during banner exchange" — reproducing the problem *inside* Aeza. This proved the issue is specific to the path to the Vienna node, not the ISP (SkyNet/Tele2 both showed it too) and not cross-border transit generically.
+
+**Paired tcpdump (RU node initiating, tcpdump on Vienna) — the smoking gun:**
+- Vienna receives the client SYN, replies SYN-ACK, gets ACK — TCP established.
+- Small packets (42 bytes, the SSH version banner) pass both ways and are ACKed.
+- Vienna then sends its key-exchange packets at **length 1082** — and the RU node **never ACKs them**. Vienna retransmits the same 1082-byte packet repeatedly (growing backoff) until the RU node gives up and sends FIN.
+- So: packets ≥ ~1000 bytes from Vienna → RU are silently dropped; small packets pass. Classic PMTU black hole, and the ICMP fragmentation-needed isn't getting back so PMTU discovery can't self-correct.
+
+**MSS clamp does NOT fix it** — tried `TCPMSS --set-mss 1200` then `900` on Vienna's OUTPUT. tcpdump confirmed the SYN-ACK carried the reduced MSS, but the SSH key-exchange packets still went out at 1082 bytes (they bypass the MSS clamp) and still black-holed. This confirms the problem is at the link/route layer, not TCP config — it can't be papered over from the server side with MSS.
+
+**Comparison that localizes it:** to Cloud4Box-Germany, full 1472-byte packets pass fine. To Aeza-Vienna, they don't. Same RU sources. So it's the specific Vienna path that's bad.
+
+### 🗺 Decision — request server relocation instead of fighting MTU
+
+Rather than force a low MTU on the interface (which would then have to be re-solved for the AWG tunnel, with its own encapsulation MTU, and would remain fragile) — decided to **ask Aeza support to move the server to a different location** where the path to RU is clean. Reasoning: building a tunnel on top of a link with a PMTU black hole is a house on a swamp — it'll resurface in AWG, in real client traffic, at the worst time. Fix the foundation first.
+
+Wrote a support ticket with the full reproducible diagnosis (ping size thresholds, tcpdump showing 1082-byte retransmits unacked, MSS-clamp not helping) and a request to relocate to Frankfurt/Amsterdam/Helsinki or similar.
+
+### 📊 Current state (nothing on fire)
+- Clients online via Beget direct exit (YouTube/Telegram/X work; Instagram/ChatGPT/Gemini need the tunnel — still pending).
+- RU-Aeza node (45.151.101.104) healthy and paid — half of the planned single-provider architecture is in place.
+- Vienna node paid but awaiting relocation.
+- Lease clock: **Beget 7 days** (holds prod — real deadline), Cloud4Box 3 weeks, Aeza-Vienna ~1 month.
+
+### 📋 Next (rested)
+- Send Aeza ticket, get Vienna relocated (or new location), re-test path RU→new-node with large packets BEFORE building anything.
+- Once path is clean: build AWG tunnel RU-Aeza ↔ exit node, MTU sized for the real path, 5 test peers, 2–3 day soak.
+- If stable: migrate clients + site + DB off Beget before its 7-day lease ends. Client configs point at Beget IP — all peers need reissue/endpoint change; plan delivery channel.
+- Remove home laptop from any production path (still the emergency relay).
+
