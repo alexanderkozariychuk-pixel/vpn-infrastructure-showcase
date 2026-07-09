@@ -2627,3 +2627,57 @@ Wrote a support ticket with the full reproducible diagnosis (ping size threshold
 - If stable: migrate clients + site + DB off Beget before its 7-day lease ends. Client configs point at Beget IP — all peers need reissue/endpoint change; plan delivery channel.
 - Remove home laptop from any production path (still the emergency relay).
 
+---
+
+## 2026-07-08
+
+### 🗺 Vienna resolved — refunded, replaced with Aeza Frankfurt
+
+Support ticket to Aeza (packet-level PMTU black-hole diagnosis from 2026-07-07) succeeded — refunded the Vienna server, rented **Aeza Frankfurt (178.20.209.224)** instead, same price.
+
+**Verified connectivity BEFORE building anything** (lesson from Vienna applied): ran the same large-packet test suite from both the home workstation and the RU-Aeza node (45.151.101.104) to Frankfurt — `ping -M do -s 1400` passes cleanly (0% loss) from both sources; only the 1500-MTU edge (`-s 1472`) fails, which is normal/expected, not a black hole. Confirmed real SSH connects (not just `nc`/ping) — the actual test that mattered with Vienna.
+
+**Hit and fixed the same `ssh.socket` activation issue as Vienna** on the fresh Frankfurt image (sshd inactive, systemd holding port 22, real SSH timing out while `nc` "succeeded"). Fixed via VNC console: `systemctl disable --now ssh.socket && systemctl enable --now ssh`.
+
+### 🛠 AmneziaWG installed on both Aeza nodes (RU + Frankfurt)
+
+Ubuntu 26.04 ("resolute") has no Amnezia PPA build yet. Fixed by pinning the PPA to `noble` (24.04) instead — installs and DKMS-builds cleanly on the 26.04 kernel. Also had to drop `apt-key` (deprecated, breaks under `set -e` on 26.04) in favor of importing the key via `gpg --dearmor` into a keyring referenced by `Signed-By`.
+
+Verified on both nodes: `awg`/`awg-quick` present, kernel module loads, and — importantly — **DKMS built the module for both the running kernel and the next one already staged** (`7.0.0-15` and `7.0.0-27`), which prevents the Cloud4Box-style "new kernel boots without the module" incident from recurring.
+
+### 🗺 Decision — stop configuring by hand, actualize Ansible
+
+After the third round of manual SSH/AWG setup in three days, decided (rightly) that repeated groundwork like this should be codified, not repeated. The project already had a mature-but-stale Ansible structure (roles: common, amneziawg, amneziawg-bridge, monitoring; playbooks for now-decommissioned Moldova/Bulgaria/shadowsocks topologies).
+
+**Actualized for Ubuntu 26.04 + the new Aeza topology:**
+- `roles/amneziawg/tasks/install.yml` — rewritten to pin the PPA to `noble`, import the key via gpg (no apt-key), and added a post-install check that DKMS actually built the module for the running kernel (`failed_when` instead of silent failure).
+- `roles/common/tasks/main.yml` — added the `ssh.socket` → `ssh.service` fix. Made SSH hardening (disable root login / password auth) **opt-in** via `ssh_hardening: true` flag instead of unconditional — deferred until everything works and clients are migrated, so root access isn't lost mid-setup.
+- `roles/amneziawg/templates/awg0.conf.j2` — made the obfuscation block (`Jc/Jmin/Jmax/S1/S2/H1-4`) conditional on `awg_obfuscation` (default false), added `MTU` (default 1300) and an optional `Endpoint` for peers. Reasoning: build the inter-node tunnel in layers — plain AmneziaWG first, obfuscation added afterward — to isolate failures instead of debugging everything at once.
+- `inventory/hosts.ini` — replaced the dead Moldova/Bulgaria/Beget-bridge entries with the current topology: `ru-aeza` (45.151.101.104, entry) and `fra-aeza` (178.20.209.224, exit), both on Aeza's backbone.
+- Decision: a separate `amneziawg-backbone` role for the inter-node tunnel (awg1), kept cleanly apart from the client-facing `awg0` role — avoids parameterizing one role for two different jobs.
+
+### 🔁 Both Aeza nodes got reinstalled (clean state)
+
+Both RU-Aeza and Frankfurt were reinstalled during the session (fresh OS, new host keys, no AWG). Re-added SSH keys to both after clearing stale `known_hosts` entries. Ended up being a good thing — a clean pair of nodes is the ideal starting point to test the actualized playbook end-to-end rather than layering automation on top of manually-patched state.
+
+### 🐛 First playbook dry-run — found one real issue
+
+Ran `ansible-playbook --check --diff` against `deploy-awg.yml` (entry group / RU-Aeza) as the first real test of the actualized roles.
+
+**Result:** apt cache update succeeded; failed on `Install base packages` — **`net-tools` is not available on Ubuntu 26.04** (functionality folded into `iproute2`, which is present by default; the package was removed from the archive). Straightforward fix: drop `net-tools` from the package list.
+
+**Stopped here** — ran out of usage limits mid-fix, right after identifying the `net-tools` issue and before applying the correction.
+
+### 📋 Next (pick up here)
+- Remove `net-tools` from `roles/common/tasks/main.yml` package list, re-run `--check --diff` on RU-Aeza.
+- Continue dry-run iteration until `common` + `amneziawg` apply cleanly on RU-Aeza (entry group).
+- Frankfurt (exit) needs its own path: `common` only at this layer (client-facing `awg0` role doesn't apply to it) — confirm/adjust playbook targeting.
+- Write the `amneziawg-backbone` role (awg1, RU↔Frankfurt): Frankfurt listens (static endpoint), RU-Aeza initiates (Endpoint + PersistentKeepalive), MTU 1300, no obfuscation on this layer, subnet 10.99.99.0/30.
+- Generate backbone keys/PSK (RU-Aeza has no `awg` binary right now post-reinstall — install via the playbook, not by hand, then generate).
+- After backbone tunnel is up: verify handshake + large-packet test *through* the tunnel (repeat the MTU methodology from 07-07, this time end-to-end).
+- Once stable: build 5 test client configs, soak 2–3 days, then migrate clients/site/DB off Beget before its lease ends.
+- Secrets handling: currently plaintext in gitignored `entry.yml`/`exit.yml`; `ansible-vault` flagged as a later improvement, not blocking current work.
+- Carried backlog: domain + SSL, UptimeRobot, README/architecture update (Moldova→Germany→Aeza).
+
+
+
