@@ -1,10 +1,21 @@
 ---
-- name: Install dependencies for PPA
+# AmneziaWG installation — updated for Ubuntu 26.04 (resolute).
+# Lessons baked in from manual debugging (2026-07-08):
+#  - Amnezia PPA has no build for 'resolute'; pin the repo to 'noble' (24.04),
+#    whose package installs and DKMS-builds fine on 26.04's kernel.
+#  - Do NOT use apt-key (deprecated, breaks on 26.04); import the key via gpg
+#    into a keyring and reference it with Signed-By.
+#  - Verify the DKMS module actually built for the running kernel.
+
+- name: Install dependencies
   apt:
-    name: 
+    name:
       - software-properties-common
       - python3-launchpadlib
+      - curl
+      - gpg
     state: present
+    update_cache: yes
 
 - name: Preseed iptables-persistent answers
   debconf:
@@ -21,10 +32,29 @@
     name: iptables-persistent
     state: present
 
-- name: Add AmneziaWG PPA
-  apt_repository:
-    repo: 'ppa:amnezia/ppa'
-    state: present
+# --- AmneziaWG PPA, pinned to noble (no resolute build exists) ---
+- name: Import Amnezia PPA signing key into a keyring
+  ansible.builtin.get_url:
+    url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75c9dd72c799870e310542e24166f2c257290828"
+    dest: /tmp/amnezia-ppa.asc
+    mode: '0644'
+
+- name: Dearmor the key into keyrings dir
+  ansible.builtin.shell: >
+    gpg --dearmor --yes -o /usr/share/keyrings/amnezia-ppa.gpg /tmp/amnezia-ppa.asc
+  args:
+    creates: /usr/share/keyrings/amnezia-ppa.gpg
+
+- name: Add AmneziaWG repository (pinned to noble)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/amnezia.sources
+    mode: '0644'
+    content: |
+      Types: deb
+      URIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/
+      Suites: noble
+      Components: main
+      Signed-By: /usr/share/keyrings/amnezia-ppa.gpg
 
 - name: Install AmneziaWG packages
   apt:
@@ -33,3 +63,15 @@
       - amneziawg-tools
     state: present
     update_cache: yes
+
+# --- verify the kernel module actually built & loads ---
+- name: Load amneziawg kernel module
+  community.general.modprobe:
+    name: amneziawg
+    state: present
+
+- name: Verify DKMS built the module for the running kernel
+  ansible.builtin.shell: "dkms status | grep amneziawg | grep \"$(uname -r)\""
+  register: dkms_check
+  changed_when: false
+  failed_when: dkms_check.rc != 0

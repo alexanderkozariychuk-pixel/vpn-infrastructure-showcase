@@ -1,0 +1,7 @@
+---
+- name: Base setup only (no client-facing AWG) — for backbone/exit nodes
+  hosts: exit
+  become: yes
+  gather_facts: yes
+  roles:
+    - common

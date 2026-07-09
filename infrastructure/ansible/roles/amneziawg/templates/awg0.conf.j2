@@ -2,12 +2,14 @@
 Address = {{ awg_address }}
 ListenPort = {{ awg_listen_port | default(443) }}
 PrivateKey = {{ awg_private_key }}
+MTU = {{ awg_mtu | default(1300) }}
 {% for rule in awg_post_up | default([]) %}
 PostUp = {{ rule }}
 {% endfor %}
 {% for rule in awg_post_down | default([]) %}
 PostDown = {{ rule }}
 {% endfor %}
+{% if awg_obfuscation | default(false) %}
 Jc = {{ awg_jc }}
 Jmin = {{ awg_jmin }}
 Jmax = {{ awg_jmax }}
@@ -17,13 +19,16 @@ H1 = {{ awg_h1 }}
 H2 = {{ awg_h2 }}
 H3 = {{ awg_h3 }}
 H4 = {{ awg_h4 }}
+{% endif %}
 {% for peer in awg_peers %}
-
 ### Client {{ peer.name }}
 [Peer]
 PublicKey = {{ peer.public_key }}
 PresharedKey = {{ peer.preshared_key }}
 AllowedIPs = {{ peer.allowed_ips }}
+{% if peer.endpoint is defined %}
+Endpoint = {{ peer.endpoint }}
+{% endif %}
 {% if peer.persistent_keepalive is defined %}
 PersistentKeepalive = {{ peer.persistent_keepalive }}
 {% endif %}
