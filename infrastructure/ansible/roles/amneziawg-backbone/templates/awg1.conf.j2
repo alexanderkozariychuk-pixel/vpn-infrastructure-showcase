@@ -1,0 +1,17 @@
+[Interface]
+Address = {{ bb_address }}
+PrivateKey = {{ bb_private_key }}
+MTU = {{ bb_mtu }}
+FwMark = {{ bb_fwmark }}
+{% if bb_role == 'listener' %}
+ListenPort = {{ bb_listen_port }}
+{% endif %}
+
+[Peer]
+PublicKey = {{ bb_peer_public_key }}
+PresharedKey = {{ bb_psk }}
+AllowedIPs = {{ bb_peer_allowed_ips }}
+{% if bb_role == 'initiator' %}
+Endpoint = {{ bb_peer_endpoint }}
+PersistentKeepalive = {{ bb_keepalive }}
+{% endif %}

@@ -1,0 +1,81 @@
+---
+# Assumes AmneziaWG is already installed (via the amneziawg role's install.yml
+# on at least one node in the pair). This role only deploys the second,
+# backbone interface (awg1) used purely for server-to-server transport.
+#
+# IMPORTANT: bb_fwmark must differ from the client-facing awg0's fwmark —
+# reusing fwmarks across interfaces causes policy-routing collisions.
+#
+# IMPORTANT: AllowedIPs for the initiator side must NOT be 0.0.0.0/0 — that
+# makes awg-quick's policy routing capture ALL outbound traffic from the
+# host (including its own SSH), causing a self-lockout the moment the
+# interface comes up but before the handshake completes. Use a narrow
+# AllowedIPs (the peer's tunnel address, e.g. /32) instead. Lesson from
+# 2026-07-09.
+
+- name: Ensure AmneziaWG is installed (idempotent, shared install path)
+  include_role:
+    name: amneziawg
+    tasks_from: install
+
+- name: Create AmneziaWG config directory
+  file:
+    path: /etc/amnezia/amneziawg
+    state: directory
+    mode: 0700
+
+- name: Deploy backbone interface config ({{ bb_interface }}.conf)
+  template:
+    src: awg1.conf.j2
+    dest: "/etc/amnezia/amneziawg/{{ bb_interface }}.conf"
+    mode: 0600
+  register: bb_config_deployed
+
+- name: Open backbone UDP port on listener side
+  iptables:
+    chain: INPUT
+    protocol: udp
+    destination_port: "{{ bb_listen_port }}"
+    jump: ACCEPT
+    comment: "AmneziaWG backbone tunnel"
+  when: bb_role == 'listener'
+
+- name: Ensure backbone tunnel is enabled at boot
+  systemd:
+    name: "awg-quick@{{ bb_interface }}"
+    enabled: yes
+
+# Explicit restart-if-config-changed instead of relying on `state: started`,
+# which is a no-op if systemd already considers the (oneshot) unit active —
+# even when the underlying config file has changed. This was the actual
+# cause of the connectivity check passing against a STALE tunnel state.
+- name: Restart backbone tunnel to apply current config
+  systemd:
+    name: "awg-quick@{{ bb_interface }}"
+    state: restarted
+  when: bb_config_deployed.changed
+
+- name: Ensure backbone tunnel is running (first-time start, config unchanged case)
+  systemd:
+    name: "awg-quick@{{ bb_interface }}"
+    state: started
+  when: not bb_config_deployed.changed
+
+# --- Safety net: verify the host itself is still reachable and the tunnel
+# actually passes traffic, AFTER the restart above (not before). ---
+- name: Wait a moment for the tunnel to settle
+  ansible.builtin.pause:
+    seconds: 3
+
+- name: Verify outbound connectivity from this host still works
+  ansible.builtin.shell: "ping -c 2 -W 3 1.1.1.1"
+  register: connectivity_check
+  changed_when: false
+  failed_when: connectivity_check.rc != 0
+
+- name: Verify backbone peer is reachable over the tunnel (initiator only)
+  ansible.builtin.shell: "ping -c 3 -W 3 {{ bb_peer_tunnel_ip }}"
+  register: peer_check
+  changed_when: false
+  failed_when: peer_check.rc != 0
+  when: bb_role == 'initiator' and bb_peer_tunnel_ip is defined

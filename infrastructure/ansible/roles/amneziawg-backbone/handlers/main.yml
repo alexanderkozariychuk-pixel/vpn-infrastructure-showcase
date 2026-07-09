@@ -1,0 +1,5 @@
+---
+- name: restart backbone tunnel
+  systemd:
+    name: "awg-quick@{{ bb_interface }}"
+    state: restarted

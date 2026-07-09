@@ -21,3 +21,16 @@ grafana_admin_password: "changeme"
 prometheus_retention: "30d"
 
 moldova_entry_ip: "45.140.146.134"
+
+
+# --- Backbone tunnel from RU-Aeza entry node (awg1) ---
+bb_interface: awg1
+bb_mtu: 1300
+bb_listen_port: 51900
+bb_fwmark: 51900
+bb_role: listener
+bb_address: "10.99.99.2/30"
+bb_private_key: "MKIgqL5LsH7IKV6ni7970+CzyDyNmXssBR+eG1/AqV4="
+bb_peer_public_key: "b4OKojq0l8/K9g8DWoHzQuOf9it/92sCrzcdpW+K7AA="
+bb_peer_allowed_ips: "10.66.66.0/24,10.99.99.0/30"
+bb_psk: "s8S+3q7ZeVaWWfbwpUoJBRdhbcyPeOuMyELpoAJPOwA="

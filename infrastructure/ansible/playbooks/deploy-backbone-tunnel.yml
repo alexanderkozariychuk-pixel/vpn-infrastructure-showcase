@@ -1,0 +1,7 @@
+---
+- name: Deploy inter-node backbone tunnel (RU-Aeza <-> Frankfurt)
+  hosts: entry:exit
+  become: yes
+  gather_facts: yes
+  roles:
+    - amneziawg-backbone

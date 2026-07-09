@@ -56,3 +56,20 @@ moldova_entry_ip: "185.237.223.94"
 moldova_entry_uuid: "5e246cfa-b30f-4a26-bf50-fef57666e3c4"
 moldova_entry_public_key: "n8x1wt_rt7IdjzmvvwxPgckqDpa5MAW8sginz8DwsV8"
 moldova_entry_short_id: "6ba85179e30d4fc2"
+
+
+# --- Backbone tunnel to Frankfurt exit node (awg1) ---
+# fwmark 51900 chosen deliberately distinct from awg0's fwmark to avoid
+# policy-routing rule collisions (see roles/amneziawg-backbone/tasks/main.yml)
+bb_interface: awg1
+bb_mtu: 1300
+bb_fwmark: 51900
+bb_role: initiator
+bb_address: "10.99.99.1/30"
+bb_private_key: "yHpDuiItbXI+ozhdNhT5bu9qmH2vtLWUXi+cUNAAlX4="
+bb_peer_public_key: "Xw8UzCCCrZRJUgVA/uUpeWex6Zs28izNz0mAQr8zYCA="
+bb_peer_endpoint: "178.20.209.224:51900"
+bb_peer_allowed_ips: "10.99.99.2/32"
+bb_peer_tunnel_ip: "10.99.99.2"
+bb_psk: "s8S+3q7ZeVaWWfbwpUoJBRdhbcyPeOuMyELpoAJPOwA="
+bb_keepalive: 25

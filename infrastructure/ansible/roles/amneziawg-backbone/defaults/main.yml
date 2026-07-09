@@ -1,0 +1,19 @@
+---
+# Inter-node backbone tunnel (awg1) — separate from client-facing awg0.
+# Layer 1: plain AmneziaWG, no obfuscation, conservative MTU.
+bb_interface: awg1
+bb_mtu: 1300
+bb_listen_port: 51900
+# fwmark MUST be unique per interface on a host — do not reuse the
+# client-facing awg0's fwmark (see tasks/main.yml comment).
+bb_fwmark: 51900
+# role: 'listener' (has stable endpoint, waits) or 'initiator' (connects out)
+bb_role: listener
+bb_address: ""
+bb_peer_public_key: ""
+bb_peer_endpoint: ""
+bb_peer_allowed_ips: "0.0.0.0/0"
+bb_peer_tunnel_ip: ""
+bb_psk: ""
+bb_private_key: ""
+bb_keepalive: 25

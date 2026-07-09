@@ -1,6 +1,7 @@
 ---
-- name: Base setup only (no client-facing AWG) — for backbone/exit nodes
-  hosts: exit
+- name: Base setup only (no client-facing AWG) — for backbone/exit nodes,
+        or any node before applying role-specific config. Use --limit.
+  hosts: all
   become: yes
   gather_facts: yes
   roles:
