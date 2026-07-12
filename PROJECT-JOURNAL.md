@@ -2679,5 +2679,123 @@ Ran `ansible-playbook --check --diff` against `deploy-awg.yml` (entry group / RU
 - Secrets handling: currently plaintext in gitignored `entry.yml`/`exit.yml`; `ansible-vault` flagged as a later improvement, not blocking current work.
 - Carried backlog: domain + SSL, UptimeRobot, README/architecture update (Moldova→Germany→Aeza).
 
+---
+
+## 2026-07-09 — Backbone role hardening: three routing bugs found and fixed
+
+Built out the dedicated backbone interface (awg1) for the entry↔exit server-to-server
+transport, kept fully separate from the client-facing interface (awg0). Three serious
+bugs surfaced during a live bring-up and were fixed in the role:
+
+1. **Self-lockout from a wide AllowedIPs on the initiator.** With `AllowedIPs = 0.0.0.0/0`
+   on the initiator side, wg-quick's automatic policy routing captured *all* host traffic —
+   including the SSH session — the instant the interface came up, before any handshake.
+   Fix: `Table = off` on the initiator plus manual scoped routing via PostUp/PostDown
+   (a dedicated routing table + an `ip rule` matching only the client subnet as source).
+   The host's own traffic keeps its normal default route; only client-subnet-sourced
+   traffic uses the tunnel.
+
+2. **Fwmark collision.** The client interface and the backbone interface had been reusing
+   the same fwmark, colliding in the policy-routing layer and black-holing host SSH. Fix:
+   a unique, explicit fwmark per interface.
+
+3. **Stale-config no-op on restart.** A `state: started` against an already-active oneshot
+   unit is a no-op even when the config changed, so a stale tunnel could pass the safety
+   check. Fix: register the template result and force `state: restarted` when the config
+   actually changed, before the safety check runs.
+
+The role now ends with explicit safety-net checks after any tunnel restart: verify the host
+still reaches the internet, and (initiator only) verify the tunnel peer is reachable — both
+fail loudly. Backbone verified end to end: handshake, ping through the tunnel, host survives,
+re-runs idempotent.
+
+**Rule reinforced:** unique fwmark per interface; never let a backbone initiator take the
+default route without `Table = off` + manually scoped routing.
+
+---
+
+## 2026-07-10 — Client layer as code; the "generations of keys" trap
+
+Codified the client-facing awg0 layer through the playbook: client subnet, gateway, port,
+MTU, five test peers, and PostUp/PostDown that forward awg0↔awg1 (into the backbone) rather
+than NAT'ing locally — egress/NAT belongs on the exit node, not the entry node. Fixed a
+lingering wrong interface name in the forward rules (an old placeholder that never matched
+the real NIC).
+
+Lost a good chunk of the day to a self-inflicted problem: over several rounds of debugging,
+client keypairs had been regenerated multiple times, and the private key that ended up in a
+client config no longer matched the public key registered as that peer on the server. The
+server silently drops a handshake it can't match to a known peer, so the symptom was pure
+silence — packets arriving, nothing coming back. The lesson isn't subtle but it's easy to
+violate under fatigue: **a client config and its server peer are one keypair; verify
+priv→pub on the server (`awg pubkey`) rather than trusting which "generation" a key came
+from.**
+
+---
+
+## 2026-07-11 — Full clean rebuild; the root cause of the intermittent behaviour
 
 
+Days of accumulated manual patches on top of the playbook had made the servers' actual state
+unreadable — every new hand-run command added a variable, and it stopped being diagnosis and
+became guessing. Decided to stop patching and return to a reproducible state: reinstalled both
+nodes and rebuilt everything through the playbook, touching the servers by hand as little as
+possible.
+
+Two root causes of the on-again/off-again behaviour across sessions were finally pinned down:
+
+- **Non-persistent IP forwarding on the exit node.** `net.ipv4.ip_forward` was only ever set
+  at runtime, so it reset to 0 on every reboot — and the nodes had rebooted repeatedly. That
+  single fact explained the intermittency: it worked whenever forwarding happened to have been
+  re-enabled after the last reboot, and failed otherwise. Fixed by writing it to a dedicated
+  file under `/etc/sysctl.d/` from the `common` role so it survives reboot.
+
+- **A leftover container runtime on the exit node** had set the kernel FORWARD policy to DROP
+  and inserted its own chains, quietly cutting forwarded client traffic. It served nothing on
+  this node; removing it (via the reinstall) returned FORWARD policy to ACCEPT.
+
+The clean rebuild ran cleanly across all stages: entry (base + client interface), exit (base),
+and backbone (both sides). End-to-end reachability from the client subnet out through the exit
+node measured 0% loss.
+
+**Rule reinforced (again, and this time it stuck):** nothing critical lives only at runtime —
+kernel modules go to DKMS, iptables to PostUp/PostDown or a persistent store, peers to config
+files immediately, and sysctl values to `/etc/sysctl.d/`. Forwarding on an exit node is exactly
+that kind of critical, must-survive-reboot value.
+
+---
+
+## 2026-07-12 — The DPI wall, and the win
+
+With a clean, code-defined stack, one symptom remained and it was stubborn: the test client
+completed its handshake and resolved DNS perfectly, but no real traffic flowed — TCP handshakes
+never completed, and pings from the server to the client dropped at every packet size, even the
+smallest. That "even the smallest fails" ruled out a plain MTU problem.
+
+Two things cracked it:
+
+1. **Obfuscation.** The working production config for the older exit uses AmneziaWG obfuscation
+   (the Jc/Jmin/Jmax/S/H parameters); the new chain had none. Under heavy DPI, plain
+   WireGuard-shaped traffic gets fingerprinted and throttled — the handshake and single small
+   UDP round-trips slip through, but a sustained stream toward the client gets cut. That matched
+   every observation: handshake up, DNS working, TCP and steady flows dying. Generated a matching
+   obfuscation set, wired it into the client interface through the playbook (the template already
+   supported it behind a flag), and pushed identical parameters into the client configs. After
+   this, server→client ping succeeded at full size in both directions — the DPI throttling was
+   gone.
+
+2. **A route/rule that lived only in PostUp.** The last blocker: the source-routing needed to
+   push client-subnet traffic into the backbone had partially fallen out of sync — the routing
+   table entry was present but the matching `ip rule` was missing, so client packets never entered
+   the backbone. Restoring the rule made real, full-size, bidirectional traffic flow immediately.
+
+Client traffic is live end to end through the exit node. This one belongs in the same family as
+every other rule this project has taught the hard way: **a route and its rule are a pair, and a
+policy-routing rule that only exists in PostUp is a runtime-only artifact — it has to be added
+atomically and idempotently so it survives restarts.**
+
+The real win here isn't "a ping succeeded." It's that any of these nodes can now be destroyed and
+rebuilt from a single playbook run and come back correct, because every rake this project stepped
+on — modules, iptables, peers, forwarding, fwmarks, wide-AllowedIPs lockouts, DPI obfuscation,
+route/rule pairing — is now encoded, with the lesson written next to it. Next: roll the remaining
+client configs and migrate real users over in stages.
