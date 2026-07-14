@@ -2799,3 +2799,54 @@ rebuilt from a single playbook run and come back correct, because every rake thi
 on — modules, iptables, peers, forwarding, fwmarks, wide-AllowedIPs lockouts, DPI obfuscation,
 route/rule pairing — is now encoded, with the lesson written next to it. Next: roll the remaining
 client configs and migrate real users over in stages.
+
+---
+
+## 2026-07-13
+### 🔀 Port change 443 → 8443 (mobile DPI) + server key pinned
+Test users on the new Aeza chain reported intermittent full drops — **mobile networks only, home Wi-Fi fine**, no pattern. Server-side diagnosis ruled out causes one at a time with data:
+- Backbone stable (fresh handshakes, GiB flowing) → not a backbone flap.
+- `ip rule from 10.66.66.0/24 lookup 200` present and in PostUp → source-routing not slipping.
+- **Differentiator:** the proven-working Beget config listens on `8443`; the new chain used `443`. RU mobile carriers inspect/shape UDP on `443` (a web port) far harder than `8443`; wired/Wi-Fi tolerate `443`, mobile does not.
+
+Changed the port through the playbook (`awg_listen_port`, firewall list, iptables INPUT `--dport`). Critically, **pinned `awg_private_key`/`awg_public_key` in `entry.yml`** so the role's `Generate a new private key` task (`when: awg_private_key is not defined`) can't fire and silently invalidate all 40 client configs. Server key now stable across redeploys — correct practice regardless.
+
+### 🐛 Self-inflicted: 35 production peers wiped by a playbook run
+After the port change, `deploy-awg.yml` rebuilt `awg0.conf` from the template — and the **35 production peers (client6–40) vanished**, because they'd been added earlier *with a script directly into the live file*, never into `awg_peers` in the inventory. Only the 5 inventory-defined test peers survived.
+Nothing lost (client configs + keys saved in `~/vpn-configs-bridge/NEW/`). **Rebuilt all 40 peers into `entry.yml`**, deriving each peer's `public_key` from the `PrivateKey` in its `.conf` via `awg pubkey` — so server peer and client key **cannot drift** (the mismatch that burned us before, prevented by construction). Same rule, re-taught: *what isn't in code gets wiped on the next run.*
+
+### 🧱 Mobile DPI wall — port alone didn't fix it
+On `8443` the handshake succeeds on mobile, but real traffic still dies. `tcpdump` on `net0:8443` was decisive: **all packets `server → client`, none `client → server`** after the handshake. Not MTU — `ping -M do` failed at *every* size (1000 → 1400), including small. The server encrypts and sends to the live endpoint; the client's return path is cut by the carrier.
+Confirmed against the working Beget config, same phone, same MTS SIM: Beget punches through, Aeza does not. Difference narrowed to the **obfuscation parameter set** (Beget `S1=72/S2=146/H1-4=…` vs ours `S1=86/S2=112/…`) and possibly Aeza's IP range being shaped harder. This is **carrier-level DPI, not an infra bug** — server, backbone, and Wi-Fi path all work.
+
+### 📋 Next (pick up here)
+- Test the Beget obfuscation set (`S1=72/S2=146/H1-4`) on the Aeza `awg0` + one client → isolates "params vs IP/ASN" as the cause.
+- If params fix it → roll the Beget set across `awg0` via Ansible. If not → the RU-Aeza IP range is DPI-shaped; consider a different host/IP.
+
+---
+
+## 2026-07-14
+### 🗺 Decision — pause Aeza migration, restore the proven exit chain
+18 real users are live on the older **Beget → Cloud4Box(DE)** chain right now. It punches through mobile DPI *and* Wi-Fi, and ran 1.5 months / 2 weeks unattended. The new Aeza chain is architecturally cleaner but **does not pass mobile DPI yet**. Chasing the clean rebuild while live users depend on the working one = risk for aesthetics. **Restore the proven chain, finish Aeza later without live users hanging on it.** (No Aeza work discarded — roles, obfuscation, backbone, 40 configs all in code.)
+Reframe worth keeping: the inter-provider connectivity loss that triggered days of emergency work looks, in hindsight, like a **transient network fault** — it healed on its own (clean pings, open ports, SSH to every node). A flare-up over-escalated into a fire. Wait-and-verify before the next "everything's broken" reaction.
+
+### 🔧 Root cause — one-way backbone tunnel (peer pointed at a dead node)
+Users were online via the RU node but on a **domestic exit only** (no foreign IP → no AI services / geo-blocked sites). Reading both ends found it without guessing:
+- Cloud4Box `awg0` peer for Beget: **`0 B received, 271 MiB sent`** → one-way tunnel, no handshake.
+- Beget's backbone iface (`awg1`) had the *correct* key (`vpZ1KP…`) and address (`10.77.77.2/30`) for Germany — but its single `[Peer]` `Endpoint` pointed at **the old Vienna node (`45.86.245.86`)**, a leftover from an abandoned relay attempt. PSKs had also drifted (`RkDHQU…` vs the `vCyQst…` Cloud4Box expected).
+
+### 🔁 Bring-up — cleared a stale default that blocked the interface
+`awg-quick up awg1` failed: `RTNETLINK answers: File exists` — PostUp's `ip route add default via 10.77.77.1 dev awg1 table 200` collided with a **stale `default via 100.100.1.1 dev eth0`** the emergency domestic-exit had left in table 200. Deleted the stale default → interface came up → **handshake with Cloud4Box immediately, transfer both ways**.
+(Note: re-adding the eth0 default needs the `onlink` flag — `Nexthop has invalid gateway` without it, since the gateway isn't in an on-link subnet.)
+
+### ✅ Cutover — tested on one client, then whole subnet with rollback in hand
+Rather than flip all 18 blind: added a narrow `ip rule from 10.88.88.44/32 lookup 201 priority 40` → **test client only** egresses via Germany, other 17 untouched on domestic. After confirming the path, switched the whole subnet (`table 200 default → via 10.77.77.1 dev awg1`), cleaned a duplicate `10.88.88.0/24 lookup 200` rule, **rollback command prepared before the change**. Verified foreign exit IP from a client. All 18 back on foreign exit, **zero dropped during the operation**.
+
+### 🔒 Persistence confirmed
+`systemctl is-enabled awg-quick@awg0 awg-quick@awg1` → both `enabled`. `awg1.conf` PostUp restores `default via 10.77.77.1 dev awg1 table 200` on bring-up → **cold reboot comes back correct, no manual step**. Backup `awg1.conf.bak-venatocloud4box` kept on the node (records the working Cloud4Box key/PSK).
+
+### 📋 Rules reinforced today
+- What isn't in code gets wiped on the next run — server peers belong in the inventory, not hand-scripted into the live file.
+- Pin the server key; never regenerate on redeploy.
+- Before touching a shared resource 18 people depend on: test on one `/32`, hold a rollback ready.
+- Not every lost-connectivity moment is a fire — sometimes the network self-heals; the calm move is wait-and-verify.
