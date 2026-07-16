@@ -3,12 +3,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MOLDOVA_IP = os.getenv("MOLDOVA_IP", "45.140.146.134")
-MOLDOVA_USER = os.getenv("MOLDOVA_USER", "alex")
+# Foreign exit node (Cloud4Box DE) — status/logs/metrics are read from here
+EXIT_IP = os.getenv("EXIT_IP", "")
+EXIT_USER = os.getenv("EXIT_USER", "sovadmin")
 AWG_INTERFACE = os.getenv("AWG_INTERFACE", "awg0")
 AWG_SERVICE = f"awg-quick@{AWG_INTERFACE}"
-IPIP_INTERFACE = os.getenv("IPIP_INTERFACE", "ipip0")
-API_SECRET = os.getenv("API_SECRET", "changeme")
+# Backbone peer as seen FROM the exit node (the /30 far end = the RU entry).
+# This link is what breaks; pinging it from the exit is the early-warning signal.
+BACKBONE_PEER_IP = os.getenv("BACKBONE_PEER_IP", "10.77.77.2")
 
 # Bridge
 BRIDGE_IP = os.getenv("BRIDGE_IP", "212.67.14.85")

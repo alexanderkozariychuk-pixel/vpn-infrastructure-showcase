@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from config import (
     AWG_SERVICE,
     AWG_INTERFACE,
-    MOLDOVA_IP,
-    MOLDOVA_USER,
-    IPIP_INTERFACE,
+    EXIT_IP,
+    EXIT_USER,
+    BACKBONE_PEER_IP,
     BRIDGE_IP,
     BRIDGE_USER,
     BRIDGE_AWG_INTERFACE,
@@ -31,7 +31,7 @@ class PeerStatus:
 
 def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
     """
-    Run command on Moldova via SSH.
+    Run command on the foreign exit node via SSH.
     Returns (stdout, stderr).
     """
     result = subprocess.run(
@@ -39,7 +39,7 @@ def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
             "ssh",
             "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=5",
-            f"{MOLDOVA_USER}@{MOLDOVA_IP}",
+            f"{EXIT_USER}@{EXIT_IP}",
             cmd,
         ],
         capture_output=True, text=True, timeout=timeout,
@@ -109,7 +109,7 @@ def get_bridge_client_names() -> dict:
 # ----------------------------------------------------------------------
 
 def get_amnezia_status() -> str:
-    """Fetch raw awg show output from Moldova."""
+    """Fetch raw awg show output from the exit node."""
     stdout, stderr = _ssh("sudo /usr/bin/awg show")
     return stdout if stdout else f"Error: {stderr}"
 
@@ -145,7 +145,7 @@ def get_full_status_data() -> tuple[list[PeerStatus] | None, str | None]:
 # ----------------------------------------------------------------------
 
 def get_logs_text(lines: int = 30) -> str:
-    """Fetch recent AWG journal logs from Moldova via SSH."""
+    """Fetch recent AWG journal logs from the exit node via SSH."""
     cmd = (
         f"sudo journalctl -u {AWG_SERVICE} "
         f"-n {lines} --no-pager --output short-iso "
@@ -158,7 +158,7 @@ def get_logs_text(lines: int = 30) -> str:
 
 
 def clear_logs() -> bool:
-    """Vacuum old logs on Moldova via SSH."""
+    """Vacuum old logs on the exit node via SSH."""
     stdout, stderr = _ssh(
         "sudo journalctl --vacuum-time=2d", timeout=15
     )
@@ -194,10 +194,10 @@ _METRICS_CMD = (
 
 def get_system_health() -> tuple[dict, dict, str | None]:
     """
-    Collect CPU/RAM/Swap/Disk from Bulgaria (local) and Moldova (SSH).
+    Collect CPU/RAM/Swap/Disk from the app server (local) and the exit node (SSH).
     Returns (local_metrics, remote_metrics, error).
     """
-    # Local — Bulgaria (inside container)
+    # Local — the app server this container runs on
     local = {}
     try:
         res = subprocess.run(
@@ -209,7 +209,7 @@ def get_system_health() -> tuple[dict, dict, str | None]:
         logger.error("Local health check failed: %s", e)
         local = {"cpu": "N/A", "ram": "N/A", "swap": "N/A", "disk": "N/A"}
 
-    # Remote — Moldova via SSH
+    # Remote — the foreign exit node via SSH
     remote = {}
     err = None
     try:
@@ -231,43 +231,40 @@ def get_system_health() -> tuple[dict, dict, str | None]:
 # ----------------------------------------------------------------------
 
 def get_network_quality() -> dict:
-    """Check packet loss and RX/TX stats on IPIP tunnel."""
-    tunnel_peer = "10.0.0.1"
+    """Backbone health, measured FROM the exit node: packet loss to the RU
+    entry across the /30, plus RX/TX on the backbone interface.
+
+    Runs over SSH, not locally — the container has no ping and no tunnel.
+    """
     ping_cmd = (
-        f"ping -c 5 -W 2 {tunnel_peer} "
+        f"ping -c 5 -W 2 {BACKBONE_PEER_IP} "
         f"| grep 'packet loss' | awk -F', ' '{{print $3}}'"
     )
     stats_cmd = (
-        f"ip -s link show {IPIP_INTERFACE} "
+        f"ip -s link show {AWG_INTERFACE} "
         f"| awk 'NR==4 {{print $1}} NR==6 {{print $1}}'"
     )
     quality = {"loss": "N/A", "rx": "0", "tx": "0"}
     try:
-        res = subprocess.run(
-            ping_cmd, shell=True, capture_output=True, text=True, timeout=15,
-        )
-        if res.returncode == 0:
-            quality["loss"] = res.stdout.strip()
-
-        res2 = subprocess.run(
-            stats_cmd, shell=True, capture_output=True, text=True, timeout=5,
-        )
-        stats = res2.stdout.strip().split("\n")
+        stdout, _ = _ssh(ping_cmd, timeout=20)
+        if stdout:
+            quality["loss"] = stdout.strip()
+        stdout2, _ = _ssh(stats_cmd, timeout=10)
+        stats = [l for l in stdout2.strip().split("\n") if l]
         if len(stats) >= 2:
             quality["rx"] = stats[0]
             quality["tx"] = stats[1]
     except Exception as e:
-        logger.error("Network quality check failed: %s", e)
-
+        logger.error("Backbone quality check failed: %s", e)
     return quality
 
 
 # ----------------------------------------------------------------------
-# Fix operations (via SSH on Moldova)
+# Fix operations (via SSH on the exit node)
 # ----------------------------------------------------------------------
 
 def fix_awg_interface() -> bool:
-    """Restart AWG on Moldova via SSH."""
+    """Restart AWG on the exit node via SSH."""
     try:
         stdout, stderr = _ssh(
             f"sudo systemctl restart {AWG_SERVICE}", timeout=30
@@ -282,27 +279,8 @@ def fix_awg_interface() -> bool:
         return False
 
 
-def fix_ipip_bridge() -> bool:
-    """
-    Reset IPIP tunnel on Bulgaria (local container).
-    Requires privileged: true in docker-compose.
-    """
-    try:
-        subprocess.run(
-            ["ip", "link", "set", IPIP_INTERFACE, "down"], check=True
-        )
-        subprocess.run(
-            ["ip", "link", "set", IPIP_INTERFACE, "up"], check=True
-        )
-        logger.info("IPIP bridge reset successfully")
-        return True
-    except Exception as e:
-        logger.error("IPIP fix failed: %s", e)
-        return False
-
-
 def get_logs(lines: int = 50) -> dict:
-    """Fetch recent logs from Moldova via SSH."""
+    """Fetch recent logs from the foreign exit node via SSH."""
     services = {
         "awg": f"sudo journalctl -u awg-quick@{AWG_INTERFACE} -n {lines} --no-pager --output short-iso ",
         "sshd": f"sudo journalctl -u ssh -n {lines} --no-pager --output short-iso ",
@@ -317,7 +295,7 @@ def get_logs(lines: int = 50) -> dict:
 
 def get_analysis_data() -> tuple[str, str]:
     """Collect logs and metrics for AI analysis."""
-    # Logs from Moldova
+    # Logs from the exit node
     logs_stdout, _ = _ssh(
         f"sudo journalctl -u {AWG_SERVICE} -n 30 --no-pager --output short-iso"
     )
@@ -327,11 +305,11 @@ def get_analysis_data() -> tuple[str, str]:
     net_q = get_network_quality()
 
     metrics = (
-        f"Bulgaria — CPU: {local_m['cpu']}, RAM: {local_m['ram']}, "
+        f"App server — CPU: {local_m['cpu']}, RAM: {local_m['ram']}, "
         f"Disk: {local_m['disk']}\n"
-        f"Moldova — CPU: {remote_m['cpu']}, RAM: {remote_m['ram']}, "
+        f"Exit node — CPU: {remote_m['cpu']}, RAM: {remote_m['ram']}, "
         f"Disk: {remote_m['disk']}\n"
-        f"IPIP tunnel — Loss: {net_q['loss']}, "
+        f"Backbone — Loss: {net_q['loss']}, "
         f"RX: {net_q['rx']} pkts, TX: {net_q['tx']} pkts"
     )
 

@@ -12,9 +12,9 @@ executor = ThreadPoolExecutor()
 _PROMPT = """You are a Senior SRE analyzing a distributed VPN infrastructure.
 
 CONTEXT:
-- Bot runs in Docker on Bulgaria Exit Node (185.237.223.94)
-- Logs collected via SSH from Moldova Entry Node
-- Architecture: Client → AmneziaWG (RU Bridge) → AmneziaWG (Moldova) → IPIP → Bulgaria → Internet
+- Bot runs in Docker on the app server
+- Logs collected via SSH from the foreign exit node
+- Architecture: Client → AmneziaWG (RU entry) → AmneziaWG backbone → foreign exit node → Internet
 
 STRICT RULES:
 1. DO NOT suggest installing journalctl locally
