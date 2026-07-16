@@ -71,6 +71,8 @@ credentials/
 # Miscellaneous
 # =============================================
 *.bak
+*.bak[0-9]
+*.bak-*
 *.backup
 *.tmp
 
@@ -83,11 +85,11 @@ sa-key.json
 # =============================================
 #Infrastructure 
 infrastructure/ansible/inventory/hosts.ini
-infrastructure/ansible/group_vars/entry.yml
-infrastructure/ansible/group_vars/bulgaria.yml
-# =============================================infrastructure/ansible/inventory/group_vars/
-infrastructure/ansible/group_vars/exit.yml
-infrastructure/ansible/group_vars/entry.yml
+
+# Real inventory vars hold private keys and PSKs. Only *.example is tracked.
+infrastructure/ansible/inventory/group_vars/*.yml
+!infrastructure/ansible/inventory/group_vars/*.yml.example
+# =============================================
 
 # Bot archives
 monitoring/ai-bot-monitoring/*.tar.gz

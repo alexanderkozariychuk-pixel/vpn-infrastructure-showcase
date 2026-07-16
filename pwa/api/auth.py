@@ -10,7 +10,13 @@ from auth.jwt import verify_password, create_token, hash_password, require_auth
 router = APIRouter()
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD_HASH = hash_password(os.getenv("ADMIN_PASSWORD", "changeme"))
+_admin_password = os.getenv("ADMIN_PASSWORD")
+if not _admin_password:
+    raise RuntimeError(
+        "ADMIN_PASSWORD is not set — refusing to start rather than exposing "
+        "admin/changeme on a public domain."
+    )
+ADMIN_PASSWORD_HASH = hash_password(_admin_password)
 
 
 class LoginRequest(BaseModel):

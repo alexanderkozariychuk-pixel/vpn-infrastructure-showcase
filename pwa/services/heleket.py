@@ -13,7 +13,11 @@ import os
 import json
 import base64
 import hashlib
+import hmac
+import logging
 import httpx
+
+logger = logging.getLogger(__name__)
 
 HELEKET_API = "https://api.heleket.com/v1"
 MERCHANT_ID = os.getenv("HELEKET_MERCHANT_ID", "")
@@ -79,7 +83,14 @@ def verify_webhook(raw_body: bytes) -> dict | None:
     body_str = _serialize(check)
     expected = _make_sign(body_str)
 
-    # constant-time compare
-    if not hashlib.compare_digest(expected, str(received_sign)):
+    # constant-time compare (hmac, NOT hashlib — hashlib has no compare_digest)
+    if not hmac.compare_digest(expected, str(received_sign)):
+        # Log byte-level mismatch: PHP json_encode vs our re-serialization can
+        # diverge on numeric types (10.00 -> 10.0). Needed to debug the first
+        # real webhook; remove the raw dump once signatures are confirmed stable.
+        logger.error(
+            "Webhook signature mismatch.\n  raw:      %r\n  reserial: %r\n  expected: %s\n  received: %s",
+            raw_body, body_str, expected, received_sign,
+        )
         return None
     return data

@@ -9,10 +9,15 @@ Flow (Basic plan):
   5. Mark user as subscribed
 """
 import os
+import base64
 import subprocess
 import logging
 from datetime import datetime, timedelta, timezone
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding, PrivateFormat, PublicFormat, NoEncryption,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.models import User, Config, Payment
@@ -40,22 +45,40 @@ POOLS = {
 }
 
 # Fernet key for encrypting private keys in DB
-_fernet_key = os.getenv("FERNET_KEY", "")
-_fernet = Fernet(_fernet_key.encode()) if _fernet_key else None
+_fernet_key = os.getenv("FERNET_KEY")
+if not _fernet_key:
+    raise RuntimeError(
+        "FERNET_KEY is not set — refusing to start. Without it, client private "
+        "keys and PSKs would be written to the database in plaintext, silently."
+    )
+_fernet = Fernet(_fernet_key.encode())
 
 
 # ── helpers ────────────────────────────────────────────────────────────
 
+# WireGuard keys are plain X25519 pairs (32 raw bytes, base64) and the PSK is
+# 32 random bytes. Generating them in-process instead of shelling out to `awg`
+# keeps the image self-contained: no amneziawg-tools, no PPA at build time, and
+# no silent dependency on whatever the host happens to have installed — which
+# is exactly what broke when this container moved off the VPN node.
+# Verified byte-identical against `awg pubkey`.
 def _awg_genkey() -> str:
-    return subprocess.check_output(["awg", "genkey"]).decode().strip()
+    key = X25519PrivateKey.generate()
+    return base64.b64encode(
+        key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+    ).decode()
+
 
 def _awg_pubkey(priv: str) -> str:
-    return subprocess.check_output(
-        ["awg", "pubkey"], input=priv.encode()
-    ).decode().strip()
+    key = X25519PrivateKey.from_private_bytes(base64.b64decode(priv))
+    return base64.b64encode(
+        key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    ).decode()
+
 
 def _awg_genpsk() -> str:
-    return subprocess.check_output(["awg", "genpsk"]).decode().strip()
+    return base64.b64encode(os.urandom(32)).decode()
+
 
 def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
     result = subprocess.run(
@@ -69,13 +92,9 @@ def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
     return result.stdout.strip(), result.stderr.strip()
 
 def _encrypt(plain: str) -> str:
-    if not _fernet:
-        return plain  # fallback: store plain if key not set (dev only)
     return _fernet.encrypt(plain.encode()).decode()
 
 def _decrypt(cipher: str) -> str:
-    if not _fernet:
-        return cipher
     return _fernet.decrypt(cipher.encode()).decode()
 
 
