@@ -87,8 +87,10 @@ sa-key.json
 infrastructure/ansible/inventory/hosts.ini
 
 # Real inventory vars hold private keys and PSKs. Only *.example is tracked.
-infrastructure/ansible/inventory/group_vars/*.yml
-!infrastructure/ansible/inventory/group_vars/*.yml.example
+# Two parallel group_vars/ dirs exist (inventory/group_vars and group_vars) —
+# match on the directory name, not the full path, so neither can slip through.
+**/group_vars/*.yml
+!**/group_vars/*.yml.example
 # =============================================
 
 # Bot archives
