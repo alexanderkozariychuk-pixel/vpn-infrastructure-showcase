@@ -3,9 +3,18 @@ Address = {{ bb_address }}
 PrivateKey = {{ bb_private_key }}
 MTU = {{ bb_mtu }}
 FwMark = {{ bb_fwmark }}
+{% if bb_role == 'initiator' %}
+Table = off
+{% endif %}
 {% if bb_role == 'listener' %}
 ListenPort = {{ bb_listen_port }}
 {% endif %}
+{% for rule in bb_post_up | default([]) %}
+PostUp = {{ rule }}
+{% endfor %}
+{% for rule in bb_post_down | default([]) %}
+PostDown = {{ rule }}
+{% endfor %}
 
 [Peer]
 PublicKey = {{ bb_peer_public_key }}

@@ -96,7 +96,13 @@
         state: present
       notify: restart ssh
 
-- name: Enable IP forwarding
+- name: Enable IP forwarding (persistent via dedicated sysctl.d file)
+  copy:
+    dest: /etc/sysctl.d/99-sovereign-forward.conf
+    mode: '0644'
+    content: "net.ipv4.ip_forward = 1\n"
+
+- name: Apply IP forwarding immediately
   sysctl:
     name: net.ipv4.ip_forward
     value: '1'

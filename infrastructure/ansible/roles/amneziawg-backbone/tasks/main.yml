@@ -6,12 +6,12 @@
 # IMPORTANT: bb_fwmark must differ from the client-facing awg0's fwmark —
 # reusing fwmarks across interfaces causes policy-routing collisions.
 #
-# IMPORTANT: AllowedIPs for the initiator side must NOT be 0.0.0.0/0 — that
-# makes awg-quick's policy routing capture ALL outbound traffic from the
-# host (including its own SSH), causing a self-lockout the moment the
-# interface comes up but before the handshake completes. Use a narrow
-# AllowedIPs (the peer's tunnel address, e.g. /32) instead. Lesson from
-# 2026-07-09.
+# IMPORTANT: on the initiator side, do NOT let wg-quick's automatic policy
+# routing take over (which happens whenever AllowedIPs=0.0.0.0/0). Use
+# `Table = off` and add scoped routing manually via PostUp/PostDown so only
+# client-subnet-sourced traffic uses the tunnel as default route — the
+# host's own traffic (SSH, management) keeps using its normal route.
+# Lesson from 2026-07-09 (mirrors the earlier Bridge/awg1 SSH-hijack fix).
 
 - name: Ensure AmneziaWG is installed (idempotent, shared install path)
   include_role:
@@ -40,6 +40,27 @@
     comment: "AmneziaWG backbone tunnel"
   when: bb_role == 'listener'
 
+# --- Exit-node NAT: on the listener (Frankfurt) side, client subnet traffic
+# arriving over the backbone tunnel needs to egress to the internet via the
+# real interface. ---
+# TODO: the template now also supports PostUp/PostDown rules (bb_post_up).
+# NAT must come from ONE source, not both — duplicated MASQUERADE rules were
+# observed in production exactly because a rule arrived from two places.
+# Resolve before this role is applied again.
+- name: Enable NAT for client subnet egress (listener/exit side only)
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ bb_client_subnet }}"
+    out_interface: "{{ ansible_default_ipv4.interface }}"
+    jump: MASQUERADE
+    comment: "AmneziaWG backbone client egress NAT"
+  when: bb_role == 'listener' and bb_client_subnet is defined
+
+- name: Save iptables rules (persist NAT across reboot)
+  shell: iptables-save > /etc/iptables/rules.v4
+  when: bb_role == 'listener' and bb_client_subnet is defined
+
 - name: Ensure backbone tunnel is enabled at boot
   systemd:
     name: "awg-quick@{{ bb_interface }}"
@@ -47,8 +68,8 @@
 
 # Explicit restart-if-config-changed instead of relying on `state: started`,
 # which is a no-op if systemd already considers the (oneshot) unit active —
-# even when the underlying config file has changed. This was the actual
-# cause of the connectivity check passing against a STALE tunnel state.
+# even when the config file changed. This was the actual cause of a
+# connectivity check passing against a STALE tunnel. Lesson from 2026-07-09.
 - name: Restart backbone tunnel to apply current config
   systemd:
     name: "awg-quick@{{ bb_interface }}"
@@ -61,8 +82,8 @@
     state: started
   when: not bb_config_deployed.changed
 
-# --- Safety net: verify the host itself is still reachable and the tunnel
-# actually passes traffic, AFTER the restart above (not before). ---
+# --- Safety net: verify the host is still reachable and the tunnel actually
+# passes traffic, AFTER the restart above (not before). ---
 - name: Wait a moment for the tunnel to settle
   ansible.builtin.pause:
     seconds: 3
