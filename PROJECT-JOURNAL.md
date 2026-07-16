@@ -2850,3 +2850,168 @@ Rather than flip all 18 blind: added a narrow `ip rule from 10.88.88.44/32 looku
 - Pin the server key; never regenerate on redeploy.
 - Before touching a shared resource 18 people depend on: test on one `/32`, hold a rollback ready.
 - Not every lost-connectivity moment is a fire — sometimes the network self-heals; the calm move is wait-and-verify.
+
+---
+
+## 2026-07-16
+### 🗺 Strategy — give the DPI-shaped node a job where its flaw doesn't apply
+Two chains exist: the proven entry→foreign-exit chain carrying 18 live users, and the
+Aeza pair that is architecturally clean but doesn't survive mobile DPI. Rather than spend
+another week forcing obfuscation params through a carrier that shapes that IP range,
+**repurposed the Aeza RU node as the PWA + database host.** The shaping targets obfuscated
+UDP; HTTPS is a different protocol with a different signature and is unaffected. The node's
+weakness is irrelevant in its new role.
+
+Falls out for free: the PWA currently lives *on the live entry node*. Moving it to a
+dedicated box is the isolation the roadmap wanted anyway — a public web app with SSH keys
+should not share a host with 18 users' tunnels.
+
+Constraint that forced the decision: **Docker cannot go on a VPN node.** So "spare VPN
+entry" and "app host" are mutually exclusive. Fallback becomes entry→Aeza-GE instead — a
+three-field re-point, already rehearsed on 07-14.
+
+### 🔍 Pre-teardown check caught a live user
+Before destroying anything, checked whether anyone was actually on the Aeza chain. Expected
+nothing (mobile DPI never let it work). Found **one peer with a handshake 24 seconds old and
+5.5 GiB served over three days.** A real person, mid-session. Confirmed who it was, waited
+for them to move, then tore down. The check cost 30 seconds and was the difference between a
+clean migration and cutting someone off without warning.
+
+### 🗑 Teardown + Docker — two predictions, both wrong
+Archived the configs (server key + 40 PSKs), pulled the archive off the box, disabled the
+units, deleted the key material, cleaned FORWARD rules left orphaned by `systemctl disable`
+(PostDown never ran). Moved the host from `[entry]` to `[app]` in the inventory so a stray
+playbook run can't resurrect a VPN on top of Docker. Roles and vars stay in git — the work
+is paused, not discarded.
+
+Two things I predicted and got wrong, both caught by scripting the check instead of trusting
+memory:
+- **Docker's repo does have a build for this release.** Assumed it would lag like the
+  Amnezia PPA did and need pinning to the previous LTS. It didn't.
+- **Docker no longer sets FORWARD policy to DROP.** It installs its own chains instead. The
+  rule "Docker breaks forwarding on a VPN node" still holds — its chains still decide the
+  fate of forwarded traffic — but the mechanism I'd been repeating is out of date. Worth
+  writing the real mechanism down rather than inheriting a legend.
+
+### 🔒 PWA audit — four ways to fail open
+Read the code before deploying it. The pattern across every finding: **the app was written
+to live on a VPN node and silently inherited things from its host.** Move it, and the
+inheritance vanishes without a word.
+
+- **`FERNET_KEY` unset → `return plain`.** The comment said "dev only"; nothing enforced it.
+  Client private keys and PSKs would be written to the database in **plaintext**, and the
+  system would work *perfectly* — configs valid, users happy, no log line. Worse, adding the
+  key later would make those rows undecryptable forever.
+- **`JWT_SECRET` fell back to a default that is public in this repo.** Anyone who read the
+  code could forge a token for any account, including admin. (The var I'd flagged as the
+  risk — `API_SECRET` — turned out to be defined and used nowhere.)
+- **`ADMIN_PASSWORD` fell back to admin/changeme**, and wasn't in `.env.example` at all.
+- **`ping` isn't in the image**, so the network-quality check piped a missing binary through
+  `grep | awk` and returned an empty string as a successful result. Silent garbage.
+
+Every one of these **failed open**. The one variable that failed *closed* — `DATABASE_URL`
+raises on absence — was the model: made the other three refuse to start. The bar is now
+"the container doesn't come up and tells you why", not "it runs and quietly does the wrong
+thing".
+
+### 🐛 The billing could never have worked
+`verify_webhook` called `hashlib.compare_digest` — **which does not exist**; it lives in
+`hmac`. Every incoming payment webhook would raise `AttributeError` → 500 → the gateway
+never gets its confirmation → the user pays and receives nothing. Confirmed against the
+exact Python version the image uses rather than assuming.
+
+Why it survived: the line only runs on an *incoming* webhook. Outgoing signing uses
+`hashlib.md5`, which exists — so every test that creates an invoice passes. The trap sits at
+the point you reach last.
+
+Fixed, and added a byte-level mismatch log, because there's a second latent problem behind
+it: the sender's `json_encode` and our re-serialization can still diverge on numeric types
+(`10.00` → `10.0` breaks the signature). Verified strings and unicode round-trip correctly;
+numbers don't. The first real webhook gets logged raw so that's diagnosed from evidence
+rather than guesswork.
+
+### 🔧 Key generation moved in-process
+Provisioning shelled out to `awg genkey`/`pubkey`/`genpsk`. **The binary isn't in the
+image** — it would have thrown `FileNotFoundError` on the first paying customer. Same root
+cause as the missing `ping`.
+
+Rejected installing the tools into the image (another external repo at build time) and
+generating over SSH (client private keys crossing the wire). WireGuard keys are plain X25519
+pairs and the PSK is 32 random bytes — `cryptography` was already a dependency. Rewrote all
+three in-process and **verified byte-identical output against `awg pubkey`** before trusting
+it. The image is now self-contained: no PPA, no host inheritance, no hidden coupling.
+
+### 🔍 The foreign exit had been running on borrowed time since 30 June
+Chased a side question and found the interface up but its **unit in `failed` since 30 June**
+— running purely at runtime, surviving only because the box hadn't rebooted. Reconstructed
+the cause from apt history: unattended-upgrades pulled a new kernel, the module wasn't
+DKMS-registered, reboot → `Unknown device type` → unit died → fixed by hand, never restarted
+through systemd. The old incident that produced the DKMS rule, still fossilised in the unit
+state.
+
+Talked myself into a panic (a reboot would drop all 18 users — the entry node routes them
+through this interface) and then out of it, on evidence: the DKMS hook is present, the module
+is registered for the running kernel, and the bootloader takes the newest. The next reboot
+should be a non-event. But "should" is a prediction, not a fact — so a **controlled restart
+is scheduled for tonight**, when most clients are offline, with a runbook and a rollback
+prepared in daylight rather than improvised at 3am.
+
+Also verified, and this is the part I'd skipped before: the persistence check on 07-14 was
+run on **one side of the tunnel only**. Half the chain went unverified, and the gap was
+exactly where the fossil was.
+
+### 🔒 Real secrets in the public repo — the .gitignore never matched
+Checked `.gitignore` before the first `git add`. It **wasn't ignoring anything it claimed to**:
+one rule had its path glued onto a `# ====` divider line, making the whole thing a comment;
+the rest pointed at paths missing a directory segment. `git check-ignore -v` said, plainly,
+"not ignored by any rule".
+
+Two backbone private keys were already pushed. Scoped the damage before reacting:
+- **The live entry node's vars held no secrets.** The thing that mattered didn't leak.
+- **Client PSKs never leaked** — and without them the key alone can't impersonate a node.
+- Forward secrecy means the static key can't decrypt past traffic.
+- One leaked key was for the node whose VPN I'd torn down **that morning** — obsolete by
+  accident of timing.
+- One was still live: the foreign fallback's backbone key. Rotated it. Its only peer was the
+  node torn down hours earlier, so nobody was connected — the rotation window was free.
+
+**Deliberately did not rewrite history.** A secret that has been public is compromised
+permanently; a force-push is theatre that also destroys the commit narrative. Rotation is
+the remedy. `git rm --cached` + a fixed `.gitignore` stops the *next* one, which is the part
+that actually matters.
+
+### 🐛 And I broke it further while fixing it
+While "fixing" `.gitignore` I deleted two rules, reasoning they pointed at a directory that
+didn't exist. **It exists** — there are two parallel `group_vars/` dirs, and I'd only looked
+at one. The rules were correct; I removed protection from files that had it. Caught it
+because `git status` showed them as `??` immediately after.
+
+Restored wider: match on the **directory name** (`**/group_vars/*.yml`) rather than a full
+path, so a third parallel copy would be covered by default too. The narrow-path rule is what
+failed in the first place; replacing it with another narrow path would have been the same
+bug with different coordinates.
+
+Bonus find: the second `group_vars/` is an April duplicate that **Ansible doesn't read** —
+it loads the one beside the inventory file. A trap: edit it, nothing happens, lose an hour.
+
+### 📋 Next
+- Tonight: controlled restart of the exit node's unit — runbook + rollback ready.
+- Tomorrow: dedicated SSH keypair for the PWA (never the personal key on a public web host)
+  + a narrow-sudoers user instead of the passwordless-sudo account it would otherwise use.
+- Then: secrets → `.env` → deploy compose → new DB via `alembic upgrade head` → verify on
+  localhost **before** nginx and a certificate. The app answers on loopback first; the
+  internet comes after.
+- Before real money moves: forced-command SSH dispatcher (the command list is short and
+  finite). The right end state — invert the direction so an agent on the node polls a queue,
+  and the web host holds no inbound SSH at all — goes on the roadmap, not today's plate.
+- Cleanup, unhurried: the dead duplicate `group_vars/`, the monitoring bot's stale topology
+  vars, today's `.bak` files.
+
+### 📌 Rules reinforced
+- **Check, don't predict.** Three times today the check disagreed with me: a live user on a
+  "dead" chain, a repo build I assumed was missing, a directory I declared nonexistent.
+- **Fail closed, not open.** A secret with a default is a hole that reports success.
+- **Verify both ends.** A persistence check on one side of a tunnel is half a check.
+- **A public secret is compromised forever** — rotate, don't rewrite.
+- The trap sits where you reach last: outgoing signing worked, incoming never could.
+
