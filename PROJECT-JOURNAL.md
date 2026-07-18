@@ -3015,3 +3015,69 @@ it loads the one beside the inventory file. A trap: edit it, nothing happens, lo
 - **A public secret is compromised forever** — rotate, don't rewrite.
 - The trap sits where you reach last: outgoing signing worked, incoming never could.
 
+---
+
+## 2026-07-18
+### 🗺 Frame
+Domain (out of money) and the exit-node restart (deferred) both blocked
+publication. Underneath them: a full day of work needing neither — harden the
+PWA's access to the nodes before it ever faces the internet. Least access that
+works: not the personal key, not passwordless root, not an arbitrary shell.
+
+### 🔒 The code was still on dead paths
+Three of four PWA routers still SSH'd into Moldova, decommissioned six weeks ago.
+Retargeted `_ssh` to the live exit and renamed the vars honestly (`EXIT_*`, not
+`MOLDOVA_*`). Repurposed a dead IPIP check to measure the backbone /30 — the
+link whose failure cost a week.
+
+### 🐛 Two "works until it doesn't" bugs
+- `verify_webhook` called `hashlib.compare_digest`, which doesn't exist (it's in
+  `hmac`). Every incoming payment webhook would 500 — user pays, gets nothing.
+  Survived because only incoming webhooks hit that line; outgoing signing uses
+  `md5`, which exists, so tests passed. The trap sits where you reach last.
+- Key generation shelled out to `awg`, absent from the image — would fail on the
+  first paying customer. Rewrote as in-process X25519, verified byte-identical
+  against `awg pubkey`.
+
+### 🔒 Second git leak, and a fix that opened a new hole
+`git status` before pushing showed real group_vars tracked and pushed. Scoped
+before reacting: the live node's vars were clean, PSKs never leaked, one leaked
+key was already obsolete (that node's VPN torn down that morning). Rotated the
+one still-live key in a free window; left history intact (a public secret is
+compromised for good — rotation, not a force-push). Then while fixing
+`.gitignore` I deleted two rules on the reasoning the dir didn't exist — it does.
+`git status` caught it seconds later. Restored wider: match on directory name.
+
+### 🔐 SSH layers 1+2 — the main build
+One `pwa-provisioner` key (splitting keys buys nothing while both mount into one
+container — that waits for layer 4). A restricted user on both nodes. Writes go
+through `pwa-add-peer`, which re-validates server-side: key format, /32 in the
+client subnet, octet range, duplicate key AND duplicate IP. Reads via
+`pwa-awg-show`/`pwa-logs`. sudoers allows only the wrappers.
+
+### 🧱 Newer sudo refused the wildcard — correctly
+Exit node's newer sudo rejected `awg show*`: wildcards not allowed in args. Not
+an obstacle — it blocks exactly the hole the entry node's older sudo waved
+through (a wildcard matches spaces). Brought the entry node to the same standard
+rather than keep the looser rule because it "worked".
+
+### 🔧 Wiring, and the check that caught me
+Rewired net_manager/clients/provisioner to the new user and wrappers; client
+names now come from the DB, not `sudo cat`. `py_compile` passed twice on a call
+to a function I'd deleted — it checks syntax, not names. The real import caught
+both. For Python, "it compiles" ≠ "it runs"; the check is `import`.
+
+### 📋 Next
+- At deploy: key at `/opt/pwa/ssh_keys/pwa-provisioner` (600, root:root) before
+  `compose up`. Watch `:ro` mount vs `accept-new` wanting to write known_hosts.
+- Local compose bring-up (no domain needed): new DB, migrations, curl loopback.
+- Waiting on money/quiet window: domain, night restart.
+- Before payments: layer 3 dispatcher. Layer 4 (on-node agent polls a queue) —
+  roadmap.
+
+### 📌 Rules
+- A public web app gets the least access that works.
+- A constraint that blocks the loose path is often protecting you.
+- "It compiles" ≠ "it runs" in Python — verify with a real import.
+- The trap sits where you reach last.
+- Scope a leak before reacting; a hurried fix can open the next hole.
