@@ -80,12 +80,20 @@ def _awg_genpsk() -> str:
     return base64.b64encode(os.urandom(32)).decode()
 
 
+# Reaches the entry node as the restricted pwa-provisioner user with a
+# dedicated key. The only write it can perform is the validated pwa-add-peer
+# wrapper — no `awg set`, no `tee`, no arbitrary sudo.
+PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", "/root/.ssh/pwa-provisioner")
+PWA_SSH_USER = "pwa-provisioner"
+
+
 def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
     result = subprocess.run(
         ["ssh",
-         "-o", "StrictHostKeyChecking=no",
+         "-i", PWA_SSH_KEY,
+         "-o", "StrictHostKeyChecking=accept-new",
          "-o", "ConnectTimeout=5",
-         f"{BRIDGE_USER}@{BRIDGE_IP}",
+         f"{PWA_SSH_USER}@{BRIDGE_IP}",
          cmd],
         capture_output=True, text=True, timeout=timeout,
     )
@@ -115,36 +123,27 @@ async def _find_free_ip(db: AsyncSession, plan: str) -> str | None:
 # ── add peer to Bridge ────────────────────────────────────────────────
 
 def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> bool:
-    """Add peer to Bridge awg0 in memory and persist to config file."""
+    """Add a peer via the validated wrapper on the entry node.
 
-    # 1. add in memory (no PSK via set — Bridge supports it)
-    psk_file = f"/tmp/psk_{peer_ip.replace('.','_')}"
-    cmd_psk  = f"echo '{psk}' > {psk_file}"
-    cmd_set  = (
-        f"sudo awg set {BRIDGE_AWG} "
-        f"peer {pub} "
-        f"preshared-key {psk_file} "
-        f"allowed-ips {peer_ip}/32 && "
-        f"rm -f {psk_file}"
-    )
-    stdout, stderr = _ssh_bridge(f"{cmd_psk} && {cmd_set}")
-    if stderr and "error" in stderr.lower():
-        logger.error("awg set failed: %s", stderr)
-        return False
+    The wrapper (pwa-add-peer) re-validates every argument server-side —
+    key format, that the IP is a /32 in the client subnet, no duplicate key
+    or IP — then does both the runtime `awg set` and the config append
+    atomically. We pass args positionally; the wrapper does the escaping.
+    """
+    # shlex-quote each arg so a hostile name/value can't break out of the
+    # remote shell before the wrapper's own validation even runs.
+    import shlex
+    args = " ".join(shlex.quote(a) for a in (pub, psk, f"{peer_ip}/32", client_name))
+    stdout, stderr = _ssh_bridge(f"sudo pwa-add-peer {args}")
 
-    # 2. persist to config file
-    block = (
-        f"\n\n### {client_name}\n"
-        f"[Peer]\n"
-        f"PublicKey = {pub}\n"
-        f"PresharedKey = {psk}\n"
-        f"AllowedIPs = {peer_ip}/32\n"
-    )
-    # escape single quotes for bash
-    block_escaped = block.replace("'", "'\\''")
-    cmd_append = f"echo '{block_escaped}' | sudo tee -a /etc/amnezia/amneziawg/{BRIDGE_AWG}.conf > /dev/null"
-    _ssh_bridge(cmd_append)
-    return True
+    out = (stdout + " " + stderr).strip()
+    if stdout.startswith("ok:"):
+        logger.info("Peer added to bridge: %s (%s)", client_name, peer_ip)
+        return True
+
+    # wrapper rejected it — surface why, don't retry blindly
+    logger.error("pwa-add-peer refused peer %s (%s): %s", client_name, peer_ip, out)
+    return False
 
 
 # ── build client config text ──────────────────────────────────────────

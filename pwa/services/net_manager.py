@@ -1,6 +1,13 @@
 # services/net_manager.py
 import logging
+import os
 import subprocess
+
+# The PWA reaches both nodes as the restricted `pwa-provisioner` user, using a
+# dedicated key (never the personal key), and can only run the sudo wrappers
+# whitelisted on each node — no arbitrary commands, no root.
+PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", "/root/.ssh/pwa-provisioner")
+PWA_SSH_USER = "pwa-provisioner"
 from dataclasses import dataclass
 
 from config import (
@@ -37,9 +44,10 @@ def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
     result = subprocess.run(
         [
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
+            "-i", PWA_SSH_KEY,
+            "-o", "StrictHostKeyChecking=accept-new",
             "-o", "ConnectTimeout=5",
-            f"{EXIT_USER}@{EXIT_IP}",
+            f"{PWA_SSH_USER}@{EXIT_IP}",
             cmd,
         ],
         capture_output=True, text=True, timeout=timeout,
@@ -51,9 +59,10 @@ def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
     result = subprocess.run(
         [
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
+            "-i", PWA_SSH_KEY,
+            "-o", "StrictHostKeyChecking=accept-new",
             "-o", "ConnectTimeout=5",
-            f"{BRIDGE_USER}@{BRIDGE_IP}",
+            f"{PWA_SSH_USER}@{BRIDGE_IP}",
             cmd,
         ],
         capture_output=True, text=True, timeout=timeout,
@@ -63,7 +72,7 @@ def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
 
 def get_bridge_status_data() -> tuple[list[PeerStatus] | None, str | None]:
     """Fetch AWG peers from Bridge."""
-    stdout, stderr = _ssh_bridge(f"sudo awg show {BRIDGE_AWG_INTERFACE}")
+    stdout, stderr = _ssh_bridge(f"sudo pwa-awg-show {BRIDGE_AWG_INTERFACE}")
     if not stdout or "interface" not in stdout.lower():
         return None, stderr or "No data from Bridge"
 
@@ -87,30 +96,9 @@ def get_bridge_status_data() -> tuple[list[PeerStatus] | None, str | None]:
     return peers, None
 
 
-def get_bridge_client_names() -> dict:
-    """Parse client names from awg0.conf on Bridge."""
-    stdout, _ = _ssh_bridge(
-        f"sudo cat /etc/amnezia/amneziawg/{BRIDGE_AWG_INTERFACE}.conf"
-    )
-    names = {}
-    current_name = None
-    for line in stdout.splitlines():
-        line = line.strip()
-        if line.startswith("### "):
-            current_name = line[4:].strip()
-        elif line.startswith("PublicKey") and current_name:
-            key = line.split("=", 1)[1].strip()
-            names[key[:12]] = current_name
-            current_name = None
-    return names
-
-# ----------------------------------------------------------------------
-# AWG status
-# ----------------------------------------------------------------------
-
 def get_amnezia_status() -> str:
     """Fetch raw awg show output from the exit node."""
-    stdout, stderr = _ssh("sudo /usr/bin/awg show")
+    stdout, stderr = _ssh("sudo pwa-awg-show")
     return stdout if stdout else f"Error: {stderr}"
 
 
@@ -260,6 +248,10 @@ def get_network_quality() -> dict:
 
 
 # ----------------------------------------------------------------------
+# DEAD CODE — not wired to any router. These call commands (journalctl
+# --vacuum, systemctl restart) that the pwa-provisioner sudoers does NOT
+# allow, so they would fail if ever called. Delete in a dedicated pass
+# (same as fix_ipip_bridge on 07-16), or wrap+whitelist if actually needed.
 # Fix operations (via SSH on the exit node)
 # ----------------------------------------------------------------------
 
@@ -282,9 +274,9 @@ def fix_awg_interface() -> bool:
 def get_logs(lines: int = 50) -> dict:
     """Fetch recent logs from the foreign exit node via SSH."""
     services = {
-        "awg": f"sudo journalctl -u awg-quick@{AWG_INTERFACE} -n {lines} --no-pager --output short-iso ",
-        "sshd": f"sudo journalctl -u ssh -n {lines} --no-pager --output short-iso ",
-        "fail2ban": f"sudo journalctl -u fail2ban -n {lines} --no-pager --output short-iso ",
+        "awg": f"sudo pwa-logs awg-quick@{AWG_INTERFACE} {lines}",
+        "sshd": f"sudo pwa-logs ssh {lines}",
+        "fail2ban": f"sudo pwa-logs fail2ban {lines}",
     }
     result = {}
     for name, cmd in services.items():
@@ -297,7 +289,7 @@ def get_analysis_data() -> tuple[str, str]:
     """Collect logs and metrics for AI analysis."""
     # Logs from the exit node
     logs_stdout, _ = _ssh(
-        f"sudo journalctl -u {AWG_SERVICE} -n 30 --no-pager --output short-iso"
+        f"sudo pwa-logs awg-quick@{AWG_INTERFACE} 30"
     )
 
     # Metrics from both nodes
