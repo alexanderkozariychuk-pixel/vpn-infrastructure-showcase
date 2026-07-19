@@ -3081,3 +3081,80 @@ both. For Python, "it compiles" ≠ "it runs"; the check is `import`.
 - "It compiles" ≠ "it runs" in Python — verify with a real import.
 - The trap sits where you reach last.
 - Scope a leak before reacting; a hurried fix can open the next hole.
+
+---
+
+## 2026-07-19
+### 🗺 Frame
+Domain still unpaid, so publication (nginx + TLS) stays blocked. The
+unblocked piece: bring the PWA up for real. Local dry-run with stubs first —
+verify it even starts — then the actual deploy on the app server.
+
+### 🐳 Local bring-up with stubs — the whole start chain, live
+Generated a stub `.env` (format-valid secrets, no production values, SSH not
+exercised), then `docker compose up`. Confirmed on a real run what had only
+been import-tested:
+- postgres reports healthy *before* pwa starts — the race the healthcheck was
+  added to close is closed
+- entrypoint's `set -e` runs 4 migrations, then uvicorn — a broken migration
+  couldn't start the server on a half-built schema
+- no `FERNET_KEY is not set` / `JWT_SECRET is not set` — the fail-closed
+  defaults from the 16th are satisfied, not tripped
+- `/`, `/api`, `/docs` → 200, listening on 127.0.0.1 only
+- auth end-to-end: `/api/auth/token` → JWT → `/api/auth/verify` returns the
+  admin identity. That exercises ADMIN_PASSWORD → argon2 → JWT_SECRET signing
+  in one shot.
+- DB schema matches the models — `configs.name` / `public_key` present, the
+  columns `_names_from_db` reads.
+
+Two small self-corrections along the way: I guessed the login path twice
+(`/api/auth/login`, then `/login`) before reading `/openapi.json` for the real
+one (`/api/auth/token`). Read the route list, don't guess it — FastAPI hands it
+over for free, and the list doubles as proof every router imported cleanly.
+
+### 🚀 Deploy on the app server — and the SSH floor holds in production
+Docker needed a group add first (`usermod -aG docker`; group applies in a new
+session). Then, on ru-aeza:
+- pwa-provisioner key → `/opt/pwa/ssh_keys/` (600, root:root); the compose mount
+  and the code's default key path line up on an absolute path, so no env var
+- code cloned from the public repo; `.env` generated *on the server* with real
+  secrets and live node IPs (Heleket/SMTP/OpenRouter left as `stub` for now)
+- stack came up identically to local: healthy → migrations → uvicorn, loopback
+  only
+- **the part local couldn't test:** a live SSH from inside the container to
+  Beget, as pwa-provisioner, through the pwa-awg-show wrapper — returned awg0's
+  real status. The whole least-access path works end to end in production:
+  container → key from a read-only mount → restricted user → validating wrapper
+  → live node. Not root, not the personal key.
+
+Caught myself mid-deploy: pasted the *local* stub admin password when the
+server generates its own. Different secret; the server's is the real one. Also
+skipped the `.env`-generation step once and only noticed when compose warned
+`POSTGRES_PASSWORD not set` and nothing came up — the missing file, not a bug.
+
+### 🧱 Known nit, not a blocker
+The SSH warned `Failed to add the host to known_hosts` and connected anyway:
+`/root/.ssh` is mounted read-only, so `accept-new` can't persist the host key.
+It works, but MITM protection is effectively off (it accepts any key each time
+— the very thing accept-new was meant to prevent). Fix later, with the compose
+change for nginx: mount a writable known_hosts pre-filled via ssh-keyscan.
+
+### 📋 Next
+Publication is now a short pass on top of a working stack, gated only on money
+for the domain:
+- buy sov3r3ign.com → A-record → propagate
+- nginx :443 → TLS (Let's Encrypt) → proxy to 127.0.0.1:8000
+- SITE_URL / PORTAL_BASE_URL → https://sov3r3ign.com (restart pwa so payment
+  callbacks and reset emails get the right address)
+- writable known_hosts in the same compose change
+- swap Heleket/SMTP/OpenRouter stubs for real keys
+- RF-reachability check without a VPN
+Still waiting on a quiet window: the Cloud4Box awg0 restart.
+
+### 📌 Rules
+- Serve on loopback until there's TLS in front — a bare public :8000 leaks
+  credentials and can't satisfy https-only callbacks.
+- Read the route list, don't guess it.
+- "It's up" is proven from the server (curl loopback), not from a browser —
+  the two aren't the same until a reverse proxy exists.
+- A missing file looks like a bug until you check for the file.
