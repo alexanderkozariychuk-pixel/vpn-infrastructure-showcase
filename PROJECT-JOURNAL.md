@@ -3158,3 +3158,60 @@ Still waiting on a quiet window: the Cloud4Box awg0 restart.
 - "It's up" is proven from the server (curl loopback), not from a browser —
   the two aren't the same until a reverse proxy exists.
 - A missing file looks like a bug until you check for the file.
+
+---
+
+## 2026-07-23
+### 🔎 Mobile one-directional-traffic incident — resolved
+Handshake succeeded but "received" only ticked up every ~25s (keepalive-sized)
+while "sent" climbed normally — independent of carrier and location. Cause:
+a 07-18 test had assigned a live client's AllowedIPs to a
+throwaway test peer, before pwa-add-peer had duplicate-IP checking. Removing
+the test peer never restored the route, so the server had nowhere to route
+return traffic to that client — handshake doesn't depend on AllowedIPs, data
+does. Fixed by reassigning allowed-ips back to the real peer on Beget.
+
+### 🗺 Decision — full Prometheus + Grafana stack on fra-aeza
+fra-aeza is retiring from the backbone-fallback-exit role (a different server
+is being rented for that in early August), so it becomes a dedicated
+monitoring node — no conflict with the established Docker-vs-VPN-forwarding
+rule. Installed natively (apt packages, no Docker): lighter on 1-core/2GB
+hardware, standard practice for exporters regardless.
+
+### 🛠 Built: node_exporter on all four nodes, firewalled to fra-aeza only
+fra-aeza, Beget (entry), Cloud4Box (exit), Aeza-RU (app) all now run
+node_exporter, each restricted so only fra-aeza's IP can scrape :9100.
+Verified with both directions on every node — a scrape from fra-aeza
+succeeds, a scrape from anywhere else times out. All five Prometheus targets
+report "up". Added 1-2GB swap on all four nodes (none had any).
+
+### 🐛 Found: netfilter-persistent "enabled" but rules.v4 was empty on Aeza-RU
+Same class of bug as the Cloud4Box awg0 unit found in July — persistence
+looked configured but wasn't. The existing udp/443 rule there is still not
+saved (TODO); the new node_exporter rule was saved correctly this time.
+Aeza-RU also has no default-deny firewall policy at all (unlike Beget/
+Cloud4Box's UFW) — works today, but is a standard gap to close later.
+
+### 🐛 Grafana dashboard silently broken after "successful" provisioning
+File-provisioned dashboard (community id 1860) loaded with no errors in the
+logs, but every panel showed No data / N/A. Cause: the dashboard's datasource
+variable `${ds_prometheus}` is never auto-resolved by file provisioning (only
+manual UI import does that) — and it wasn't just the one variable, it was
+127 separate references throughout the JSON. Fixed by replacing all 127 with
+the literal datasource UID. Lesson: "no errors in the log" and "finished to
+provision dashboards" did not mean it worked — the dashboard had to be opened
+and checked visually.
+
+### 📋 Next (tomorrow)
+- Alertmanager → Telegram
+- Alert rule for config-vs-runtime AllowedIPs drift (directly targets today's
+  root cause, would have caught it in seconds instead of days)
+- Aeza-RU: default-deny firewall policy, persist the udp/443 rule
+- Still waiting: Cloud4Box night restart, domain purchase
+
+### 📌 Rules reinforced
+- Handshake succeeding is not proof AllowedIPs is intact — check the actual
+  route, not just connectivity.
+- "No errors in the logs" is not "it works" — open the UI and look.
+- A duplicate-IP check exists for a reason: the incident it would have
+  prevented took days to surface and diagnose.
