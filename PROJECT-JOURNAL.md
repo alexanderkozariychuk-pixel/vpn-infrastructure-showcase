@@ -3215,3 +3215,59 @@ and checked visually.
 - "No errors in the logs" is not "it works" — open the UI and look.
 - A duplicate-IP check exists for a reason: the incident it would have
   prevented took days to surface and diagnose.
+
+---
+
+## 2026-07-24
+### 🛠 Alertmanager → Telegram wired up
+Installed Alertmanager on fra-aeza, bound to loopback, connected to Prometheus,
+delivering to the existing ai-bot-monitoring Telegram bot. Reused the old
+bot's token rather than creating a new one.
+
+### 🐛 Two permission misses before it actually ran
+`amtool check-config` passed clean, but the service still failed to start —
+config syntax being valid said nothing about whether the process could read
+the file. Root cause: alertmanager.yml was `600 root:root`, but the service
+runs as user `prometheus`, not root. First fix attempt matched the *pattern*
+of the already-working prometheus.yml (which is root:root, 644) instead of
+checking who reads it — set `640 root:root`, still failed, because 640 only
+grants group-read and `prometheus` isn't in the root group. Only checking
+`id prometheus` (uid 105, gid 107, its own group) and setting the file's
+group to match fixed it. Two guesses based on "the other file looks like
+this" before actually looking at who reads the file — same shape of mistake
+as checking assumptions against real output, just one layer removed (checking
+against a *similar* configuration instead of the *actual* runtime user).
+
+### ✅ End-to-end delivery confirmed
+Sent a manual test alert through Alertmanager's API — it arrived in Telegram,
+just later than expected. Not a bug: `group_wait: 30s` in the config means
+Alertmanager deliberately holds new alert groups briefly before the first
+send, to batch multiple simultaneous alerts into one message rather than
+spamming one at a time.
+
+### 🗺 Decision — no automated AllowedIPs drift detection, for now
+Considered building a textfile-collector script + alert rule to catch
+config-vs-runtime AllowedIPs drift automatically (the exact class of bug
+behind the 07-20 incident). Decided against it: the vector that caused that
+incident — a test peer silently taking over a live client's AllowedIPs — is
+now closed by pwa-add-peer's duplicate-IP check. Building detection for a
+now-mitigated one-off risk isn't worth the added monitoring surface today.
+Caveat noted: the wrapper only protects writes that go through it: a future
+direct `awg set` outside the wrapper could still hit the same bug, but that's
+a rare path now, not the main one.
+
+### 📋 Next
+- Aeza-RU: bring firewall to default-deny (currently ACCEPT-by-default with
+  point rules only — works, but inconsistent with Beget/Cloud4Box's UFW)
+- Aeza-RU: persist the still-unsaved udp/443 rule (found 07-23 that
+  netfilter-persistent reported enabled while rules.v4 was empty)
+- Domain purchase and Cloud4Box night restart still waiting
+
+### 📌 Rules reinforced
+- A config passing its own syntax checker says nothing about whether the
+  process can actually read the file — check the runtime user, not the tool.
+- Matching an existing file's *permission pattern* isn't the same as checking
+  who *actually* needs to read the new one — verify the specific user, don't
+  extrapolate from a similar-looking case.
+- A slow-arriving alert isn't necessarily broken — check the config
+  (group_wait) before assuming failure.
