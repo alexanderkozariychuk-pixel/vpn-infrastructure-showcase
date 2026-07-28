@@ -3271,3 +3271,57 @@ a rare path now, not the main one.
   extrapolate from a similar-looking case.
 - A slow-arriving alert isn't necessarily broken — check the config
   (group_wait) before assuming failure.
+
+---
+
+## 2026-07-28
+### 🛠 Aeza-RU brought to default-deny — the last inconsistent node
+Beget and Cloud4Box have run UFW with default-deny for a while; Aeza-RU (the
+app server) still had a bare ACCEPT policy with only point rules. Closed the
+gap: built the full rule set first (loopback, established/related, SSH,
+the existing 9100 rule) *before* touching the default policy, verified it,
+then switched both iptables and ip6tables to DROP.
+
+### 🐛 Found and removed a dead rule instead of persisting it
+A standing `udp/443 ACCEPT` rule had nothing listening behind it — likely a
+leftover from before this node was repurposed from a VPN role to a pure app
+server. The 07-23 plan had this marked "TODO: persist it"; checked first
+instead of carrying old TODOs forward blindly, found no listener, removed it
+rather than preserving dead config.
+
+### 🔎 A firewall command showed two different answers seconds apart — investigated before proceeding
+`ip6tables -S INPUT` showed empty, then showed a full rule set moments later
+in the same session, with no code change in between. Root cause: `ip6tables`
+resolves to the nft backend on this host (`update-alternatives` confirmed:
+best version is `-nft`), and `ip6tables-legacy` is empty and inert — so
+there's no live second backend actually fighting for control. What produced
+the one inconsistent read is unresolved (file mtime, Docker restart time, and
+login history all ruled out as the cause) — didn't invent an explanation
+for it. Confirmed no real risk (no active second backend) before continuing,
+rather than either ignoring the anomaly or over-reacting to it.
+
+### ✅ Verified before AND after switching default policy
+Before flipping to DROP: opened a second, separate SSH session and kept it
+open as a safety net. After flipping: the held-open session survived (proves
+established/related works), a brand-new SSH connection succeeded (proves the
+port-22 rule works), and a scrape from fra-aeza still returned metrics
+(proves the existing 9100 rule wasn't disturbed). Saved only after all three
+passed, then confirmed the saved *filter* table (not the unrelated *nat
+table, which naturally still shows ACCEPT) actually reads DROP on disk.
+
+### 📌 Monitoring track now complete
+All four nodes on one firewall model (default-deny, explicit allow-lists).
+Prometheus + Grafana + node_exporter + Alertmanager→Telegram all confirmed
+working end to end across the last week of sessions.
+
+### 📌 Rules reinforced
+- Build and verify the full allow-list before touching a default policy —
+  never flip default first and patch gaps after.
+- Keep a second, already-open session as a rollback path whenever changing
+  a live host's default network policy.
+- An old TODO ("persist this rule") deserves a fresh check, not blind
+  execution — the rule turned out to be dead and didn't need persisting at
+  all, just removing.
+- An unexplained anomaly gets investigated for real risk, not narrated away
+  with a plausible-sounding guess — and if the exact cause can't be pinned
+  down, say so rather than inventing a tidy story.
