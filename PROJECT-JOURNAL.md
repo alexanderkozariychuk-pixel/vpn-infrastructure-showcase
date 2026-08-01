@@ -3325,3 +3325,90 @@ working end to end across the last week of sessions.
 - An unexplained anomaly gets investigated for real risk, not narrated away
   with a plausible-sounding guess — and if the exact cause can't be pinned
   down, say so rather than inventing a tidy story.
+
+  ---
+
+  ## 2026-08-01
+### 🗺 Domain purchased — Njalla, paid in ETH
+Compared Aeza (bundled with the server) against dedicated registrars first:
+Aeza's own .com pricing came in notably higher, and neither Namecheap nor
+Porkbun accept Russian MIR cards directly — both do accept crypto natively,
+which matches money flows already in use for this project. Landed on Njalla
+instead: privacy-focused registrar, WHOIS proxied by default, crypto-native —
+a better fit for a censorship-circumvention project than either alternative
+considered. sov3r3ign.com bought for €15 in ETH, active within ~10 minutes.
+
+### 🛠 Full publication: DNS → nginx → firewall → TLS
+- A-record pointed at the app server; caught and fixed a one-digit IP typo
+  before saving (45.141... vs the real 45.151...) — same class of small,
+  high-consequence mistake as the AllowedIPs incident, caught this time
+  before it went live instead of after.
+- nginx installed, reverse-proxying to the existing Docker container on
+  loopback:8000 — the container itself never changed, it just got a public
+  front door.
+- Opened 80/443 on Aeza-RU's default-deny firewall (set up 07-28),
+  verified, then persisted.
+- certbot issued a Let's Encrypt certificate and rewrote the nginx config
+  itself (HTTPS + HTTP→HTTPS redirect) — no manual TLS config needed.
+- Updated .env's SITE_URL/PORTAL_BASE_URL to the real domain, restarted the
+  PWA container. Confirmed end-to-end: valid TLS, admin login works over
+  HTTPS (retrieved the forgotten admin password straight from .env, still
+  there from the 07-19 deploy).
+
+### 🔎 Heleket integration — code audit before wiring real keys
+Reviewed the existing webhook handler before touching production keys.
+Good news: the `hmac.compare_digest` fix from 07-16 is already in place, the
+signature verification correctly recreates PHP's json_encode escaping, and
+the webhook is idempotent (checks `payment.status == "paid"` before
+re-processing).
+
+Found a real, not-yet-tested architectural risk: `provision_basic()` commits
+to an `AsyncSession` that was created in the main request's event loop, but
+the function itself runs inside `asyncio.run()` in a separate thread
+(necessary because the SSH calls to the entry node are blocking). Async
+sessions are generally tied to the event loop that created their connection —
+crossing that boundary is a known source of `RuntimeError`s that show up
+under real load rather than in a quiet test. Not fixed yet — planned to
+verify with a real, small (150 RUB) payment while watching logs live, rather
+than guessing at the fix without evidence either way.
+
+### 🗺 Decision — one tier, not three
+Launching with a single 150 RUB/month plan. Extended and Family, plus the
+multi-config dashboard mechanic, are deferred and won't be mentioned anywhere
+for now. Simplified the backend's PLANS dict to match (removed the two
+unused tiers and the now-unnecessary 409 special case).
+
+### 🐛 Frontend caught two real mismatches before going live
+- The pricing card still showed 200 ₽/mo — stale from before today's
+  150 ₽ decision. Would have shown a different price than what Heleket
+  actually charged at checkout.
+- A features list claimed "Stockholm exit node" — never true for the
+  current topology (the real exit is in Germany). Same class of drift as
+  the outdated README, except this one is client-facing and provable by
+  anyone checking the exit IP's geolocation. Reworded to a topology-neutral
+  claim instead of hardcoding a location that will change again.
+
+Checked the disabled "Extended — Coming Soon" card before assuming it was a
+risk: its button has no onclick handler at all, so it can't actually reach
+the backend. No fix needed there — already built defensively.
+
+### 📋 Next
+- Wire real Heleket merchant ID + API key once moderation clears (up to
+  24h), then a live 150 RUB test payment with logs open, specifically
+  watching for the cross-event-loop commit issue
+- If it does throw: fix by having provision_basic open its own DB session
+  rather than reusing one from a different event loop
+- Cloud4Box night restart still waiting
+- README rewrite — more overdue now that monitoring and billing have both
+  moved since it was last touched
+
+### 📌 Rules reinforced
+- A small typo (one digit in an IP) in a DNS record is the same class of
+  mistake as a config typo anywhere else — worth the same double-check
+  before saving, not just in server configs.
+- An architectural risk found by reading code carefully doesn't get "fixed"
+  on paper — it gets verified with real traffic and open logs before being
+  called resolved either way.
+- Client-facing copy is a production surface, not documentation — a stale
+  price or a false location claim there is a user-visible bug, not a
+  cosmetic one.
