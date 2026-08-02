@@ -3412,3 +3412,85 @@ the backend. No fix needed there — already built defensively.
 - Client-facing copy is a production surface, not documentation — a stale
   price or a false location claim there is a user-visible bug, not a
   cosmetic one.
+
+  ---
+
+  ## 2026-08-02
+### 🐛 Mobile hamburger button overlapping page content — fixed
+The fixed-position hamburger (z-index 200) sat directly on top of the sidebar
+logo when the menu was open, and on top of page titles when closed — same
+root cause, two visible symptoms. Fixed with a `padding-left` on page headers
+plus a `:has()` selector hiding the button while the sidebar is open.
+Confirmed on a real iPhone, not just assumed from the CSS.
+
+### 🎉 Heleket moderation passed on the first attempt
+No revisions requested — likely because the price mismatch and the false
+"Stockholm" claim were caught and fixed before submission, not after.
+
+### 🐛 The day's recurring bug: static edits vs `docker compose restart`
+Hit this same root cause three separate times today (hamburger fix, Extended
+card removal, price change) before fully internalizing it: the Dockerfile
+does `COPY . .` at build time, not a live mount, so editing static/index.html
+on the server has zero effect until `docker compose build` + `up
+--force-recreate` — a plain `restart` just relaunches the old image. `.env`
+changes are read at process start, which is why the domain switch worked with
+just a restart and masked this the first time it mattered.
+
+### 🐛 Real payment test surfaced a second instance of the same root cause
+Wired what looked like real Heleket keys — got a 401, first suspected wrong
+key type (Payout vs Payment). Root cause was simpler: `.env` still held
+`stub` for both values because the container hadn't been recreated, only
+restarted. A live diagnostic script confirmed it directly (printed key
+lengths rather than guessing) before touching anything else.
+
+### 🔎 Checked wallet/network compatibility before writing the client guide
+Before recommending MetaMask, confirmed which network Heleket actually offers
+at checkout: BSC (BEP-20), Tron (TRC-20), ETH (ERC-20). MetaMask supports the
+first and third but not Tron. BSC is also Heleket's own "Best choice" (lowest
+fees), so MetaMask + BSC is a correct, non-arbitrary recommendation — this
+was checked against the real checkout screen, not assumed from general
+MetaMask knowledge.
+
+### 🛠 Built a client-facing FAQ (payment page → wallets, seed phrases, network selection)
+Added an accordion FAQ to the Support page: how to get crypto without
+already owning any, installing MetaMask, seed-phrase security (repeated
+warning, most important section), which network to pick and why, adding BSC
+to MetaMask, how to send the payment, what to do if status doesn't update.
+
+### ⚠️ Declined a second payment provider (platega.io)
+Considered as an SBP-native alternative. Researched it: all sources were
+forum ads and Telegram-manager posts, not independent reviews, and its own
+positioning ("payments without a legal entity") is a red flag for a project
+that just passed legitimate moderation — that framing is typically aimed at
+gray-market use cases. Recommended staying with Heleket rather than adding a
+provider found through promotional posts.
+
+### 🔧 Pricing raised 150 → 300 RUB/month
+Grepped both the backend and frontend for every occurrence of "150" before
+changing anything, rather than editing from memory — caught a third mention
+buried in the FAQ text itself ("only 150 ₽ per invoice"), which would have
+made the site contradict its own explanation the next day if missed.
+Verified inside the running container afterward: price display, FAQ text,
+and the backend PLANS dict all read 300.
+
+### 🗺 Process finding: local repo and server have diverged
+The last several days of fixes were made directly on the server via SSH;
+deploy.sh syncs from the local workstation's copy, which is now stale.
+Running it today would silently overwrite the server's working fixes.
+Needs reconciling before deploy.sh is trusted again — not done yet.
+
+### 📋 Next (tomorrow)
+Full client-journey test end to end: find an exchanger via BestChange, buy
+USDT, create a MetaMask wallet, pay 300 RUB on the site through BSC, confirm
+webhook processing, and check that the config actually gets delivered.
+
+### 📌 Rules reinforced
+- `docker compose restart` ≠ picking up new static files — anything baked in
+  via `COPY` needs `build` + `--force-recreate`. This bit three times today
+  before it was fully internalized.
+- Before recommending a specific wallet/network, check the actual checkout
+  screen — not general knowledge about the wallet.
+- Grep for every occurrence of a value before changing it — a stale copy can
+  hide inside content you wrote yourself, not just in code.
+- A payment provider's own marketing ("no legal entity needed") is itself
+  evidence worth weighing, not just its fees.
