@@ -1,0 +1,80 @@
+# infrastructure/ansible/playbooks/deploy-shadowsocks.yml
+---
+- name: Deploy Shadowsocks-Rust on Bulgaria Exit Node
+  hosts: exit
+  become: yes
+  gather_facts: yes
+
+  vars:
+    ss_version: "v1.21.2"
+    ss_password: "{{ shadowsocks_password }}"
+    ss_port: 8388
+    ss_method: "aes-256-gcm"
+    ss_install_dir: /opt/shadowsocks
+
+  tasks:
+    - name: Create Shadowsocks directory
+      file:
+        path: "{{ ss_install_dir }}"
+        state: directory
+        mode: 0755
+
+    - name: Download Shadowsocks-Rust binary
+      get_url:
+        url: "https://github.com/shadowsocks/shadowsocks-rust/releases/download/{{ ss_version }}/shadowsocks-{{ ss_version }}.x86_64-unknown-linux-musl.tar.xz"
+        dest: "/tmp/shadowsocks.tar.xz"
+        mode: 0644
+
+    - name: Extract Shadowsocks-Rust
+      unarchive:
+        src: /tmp/shadowsocks.tar.xz
+        dest: "{{ ss_install_dir }}"
+        remote_src: yes
+
+    - name: Deploy Shadowsocks config
+      copy:
+        content: |
+          {
+            "server": "0.0.0.0",
+            "server_port": {{ ss_port }},
+            "password": "{{ ss_password }}",
+            "method": "{{ ss_method }}",
+            "fast_open": true,
+            "mode": "tcp_and_udp"
+          }
+        dest: "{{ ss_install_dir }}/config.json"
+        mode: 0600
+
+    - name: Deploy systemd service for Shadowsocks
+      copy:
+        content: |
+          [Unit]
+          Description=Shadowsocks-Rust Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart={{ ss_install_dir }}/ssserver -c {{ ss_install_dir }}/config.json
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/shadowsocks.service
+        mode: 0644
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Shadowsocks
+      systemd:
+        name: shadowsocks
+        enabled: yes
+        state: started
+
+    - name: Allow Shadowsocks port in UFW
+      ufw:
+        rule: allow
+        port: "{{ ss_port }}"
+        proto: any

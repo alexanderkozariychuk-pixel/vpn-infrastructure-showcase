@@ -1,0 +1,125 @@
+# infrastructure/ansible/playbooks/deploy-tun2socks.yml
+---
+- name: Deploy tun2socks on Moldova Entry Node
+  hosts: entry
+  become: yes
+  gather_facts: yes
+
+  vars:
+    ss_password: "{{ shadowsocks_password }}"
+    ss_port: 8388
+    ss_method: "aes-256-gcm"
+    bulgaria_ip: "185.237.223.94"
+    tun2socks_version: "v2.5.2"
+    tun_interface: "tun0"
+    tun_address: "198.18.0.1"
+    tun_gateway: "198.18.0.0"
+
+  tasks:
+    - name: Install Shadowsocks client
+      apt:
+        name: shadowsocks-libev
+        state: present
+        update_cache: yes
+
+    - name: Deploy Shadowsocks client config
+      copy:
+        content: |
+          {
+            "server": "{{ bulgaria_ip }}",
+            "server_port": {{ ss_port }},
+            "local_address": "127.0.0.1",
+            "local_port": 1080,
+            "password": "{{ ss_password }}",
+            "method": "{{ ss_method }}",
+            "mode": "tcp_and_udp"
+          }
+        dest: /etc/shadowsocks-libev/config.json
+        mode: 0600
+
+    - name: Enable and start Shadowsocks client
+      systemd:
+        name: shadowsocks-libev
+        enabled: yes
+        state: started
+
+    - name: Download tun2socks binary
+      get_url:
+        url: "https://github.com/xjasonlyu/tun2socks/releases/download/{{ tun2socks_version }}/tun2socks-linux-amd64.zip"
+        dest: /tmp/tun2socks.zip
+        mode: 0644
+
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: present
+
+    - name: Extract tun2socks
+      unarchive:
+        src: /tmp/tun2socks.zip
+        dest: /usr/local/bin/
+        remote_src: yes
+        mode: 0755
+
+    - name: Deploy systemd service for tun2socks
+      copy:
+        content: |
+          [Unit]
+          Description=tun2socks
+          After=network.target shadowsocks-libev.service
+          Requires=shadowsocks-libev.service
+
+          [Service]
+          Type=simple
+          ExecStartPre=/bin/sleep 2
+          ExecStart=/usr/local/bin/tun2socks-linux-amd64 \
+            -device {{ tun_interface }} \
+            -proxy socks5://127.0.0.1:1080 \
+            -interface ens3 \
+            -udp-timeout 30s
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/tun2socks.service
+        mode: 0644
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start tun2socks
+      systemd:
+        name: tun2socks
+        enabled: yes
+        state: started
+
+    - name: Configure tun interface
+      shell: |
+        ip addr add {{ tun_address }}/8 dev {{ tun_interface }} 2>/dev/null || true
+        ip link set {{ tun_interface }} up
+
+    - name: Add policy routing for AWG clients
+      shell: |
+        ip route add default dev {{ tun_interface }} table 100
+        ip rule add from 10.66.66.6 lookup 100 priority 100
+      ignore_errors: yes
+
+    - name: Exclude Bulgaria IP from tunnel
+      shell: |
+        ip rule add to {{ bulgaria_ip }} lookup main priority 50
+      ignore_errors: yes
+
+    - name: Make routing rules persistent via rc.local
+      copy:
+        content: |
+          #!/bin/bash
+          # tun2socks routing rules
+          sleep 5
+          ip route add default dev tun0 table 100 2>/dev/null || true
+          ip rule add from 10.66.66.6 lookup 100 priority 100 2>/dev/null || true
+          ip rule add to {{ bulgaria_ip }} lookup main priority 50 2>/dev/null || true
+          exit 0
+        dest: /etc/rc.local
+        mode: 0755
