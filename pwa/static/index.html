@@ -1064,6 +1064,8 @@
 
     @media (max-width: 700px) {
       .hamburger { display: flex; }
+      .page-header { padding-left: 56px; }
+      .view:has(.sidebar.open) .hamburger { display: none; }
       .sidebar {
         display: flex !important;
         position: fixed;
@@ -1336,30 +1338,20 @@
               <div class="plan-badge" data-i18n="badge-popular">Popular</div>
               <div class="plan-name" data-i18n="plan-basic-name">Basic</div>
               <div class="plan-desc" data-i18n="plan-basic-desc">1 device · Standard exit</div>
-              <div class="plan-price">200 <span data-i18n="per-mo">₽/mo</span></div>
+              <div class="plan-price">300 <span data-i18n="per-mo">₽/mo</span></div>
               <div class="plan-promo">&nbsp;</div>
               <ul class="plan-features">
                 <li data-i18n="feat-1dev">1 device config</li>
                 <li data-i18n="feat-home">Works on home WiFi</li>
                 <li data-i18n="feat-mobile">Works on mobile network</li>
-                <li data-i18n="feat-stockholm">Stockholm exit node</li>
+                <li data-i18n="feat-stockholm">Obfuscated exit node</li>
               </ul>
               <button class="plan-btn" onclick="selectPlan('Basic')" data-i18n="btn-get-started">Get Started →</button>
             </div>
 
-            <div class="plan-card">
-              <div class="plan-name" data-i18n="plan-ext-name">Extended</div>
-              <div class="plan-desc" data-i18n="plan-ext-dev">In development</div>
-              <div class="plan-price" style="color:var(--text-dim)">—</div>
-              <div class="plan-promo" style="color:var(--yellow)" data-i18n="plan-ext-promo">Infrastructure in development</div>
-              <ul class="plan-features">
-                <li class="wip" data-i18n="feat-soon">Coming soon</li>
-              </ul>
-              <button class="plan-btn wip-btn" disabled data-i18n="btn-coming-soon">Coming Soon</button>
-            </div>
           </div>
           <div class="card" style="text-align:center;padding:20px">
-            <div id="pay-status" style="font-size:13px;color:var(--text-dim);letter-spacing:1px" data-i18n="pay-coming">Payment integration coming soon</div>
+            <div id="pay-status" style="font-size:13px;color:var(--text-dim);letter-spacing:1px"></div>
           </div>
         </div>
 
@@ -1379,6 +1371,83 @@
         <div class="page-header">
           <div class="page-title" data-i18n="nav-support">Support</div>
           <div class="page-sub" data-i18n="support-sub">We're here to help</div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title" style="margin-bottom:16px">Частые вопросы об оплате</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500">У меня нет криптовалюты. Как оплатить?</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                Купите ETH (Ethereum) через любой проверенный обменник — деньги переводятся по СБП или картой,
+                крипта зачисляется на ваш кошелёк за несколько минут, регистрация на бирже не нужна.
+                Ищите обменник через агрегаторы вроде bestchange, где собраны курсы и отзывы — так безопаснее,
+                чем доверять первому попавшемуся сайту.<br><br>
+                Мы рекомендуем покупать именно ETH, а не стейблкоин — для отправки стейблкоина всё равно
+                нужен отдельный токен на комиссию сети, получаются два разных актива вместо одного. При
+                оплате напрямую в ETH комиссия списывается из того же баланса.<br><br>
+                Минимальная покупка через большинство обменников — около 1000 ₽, этой суммы хватит на
+                несколько месяцев подписки. Курс ETH колеблется, поэтому остаток в рублёвом эквиваленте
+                может немного плавать — если суммы не хватит на следующий счёт, докупите ETH на разницу.
+              </div>
+            </details>
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500">У меня нет крипто-кошелька. Что установить?</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                Подойдёт MetaMask — бесплатное расширение для браузера или приложение для телефона.
+                Установите его с официального сайта metamask.io, следуя шагам создания нового кошелька.
+              </div>
+            </details>
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500;color:var(--yellow)">⚠ Что такое seed-фраза и как её хранить?</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                Seed-фраза — это 12-24 слова, которые при создании кошелька MetaMask покажет вам один раз.
+                Это единственный способ восстановить доступ к вашим деньгам, и одновременно — единственное,
+                что нужно злоумышленнику, чтобы их украсть.<br><br>
+                <b style="color:var(--text-bright)">Никогда никому не сообщайте seed-фразу</b> — ни в переписке,
+                ни по телефону, ни в форме на сайте. Наша поддержка никогда не попросит её у вас, и ни один
+                легитимный сервис не запросит её вообще.<br><br>
+                Запишите фразу на бумаге и храните офлайн — не в заметках телефона, не в фото, не в облаке.
+                Ещё раз: <b style="color:var(--text-bright)">никому и никогда</b>, включая тех, кто представляется поддержкой.
+              </div>
+            </details>
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500">Какую валюту и сеть выбрать при оплате?</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                На странице оплаты выберите <b style="color:var(--text-bright)">ETH</b>, сеть —
+                <b style="color:var(--text-bright)">ETH (ERC-20)</b>. Это основная сеть Ethereum, MetaMask
+                работает с ней сразу после установки, без дополнительной настройки.<br><br>
+                <b style="color:var(--yellow)">Важно:</b> комиссия сети оплачивается отдельно из вашего
+                баланса ETH, сверх суммы платежа. В часы высокой загрузки сети комиссия может быть заметно
+                выше обычного — MetaMask показывает её точный размер на экране подтверждения транзакции,
+                проверьте перед отправкой.
+              </div>
+            </details>
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500">Как отправить платёж?</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                1. На странице оплаты выберите ETH и сеть ETH (ERC-20)<br>
+                2. Скопируйте адрес или отсканируйте QR-код<br>
+                3. В MetaMask откройте отправку, вставьте адрес и укажите сумму в ETH<br>
+                4. Проверьте размер комиссии на экране подтверждения и отправьте<br><br>
+                Перед подтверждением проверьте адрес получателя ещё раз — крипто-транзакции необратимы.
+              </div>
+            </details>
+
+            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+              <summary style="cursor:pointer;font-weight:500">Я отправил платёж, но статус не обновился</summary>
+              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
+                Подтверждение в блокчейне может занять несколько минут в зависимости от загруженности сети.
+                Если статус не обновился дольше 30 минут — напишите в поддержку и приложите хэш транзакции
+                (его можно скопировать из MetaMask, раздел «Активность»).
+              </div>
+            </details>
+
+          </div>
         </div>
 
         <!-- Form state -->
@@ -1617,8 +1686,6 @@ const translations = {
     'support-hours-val': 'Daily, 10:00–22:00 MSK',
     'support-note': "Describe your issue in detail — device, app version, and what's not working. We'll respond as soon as possible.",
     'per-mo': '₽/mo',
-    'plan-ext-dev': 'In development',
-    'feat-soon': 'Coming soon',
     'pay-tab-sub': 'Subscription',
     'pay-tab-history': 'Order History',
     'pay-tab-support': 'Support',
@@ -1626,7 +1693,6 @@ const translations = {
     'metric-plan': 'Plan',
     'metric-status': 'Status',
     'metric-expires': 'Expires',
-    'pay-coming': 'Payment integration coming soon',
     'pay-processing': 'Creating invoice...',
     'pay-error': 'Payment error',
     'feat-1dev': '1 device config',
@@ -1634,7 +1700,7 @@ const translations = {
     'feat-3dev': '3 device configs',
     'feat-home': 'Works on home WiFi',
     'feat-mobile': 'Works on mobile network',
-    'feat-stockholm': 'Stockholm exit node',
+    'feat-stockholm': 'Obfuscated exit node',
     'feat-basic-incl': 'Basic plan included',
     'feat-allowlist': 'Allowlist bypass config',
     'feat-residential': 'Residential exit node',
@@ -1730,7 +1796,7 @@ const translations = {
     'status-offline': 'Offline',
     'node-spb': 'St. Petersburg',
     'node-chisinau': 'Chisinau',
-    'node-stockholm': 'Stockholm',
+    'node-stockholm': 'Exit node',
     // Landing
     'badge': 'Encrypted Access Network',
     'landing-sub': 'Private · Secure · Resilient',
@@ -1797,14 +1863,10 @@ const translations = {
     'plan-basic-name': 'Basic',
     'plan-basic-desc': '1 device · Standard exit',
     'plan-basic-promo': 'First month — 250 ₽',
-    'plan-ext-name': 'Extended',
-    'plan-ext-desc': '2 devices · Allowlist bypass',
-    'plan-ext-promo': 'Infrastructure in development',
     'plan-fam-name': 'Family',
     'plan-fam-desc': '3 devices · Best value',
     'badge-popular': 'Popular',
     'btn-get-started': 'Get Started →',
-    'btn-coming-soon': 'Coming Soon',
     'payment-label': 'PAYMENT · CRYPTO BILLING COMING SOON',
     'payment-sub': 'To subscribe now — contact support on the site',
     // Payment
@@ -1835,8 +1897,6 @@ const translations = {
     'support-hours-val': 'Ежедневно, 10:00–22:00 МСК',
     'support-note': 'Опишите проблему подробно — устройство, версия приложения и что не работает. Ответим в ближайшее время.',
     'per-mo': '₽/мес',
-    'plan-ext-dev': 'В разработке',
-    'feat-soon': 'Скоро',
     'pay-tab-sub': 'Подписка',
     'pay-tab-history': 'История заказов',
     'pay-tab-support': 'Техподдержка',
@@ -1844,7 +1904,6 @@ const translations = {
     'metric-plan': 'Тариф',
     'metric-status': 'Статус',
     'metric-expires': 'Истекает',
-    'pay-coming': 'Интеграция оплаты скоро',
     'pay-processing': 'Создание счёта...',
     'pay-error': 'Ошибка оплаты',
     'feat-1dev': '1 конфиг устройства',
@@ -1852,7 +1911,7 @@ const translations = {
     'feat-3dev': '3 конфига устройств',
     'feat-home': 'Работает на домашнем WiFi',
     'feat-mobile': 'Работает в мобильной сети',
-    'feat-stockholm': 'Выход через Стокгольм',
+    'feat-stockholm': 'Обфусцированный выходной узел',
     'feat-basic-incl': 'Базовый тариф включён',
     'feat-allowlist': 'Конфиг обхода белых списков',
     'feat-residential': 'Резидентный выходной узел',
@@ -1948,7 +2007,7 @@ const translations = {
     'status-offline': 'Офлайн',
     'node-spb': 'Санкт-Петербург',
     'node-chisinau': 'Кишинёв',
-    'node-stockholm': 'Стокгольм',
+    'node-stockholm': 'Выходной узел',
     // Landing
     'badge': 'Зашифрованный доступ',
     'landing-sub': 'Приватно · Надёжно · Устойчиво',
@@ -2015,14 +2074,10 @@ const translations = {
     'plan-basic-name': 'Базовый',
     'plan-basic-desc': '1 устройство · Стандартный выход',
     'plan-basic-promo': 'Первый месяц — 250 ₽',
-    'plan-ext-name': 'Расширенный',
-    'plan-ext-desc': '2 устройства · Белые списки',
-    'plan-ext-promo': 'Инфраструктура в разработке',
     'plan-fam-name': 'Семейный',
     'plan-fam-desc': '3 устройства · Лучшее соотношение',
     'badge-popular': 'Популярный',
     'btn-get-started': 'Подключиться →',
-    'btn-coming-soon': 'Скоро',
     'payment-label': 'ОПЛАТА · КРИПТОБИЛЛИНГ СКОРО',
     'payment-sub': 'Для подключения — напишите в поддержку на сайте',
     // Payment

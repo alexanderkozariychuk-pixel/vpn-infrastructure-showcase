@@ -28,9 +28,7 @@ router = APIRouter()
 SITE_URL = os.getenv("SITE_URL", "http://212.67.14.85")
 
 PLANS = {
-    "Basic":    {"amount": "200", "currency": "RUB", "days": 30},
-    "Extended": {"amount": "750", "currency": "RUB", "days": 30},
-    "Family":   {"amount": "600", "currency": "RUB", "days": 30},
+    "Basic": {"amount": "300", "currency": "RUB", "days": 30},
 }
 
 PAID_STATUSES = {"paid", "paid_over"}
@@ -49,8 +47,6 @@ async def create_payment(
     plan = req.plan
     if plan not in PLANS:
         raise HTTPException(status_code=400, detail="Unknown plan")
-    if plan == "Extended":
-        raise HTTPException(status_code=409, detail="Plan not available yet")
 
     username = payload.get("sub")
     result = await db.execute(select(User).where(User.username == username))
@@ -116,10 +112,7 @@ async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
         if user and payment.plan == "Basic":
             # run provisioner in thread (SSH calls are blocking)
-            ok = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: asyncio.run(provision_basic(user, payment, db))
-            )
+            ok = await provision_basic(user, payment, db)
             if not ok:
                 logger.error("Provisioning failed for user %s", user.username)
                 # still ack to Heleket — manual recovery needed

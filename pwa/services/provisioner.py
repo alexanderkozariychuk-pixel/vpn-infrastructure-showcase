@@ -1,3 +1,4 @@
+import asyncio
 """
 services/provisioner.py — Auto-provisioning of AWG peers after payment.
 
@@ -108,11 +109,13 @@ def _decrypt(cipher: str) -> str:
 
 # ── find free IP ───────────────────────────────────────────────────────
 
-async def _find_free_ip(db: AsyncSession, plan: str) -> str | None:
+async def _find_free_ip(db: AsyncSession, plan: str, exclude: set[str] | None = None) -> str | None:
     """Return next available VPN IP for the given plan."""
     prefix, start, end = POOLS.get(plan, ("10.88.88", 42, 99))
     result = await db.execute(select(Config.peer_ip))
     used = {row[0] for row in result.fetchall() if row[0]}
+    if exclude:
+        used |= exclude
     for i in range(start, end + 1):
         candidate = f"{prefix}.{i}"
         if candidate not in used:
@@ -122,7 +125,7 @@ async def _find_free_ip(db: AsyncSession, plan: str) -> str | None:
 
 # ── add peer to Bridge ────────────────────────────────────────────────
 
-def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> bool:
+def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> tuple[bool, str]:
     """Add a peer via the validated wrapper on the entry node.
 
     The wrapper (pwa-add-peer) re-validates every argument server-side —
@@ -139,11 +142,11 @@ def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> b
     out = (stdout + " " + stderr).strip()
     if stdout.startswith("ok:"):
         logger.info("Peer added to bridge: %s (%s)", client_name, peer_ip)
-        return True
+        return True, "ok"
 
     # wrapper rejected it — surface why, don't retry blindly
     logger.error("pwa-add-peer refused peer %s (%s): %s", client_name, peer_ip, out)
-    return False
+    return False, out
 
 
 # ── build client config text ──────────────────────────────────────────
@@ -182,15 +185,25 @@ async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> boo
         logger.error("Key generation failed: %s", e)
         return False
 
-    peer_ip = await _find_free_ip(db, "Basic")
-    if not peer_ip:
-        logger.error("No free IPs in Basic pool")
-        return False
-
     client_name = f"auto-{user.username}"
-    ok = _add_peer_to_bridge(pub, psk, peer_ip, client_name)
-    if not ok:
-        logger.error("Failed to add peer to Bridge for user %s", user.username)
+    loop = asyncio.get_event_loop()
+    tried_ips: set[str] = set()
+    peer_ip = None
+    for attempt in range(10):
+        peer_ip = await _find_free_ip(db, "Basic", exclude=tried_ips)
+        if not peer_ip:
+            logger.error("No free IPs in Basic pool")
+            return False
+        ok, reason = await loop.run_in_executor(None, _add_peer_to_bridge, pub, psk, peer_ip, client_name)
+        if ok:
+            break
+        tried_ips.add(peer_ip)
+        if "ip in use" not in reason:
+            logger.error("Failed to add peer to Bridge for user %s: %s", user.username, reason)
+            return False
+        logger.warning("IP %s already in use on Bridge (stale local tracking) - retrying with next IP", peer_ip)
+    else:
+        logger.error("Exhausted retries finding a free IP for user %s", user.username)
         return False
 
     # save Config to DB
