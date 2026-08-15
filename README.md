@@ -1,158 +1,176 @@
-# Multi-Hop Obfuscated VPN Infrastructure
+# Sovereign — Multi-Hop Obfuscated VPN Infrastructure
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)](https://github.com/alexanderkozariychuk-pixel/vpn-infrastructure-showcase)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED.svg?logo=docker&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-Ubuntu_24.04-FCC624.svg?logo=linux&logoColor=black)
-[![WireGuard](https://img.shields.io/badge/AmneziaWG-88171A?logo=wireguard)](https://github.com/amnezia-vpn/amneziawg)
+![Ansible](https://img.shields.io/badge/Ansible-EE0000.svg?logo=ansible&logoColor=white)
+[![AmneziaWG](https://img.shields.io/badge/AmneziaWG-88171A?logo=wireguard)](https://github.com/amnezia-vpn/amneziawg)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
+
+**A production VPN service designed, built, and operated solo**: multi-hop AmneziaWG routing resilient to DPI interference, a self-hosted client portal with automated crypto billing and peer provisioning, and a full Prometheus/Grafana/Alertmanager observability stack across four servers.
+
+Every incident described below happened on a live system with real users. Each was diagnosed from its symptoms, fixed, and closed with a structural change that prevents the same class of mistake from recurring.
 
 ---
 
-**Production-grade censorship-resistant VPN** with multi-hop routing, AmneziaWG obfuscation, and a self-hosted client portal with automated peer provisioning.
+## What This Project Demonstrates
 
----
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Architecture](#architecture)
-- [Current Status](#current-status)
-- [Tech Stack](#tech-stack)
-- [Client Portal](#client-portal)
-- [Auto-Provisioning](#auto-provisioning)
-- [Next Steps](#next-steps)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Project Overview
-
-Sovereign is a production VPN service targeting users behind DPI-based censorship and allowlist filtering. The infrastructure is designed around AmneziaWG — a fork of WireGuard with traffic obfuscation parameters that defeat deep packet inspection — running across multiple VPS nodes and a residential home node.
-
-The project includes a full client-facing PWA portal (registration, authentication, automated config delivery, subscription management) and a billing scaffold ready for crypto payment integration.
+- **Linux administration** — systemd services, DKMS kernel-module management, cloud-init pitfalls, SSH hardening verified with `sshd -T`, fail2ban, unattended-upgrades
+- **Networking** — WireGuard/AmneziaWG internals, multi-hop routing, NAT, iptables/UFW default-deny firewalling, DPI behavior analysis on mobile networks
+- **Infrastructure as code** — Ansible roles for node provisioning (AmneziaWG, firewall), with documented lessons on idempotency and secret handling
+- **Monitoring & alerting** — Prometheus, node_exporter, Grafana, Alertmanager → Telegram, with source-IP-restricted scrape paths
+- **Backend engineering** — async FastAPI, PostgreSQL (asyncpg/SQLAlchemy), Alembic migrations, JWT auth, Docker Compose
+- **Security engineering** — privilege separation for automated SSH access, secrets-at-rest encryption, HMAC webhook verification, incident response with public post-mortems
+- **Operations discipline** — dated research log, runbook, honest archive of superseded approaches
 
 ---
 
 ## Architecture
 
 ```
-Standard tier (free / basic):
-  Device → Bridge (St. Petersburg, RF IP) → Moldova (relay) → Internet
-
-Premium tier (allowlist bypass):
-  Device → Residential node (home RF IP) → Stockholm → Internet
+Client device → Entry node (obfuscated AmneziaWG) → Backbone tunnel → Exit node (NAT) → Internet
 ```
 
-### Nodes
+| Node role | Function |
+|---|---|
+| **Entry** | Public-facing AmneziaWG endpoint clients connect to |
+| **Exit** | Backbone endpoint; NATs client traffic out to the internet |
+| **App server** | Client portal (FastAPI + PostgreSQL, Dockerized) — deliberately separate from the VPN data plane |
+| **Monitoring** | Prometheus, Grafana, Alertmanager — scrapes all nodes over a firewalled, single-source-IP path |
 
-| Node | Location | Provider | Role |
-|------|----------|----------|------|
-| Bridge | St. Petersburg | Beget | Entry node, AWG server for clients, hosts PWA |
-| Moldova | Chișinău | Cloud4Box | Relay, standard-tier exit via NAT |
-| Stockholm | Stockholm | AEZA | Exit node for residential chain |
-| Residential | Home (RF) | ISP (dynamic IP) | Ubuntu 24.04 laptop — AWG server for premium clients, AWG client to Stockholm |
+The service targets hostile network environments: DPI-based protocol fingerprinting, throttling, and strict IP/domain allowlist filtering. All AmneziaWG interfaces run unique per-node obfuscation parameters (Jc, Jmin, Jmax, S1, S2, H1–H4). Plain WireGuard clients can't connect by design — the standard WireGuard handshake is fingerprinted and throttled by DPI on some mobile networks (see [Research Log](#research-log)), while AmneziaWG's obfuscated stream passes as generic UDP.
 
-### Routing logic
-
-All nodes run AmneziaWG with unique obfuscation parameters (Jc, Jmin, Jmax, S1, S2, H1–H4) generated per server. Client configs include matching parameters — standard WireGuard clients cannot connect.
-
-Standard-tier clients connect to Bridge on port 8443 and exit through Moldova's IP. The residential node (home ISP address) serves as a first hop that is indistinguishable from normal home traffic, providing the highest resilience against allowlist filtering. Traffic from the residential node exits through Stockholm.
+The app server is intentionally separate from the VPN nodes: Docker's own iptables/NAT chains conflicted with WireGuard forwarding when co-located early on. The split resolved it cleanly and is now a standing rule.
 
 ---
 
-## Current Status
+## Security Model
 
-| Component | Status | Details |
-|-----------|--------|---------|
-| Bridge (St. Petersburg) | ✅ Operational | Entry node, 20+ active client peers |
-| Moldova | ✅ Operational | Relay, standard-tier NAT exit |
-| Stockholm | ✅ Operational | Primary exit for residential chain |
-| Residential node | ✅ Operational | AWG server :7443 + client to Stockholm |
-| Client portal (PWA) | ✅ v0.8.0 deployed | Registration, auth, config delivery, subscription |
-| Auto-provisioning | ✅ Implemented | Key generation, SSH peer addition, encrypted DB storage |
-| Crypto billing (Heleket) | 🔧 Scaffolded | Awaiting domain + credentials |
-| Client configs | ✅ 20+ peers | Standard tier (Bridge → Moldova) |
+Principles that emerged from real incidents, not from a checklist:
+
+- **Nothing critical exists only at runtime.** Kernel modules go through DKMS, firewall rules through PostUp/PostDown and persisted rule files, peers into config files immediately. This rule exists because each of those three bit me once: a module lost on kernel upgrade, an "enabled" persistence service with an empty rules file, peers that vanished on reboot.
+- **The web app never holds admin credentials.** The portal reaches VPN nodes through a dedicated low-privilege unix user and keypair, restricted by sudoers to a small set of validating wrapper scripts — no raw `awg`, `cat`, or `journalctl`. The write wrapper independently re-validates every argument server-side (key format, subnet membership, duplicate key, duplicate IP) before touching live WireGuard state.
+- **Default-deny everywhere.** iptables/ip6tables default-deny on every node, verified before switching policy: a held-open SSH session survives, a fresh SSH connection succeeds, monitoring scrapes still pass. Exporters accept scrapes from exactly one source IP — confirmed with both a positive test (monitoring node succeeds) and a negative test (everything else times out).
+- **Secrets encrypted at rest.** Client private keys are Fernet-encrypted in the database and decrypted only on demand for config delivery — never stored or logged in plaintext. Payment amounts come from a server-side price table; client-supplied values are never trusted.
+- **Verification over assumption.** SSH hardening is confirmed with `sshd -T` (after discovering cloud-init silently overriding sshd_config), fixes are confirmed by reproducing the failure live, and firewall changes are tested from both sides.
+
+---
+
+## Engineering Highlights
+
+**Privilege separation for automated SSH access.** The portal originally reached the entry node with the same personal key and passwordless sudo used for manual administration — a public web app with root-equivalent access to a production node. Rebuilt around a dedicated provisioning user and the validating-wrapper scheme described above. A newer sudo version on one node rejected a wildcard pattern an older sudo had silently accepted; instead of working around the stricter version, the looser node was brought up to its standard — the rejection was correctly closing a real hole.
+
+**One-way traffic on mobile clients, traced through a WireGuard internal.** Symptom: handshake succeeds, "sent" climbs, "received" frozen except keepalive-sized bumps every 25s. Root cause: days earlier, a test peer had been assigned a live client's `AllowedIPs` — WireGuard permits one IP per peer and reassigns silently — and deleting the test peer never restored the original route. Diagnosed by diffing the server's live `AllowedIPs` table against the on-disk config. Closed structurally: the write wrapper now rejects duplicate IPs, so this class of mistake can't recur silently.
+
+**Secrets exposure in this public repo — contained, rotated, documented.** A malformed `.gitignore` (a path glued onto a divider comment) caused real Ansible group_vars to be tracked and pushed, including two backbone tunnel private keys. Response: impact analysis first (only one key was still live; preshared keys and the live-user node were unaffected), then immediate rotation of everything exposed. Deliberate decision: rotate rather than rewrite git history — a secret that has been public must be treated as permanently compromised, so history-rewriting adds no security and only hides the lesson.
+
+**An asyncio/asyncpg bug confirmed live, not assumed from a code read.** The provisioning path ran a blocking SSH call inside a fresh event loop (`asyncio.run()` in a thread executor), which bound database connections to a different loop than the one that created them — a hard runtime error in asyncpg. Before fixing, the failure was reproduced deliberately: a correctly signed synthetic webhook against a real pending invoice, watching the exact `RuntimeError` appear in production logs. Fix: only the blocking SSH call goes to the executor; database work stays in the request's own loop. Verified with a second live run showing successful provisioning end to end.
+
+**Byte-level webhook signature compatibility, verified before the first real transaction.** The payment gateway signs webhooks over PHP's `json_encode` output, so signature verification required replicating its serialization quirks byte for byte — escaped forward slashes, exact numeric formatting. A mismatch would make every real webhook fail silently. The full path — signature check, provisioning, database state — was proven with a signed synthetic webhook against a real unpaid invoice before production credentials were wired in.
+
+**"The fix isn't working" turned out to be a Docker deployment fact.** Several rounds of edits appeared to have no effect on the running app. Cause: the Dockerfile bakes code into the image at build time (`COPY . .`), and `docker compose restart` reuses the already-built image — it picks up `.env` changes (read at process start) but never code changes. Only `build` + `up --force-recreate` does. The deploy procedure now rebuilds unconditionally, and the distinction is documented in the runbook.
+
+---
+
+## Monitoring
+
+Prometheus + node_exporter on all four nodes, Grafana dashboards, Alertmanager routing to Telegram. Every exporter is firewalled to a single scrape source; every alert path was verified end to end with a manual test alert before being trusted.
+
+<!-- SCREENSHOT: Grafana Node Exporter Full dashboard, multiple nodes -->
+<!-- SCREENSHOT: Alertmanager → Telegram alert delivery -->
+
+Monitoring runs as native systemd services rather than in Docker — a deliberate choice, since Docker's iptables manipulation conflicts with WireGuard forwarding on VPN-adjacent hosts.
+
+---
+
+## Client Portal & Billing
+
+A PWA (vanilla JS, RU/EN i18n, installable) backed by async FastAPI: registration, JWT auth, personal config delivery, subscription and payment history, support form. After a confirmed payment, provisioning runs unattended:
+
+1. Generate a fresh keypair + preshared key
+2. Allocate a free IP from the client pool, retrying against the entry node's live state if the local pool is stale
+3. Add the peer through the validating wrapper — never a raw SSH command
+4. Encrypt and store the config, activate the subscription
+
+Billing is handled by a crypto payment gateway over an HTTPS API with HMAC-signed webhooks. Transactional email runs over an HTTPS API as well — chosen after diagnosing (via direct TCP tests against multiple providers) that all outbound SMTP ports were blocked at the hosting-network level.
+
+---
+
+## Research Log
+
+[`docs/troubleshooting.md`](docs/troubleshooting.md) is a dated research log from earlier stages — real investigations into mobile-network DPI behavior, not a generic FAQ. Highlights:
+
+- **Dynamic DPI blacklisting**: one mobile operator's DPI temporarily blacklisted the server IP/port for 10–30 seconds after detecting a VPN handshake attempt, then cleared automatically — established through a structured hypothesis → test matrix → conclusion process (ping/DNS/handshake retries under controlled conditions).
+- **Strict allowlist filtering defeats protocol-level obfuscation**: even traffic shaped to mimic permitted domains fails under strict allowlist enforcement, because DNS/SNI reveal the true destination before obfuscation matters. This finding ruled out several alternative protocols and shaped the current architecture.
+- **Tethering detection via TTL**: mobile operators can detect tethered devices from the TTL decrement added by the extra router hop — confirmed by direct TTL comparison, not assumption.
+
+[`docs/runbook.md`](docs/runbook.md) covers day-to-day operations: diagnosing a failed provisioning, recovering a peer manually, safe node restart procedures.
+
+[`archive/`](archive/README.md) preserves five superseded approaches with honest notes on why each was replaced — including a Docker-based monitoring bot prototype and four alternative-protocol deployments dropped after real-world DPI testing.
 
 ---
 
 ## Tech Stack
 
-**Infrastructure:**
-- AmneziaWG — obfuscated WireGuard fork, custom parameters per node
-- Ubuntu 24.04 on all nodes
-- Policy-based routing (ip rule / ip route / custom tables)
-- iptables MASQUERADE for NAT at exit nodes
-
-**Backend (PWA):**
-- FastAPI (Python 3.12) — async REST API
-- PostgreSQL — users, configs (Fernet-encrypted keys), payments
-- Alembic — database migrations
-- Docker Compose — container orchestration on Bridge
-- Cryptography (Fernet) — symmetric encryption of private keys at rest
-
-**Frontend:**
-- Vanilla JS single-page application (no framework)
-- Self-hosted, served from Bridge via Nginx
-- RU/EN i18n, dark/light themes
-- Tabbed setup instructions (iOS / Android / Windows)
-
-**Billing:**
-- Heleket crypto payment gateway (scaffolded)
-- Webhook verification (MD5 signature with PHP-compatible serialization)
-- Server-side price table — client amounts never trusted
+| Layer | Choices |
+|---|---|
+| VPN | AmneziaWG (obfuscated WireGuard fork), unique parameters per node, multi-hop backbone |
+| OS / hardening | Ubuntu, iptables/UFW default-deny, SSH key-only, fail2ban, unattended-upgrades, DKMS |
+| IaC | Ansible (node roles: AmneziaWG, firewall) |
+| Monitoring | Prometheus, node_exporter, Grafana, Alertmanager (native systemd, not Docker) |
+| Backend | FastAPI (Python 3.12, fully async), SQLAlchemy async + asyncpg, PostgreSQL, Alembic, JWT, Fernet encryption at rest |
+| Frontend | Vanilla JS PWA, RU/EN i18n, dark theme |
+| Billing & email | Crypto payment gateway (HMAC webhooks, server-side pricing), transactional email via HTTPS API |
+| Web entry | nginx + Let's Encrypt (certbot), Docker Compose on the app server only |
 
 ---
 
-## Client Portal
+## Current Status
 
-The PWA is accessible at the Bridge node's IP. It provides:
-
-- Registration and JWT-based authentication
-- **My Config** — displays the user's personal AmneziaWG `.conf` with syntax highlighting; one-click copy and download
-- **Payment** — current subscription status, plan selection (Basic / Extended), order history
-- **Support** — contact information
-- **Admin SRE panel** — peer status, traffic, logs from Moldova, AI-assisted infrastructure analysis
-
-After a successful payment, `provision_basic()` automatically:
-1. Generates a fresh AWG keypair and PSK locally
-2. Finds the next available IP from the Basic pool (`10.88.88.42–99`)
-3. Adds the peer to Bridge via SSH (`awg set` + appends to `awg0.conf`)
-4. Saves the encrypted config to PostgreSQL
-5. Activates the 30-day subscription
+| Component | Status |
+|---|---|
+| VPN infrastructure (obfuscated multi-hop) | ✅ Operational |
+| Client portal (PWA) | ✅ Live, HTTPS, RU/EN |
+| Auto-provisioning (payment → peer → config) | ✅ Verified end to end with a live test transaction |
+| Crypto billing | ✅ Live, passed gateway moderation |
+| Transactional email | ✅ Live (HTTPS API) |
+| Monitoring (Prometheus/Grafana/Alertmanager) | ✅ Operational, all nodes |
+| Admin panel | 🔧 Functional, UX polish in progress |
 
 ---
 
-## Auto-Provisioning
+## Repository Layout
 
-`services/provisioner.py` handles the full lifecycle of a new paid client without manual intervention. Private keys and PSKs are encrypted with Fernet (AES-128-CBC) before storage. The decrypted `.conf` is generated on-demand at `GET /api/client/config` and never stored in plaintext.
-
-SSH access from the PWA container to Bridge uses the same key-based auth as manual administration, scoped to the `vpnadmin` user.
-
----
-
-## Next Steps
-
-- Purchase domain (`sovrn.nexus`) and configure DNS — required for HTTPS and Heleket `url_callback`
-- Activate Heleket credentials and complete billing integration
-- Complete residential chain routing: Phone → Residential → Stockholm (routing fix in progress)
-- PostgreSQL automated backups
-- Support form with email ticket delivery (`sovereign.support@gmail.com`)
-- "Forgot password" flow (requires SMTP)
-- Per-client iptables isolation (clients cannot reach each other's subnets)
-- Uptime Kuma monitoring for all nodes
+```
+pwa/                      FastAPI client portal + billing + provisioning
+infrastructure/ansible/   Server configuration as code (AmneziaWG roles, firewall)
+monitoring/               Prometheus / Grafana / Alertmanager configuration
+docs/                     Architecture, runbook, dated research log
+archive/                  Superseded approaches, kept with honest post-mortems
+```
 
 ---
 
-## Troubleshooting
+## Roadmap
 
-The main real-world challenge driving this project is **allowlist-based filtering** on Russian mobile networks — only pre-approved domains/IPs are accessible, UDP is throttled or blocked entirely.
+- Automated PostgreSQL backups
+- Per-client network isolation (clients unable to reach each other's subnets)
+- SSH access layer 3: forced-command dispatcher for the provisioning path
+- CI secret scanning (gitleaks) and pre-push checks — turning the `.gitignore` incident into pipeline policy
+- Exploring: AI-assisted incident diagnosis on top of Alertmanager events (read-only, wrapper-constrained)
 
-Key lessons from production:
+---
 
-- **Cloudflare proxy (orange cloud) is throttled to 16 KB/s** by Russian ISPs as of mid-2025. The site must resolve directly to a Russian IP — not through any CDN.
-- **Standard WireGuard is blocked** by DPI on most Russian mobile networks. AmneziaWG with randomized obfuscation parameters passes as generic UDP traffic.
-- **Debug iptables LOG rules** in PREROUTING can silently consume gigabytes of disk within hours on a relay node. Keep `iptables-save` clean.
-- **Process substitution (`<(...)`) fails** when piped through SSH. Use temp files for passing secrets to `awg set preshared-key`.
+## About
 
-Detailed notes are tracked in [`PROJECT-JOURNAL.md`](PROJECT-JOURNAL.md).
+Solo project by Alexander — self-taught, currently looking for **Junior Linux SysAdmin / IT Support (L2)** roles.
+
+- CONTACT: 
+https://www.linkedin.com/in/alexander-kozariychuk/
+alexanderkozariychuk@gmail.com
+
+
+## License
+
+MIT — see [LICENSE](LICENSE).
