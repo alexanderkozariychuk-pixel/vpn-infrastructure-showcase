@@ -3494,3 +3494,113 @@ webhook processing, and check that the config actually gets delivered.
   hide inside content you wrote yourself, not just in code.
 - A payment provider's own marketing ("no legal entity needed") is itself
   evidence worth weighing, not just its fees.
+
+  ---
+
+  ## 2026-08-21
+### 🗺 Returning after a pause — new working pattern
+Adopted a fixed sequence for coming back to the project: **assess state → plan →
+implement**, reconstructing reality from `git log` and server output rather than
+from memory. Work had happened in unrecorded sessions, so recollection was not a
+trustworthy source.
+
+### 🔧 SSH aliases for the production nodes
+Beget and Cloud4Box had never had aliases — every login was `user@IP` by hand.
+Added `sov-entry` and `sov-exit`, named by **role** rather than provider, since
+providers have already changed twice while the roles stayed constant. Verified
+with `ssh -G` (what ssh will actually apply, not what the file appears to say).
+Added `ControlMaster` — noticeably faster across long diagnostic chains.
+
+### 🐛 `docs/` is in `.gitignore` — `docs/runbook.md` was never committed
+Files tracked before the rule survive; `runbook.md` was created after it and
+silently never entered git, which is why the README's link to it 404s. `git status`
+stays clean, the file exists locally. Forward-looking damage is the real problem:
+any new documentation file would fail to commit the same way.
+
+### 🐛 The pushed README is the original draft, not the rework
+No Project Phases section, none of the PMTU / canary / split-tunnel content;
+14261 bytes against the rework's 22771. The commit message describes the rework in
+detail. Checked against `origin` after first confirming the local clone wasn't
+stale — `git fetch` showed the same hash on both sides.
+
+### 🔎 Repo audit: other findings
+Real production IPs published across `docs/`, `pwa/` source defaults,
+`static/index.html` and the committed journal. Three `__init.py__` typos in
+`monitoring/ai-bot-monitoring/` breaking those packages. `tests/` holding only an
+empty `__init__.py`. `lint.yml` still pointing at `infrastructure/terraform/`,
+which now lives in `archive/`. A README claim of an Ansible `firewall` role that
+doesn't exist. The repo also has exactly one commit, which contradicts months of
+iterative work at a glance.
+
+### ✅ Split tunneling verified end to end
+Checked all three components rather than trusting the `ip rule` entries: ipset
+`ru_nets` with 11419 prefixes, the mangle `PREROUTING` mark rule, and table 200's
+default via `awg1`. If the ipset were empty or the mangle rule missing, nothing
+would be marked and *all* traffic — including domestic banking — would leave via
+the foreign exit, with no visible symptom.
+
+### 🐛 Exit node's `awg-quick@awg0` has been `failed` since 30 June
+The interface is up and carrying all production traffic while its unit sits in
+`failed`. Same runtime-only condition found on 16 July; the controlled restart
+planned then never happened. Uptime of 52 days dates it to the 30 June boot.
+`journalctl` gave the original cause verbatim: `ip link add awg0 type amneziawg`
+→ `Unknown device type` — the module was missing for the new kernel. Brought up by
+hand afterwards, never started through systemd again; systemd holds `failed` until
+something attempts a start, and a running interface hides it from the outside.
+**Cause is already gone**: `dkms status` shows the module built for both 7.0.0-27
+(running) and 7.0.0-30 (installed, not yet booted) — July's DKMS registration has
+already done its job on a future kernel.
+
+### 🔎 Compared runtime against config before planning the restart
+The config was last modified 5 July, *after* the manual bring-up, so the two could
+have diverged. A first attempt with `diff <(...) <(...)` under `sudo` failed —
+`/dev/fd/63: No such file or directory`, since sudo closes inherited descriptors
+before the root-owned `diff` can read them. Compared by eye instead, with keys
+filtered out. Everything matches except two things: the backbone peer runs
+`AdvancedSecurity = on` with no such line in the file, and a dead `awg-de` peer
+exists in runtime only.
+
+### 🔎 Used the healthy node as a control group
+Rather than guess the `AdvancedSecurity` default, checked the entry node: its file
+also lacks the line, its unit starts normally, and its runtime shows `off`. So
+start-from-config yields `off` — and the backbone is currently **asymmetric**
+(`on` at the exit, `off` at the entry) while moving terabytes without trouble.
+Decision: don't add the line. Letting the exit fall to `off` makes both ends
+symmetric and reproducible from configuration, which is the whole point. Runtime
+saved to `/root/awg0-runtime-2026-08-21.conf` for rollback.
+
+### 🔎 Duplicated firewall rules — restart is net-neutral
+Both MASQUERADE rules and both `FORWARD` pairs for `awg0` exist twice, one copy per
+manual bring-up, since `PostUp` appends unconditionally. `PostDown` removes one and
+`PostUp` re-adds one. `FORWARD` policy is `ACCEPT`, so these aren't load-bearing
+today — they become so the moment it's tightened to `DROP`.
+
+### ⚠️ Docker chains on the VPN entry node
+`DOCKER`, `DOCKER-FORWARD`, `DOCKER-USER` and friends are present in iptables on
+the entry node, despite the standing rule that Docker never shares a host with the
+data plane — the rule that exists because Docker's chain manipulation broke
+forwarding once already. Leftover from when the portal lived there. Harmless while
+`FORWARD` is `ACCEPT`; a mine under any future hardening.
+
+### ⚠️ Monitoring is gone
+`fra-aeza` wasn't renewed and the server is deleted — the whole
+Prometheus/Grafana/Alertmanager stack went with it. Until a replacement is rented,
+the first notification of a production failure would come from a client.
+
+### 📋 Next (tonight / tomorrow)
+Controlled restart of `awg-quick@awg0` on the exit node at low traffic, rollback
+ready. Verification is a real client loading a foreign site, not the command
+output. Tomorrow: confirm it survived the night, then remove `awg-de` and the six
+dead peers one change at a time, drop `docs/` from `.gitignore`, push the real
+README.
+
+### 📌 Rules reinforced
+- A clean `git status` is not evidence a file is tracked — an ignore rule added
+  after the fact hides only new files, and hides them silently.
+- `systemd` holds `failed` until something tries to start the unit again; fixing
+  the root cause doesn't clear it, and a running interface hides it entirely.
+- Use an existing healthy node as the control group before changing a production
+  one — the entry node answered the `AdvancedSecurity` question at zero risk.
+- Diagnose from a sample that actually includes production. Concluded the
+  infrastructure was down after snapshotting only the two migration nodes; prod
+  was never in the loop that was written.
