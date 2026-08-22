@@ -119,5 +119,3 @@ infrastructure/ansible/playbooks/deploy-backbone.yml
 infrastructure/ansible/roles/outline/
 infrastructure/ansible/roles/fou-backbone/
 
-# Outdated docs (will be rewritten)
-docs/
