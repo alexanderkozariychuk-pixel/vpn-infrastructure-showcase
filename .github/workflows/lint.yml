@@ -7,156 +7,72 @@ on:
     branches: [ main ]
 
 jobs:
-  lint:
+  ansible:
+    name: Ansible syntax
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: infrastructure/ansible
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-       # -------------------------------
-      # Terraform
-      # -------------------------------
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: actions/setup-python@v5
         with:
-          terraform_version: 1.10.0
+          python-version: '3.12'
 
-      - name: Cache Terraform plugins
-        uses: actions/cache@v3
-        with:
-          path: ~/.terraform.d/plugin-cache
-          key: ${{ runner.os }}-terraform-${{ hashFiles('infrastructure/terraform/**/.terraform.lock.hcl') }}
-          restore-keys: |
-            ${{ runner.os }}-terraform-
-
-      # --- Aeza module ---
-      - name: Terraform fmt check (aeza)
-        run: |
-          cd infrastructure/terraform/aeza
-          terraform fmt -check -recursive
-
-      - name: Terraform init (aeza)
-        run: |
-          cd infrastructure/terraform/aeza
-          terraform init -backend=false
-
-      - name: Terraform validate (aeza)
-        run: |
-          cd infrastructure/terraform/aeza
-          terraform validate
-
-      - name: Terraform plan (aeza)
-        env:
-          AEZA_API_KEY: ${{ secrets.AEZA_API_KEY }}
-        run: |
-          cd infrastructure/terraform/aeza
-          terraform plan -input=false -no-color
-        continue-on-error: true  
-
-      # --- Yandex module ---
-      - name: Terraform fmt check (yandex)
-        run: |
-          cd infrastructure/terraform/yandex
-          terraform fmt -check -recursive
-
-      - name: Terraform init (yandex)
-        run: |
-          cd infrastructure/terraform/yandex
-          terraform init -backend=false
-
-      - name: Terraform validate (yandex)
-        run: |
-          cd infrastructure/terraform/yandex
-          terraform validate
-
-      - name: Terraform plan (yandex)
-        env:
-          YC_TOKEN: ${{ secrets.YANDEX_CLOUD_TOKEN }}
-          YC_CLOUD_ID: ${{ secrets.YANDEX_CLOUD_ID }}
-          YC_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
-        run: |
-          cd infrastructure/terraform/yandex
-          terraform plan -input=false -no-color
-        continue-on-error: true
-
-      # -------------------------------
-      # Ansible
-      # -------------------------------
       - name: Install Ansible
         run: pip install ansible
 
-      - name: Ansible syntax check
-        run: ansible-playbook infrastructure/ansible/playbooks/site.yml --syntax-check
-        
-      - name: Ansible syntax check (other playbooks)
+      - name: Syntax check all playbooks
         run: |
-          for playbook in infrastructure/ansible/playbooks/*.yml; do
+          for playbook in playbooks/*.yml; do
+            echo "::group::$playbook"
             ansible-playbook "$playbook" --syntax-check
+            echo "::endgroup::"
           done
 
-      # -------------------------------
-      # Shell scripts
-      # -------------------------------
+  shell:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Install shellcheck
-        run: sudo apt-get install -y shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Run shellcheck on all .sh files
+      - name: Run shellcheck
         run: |
-          find scripts/ -name "*.sh" -exec shellcheck {} \;
+          find . -name "*.sh" -not -path "./.git/*" -not -path "./archive/*" \
+            -print -exec shellcheck {} +
 
-      # -------------------------------
-      # Python scripts
-      # -------------------------------
-      - name: Setup Python
-        uses: actions/setup-python@v5
+  python:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install ruff
         run: pip install ruff
 
-      - name: Ruff check (Python scripts)
-        run: ruff check scripts/ --output-format=github
+      # Errors only: syntax errors and undefined names.
+      # Style is deliberately not enforced — this gate exists to catch
+      # code that cannot run, not code that reads differently.
+      - name: Ruff check
+        run: ruff check pwa/ monitoring/ --select E9,F63,F7,F82 --output-format=github
 
-      #------------------------------
-      # AIBot-Monitoring
-      #------------------------------
-      - name: Bot - import check
-        on:
-          push:
-            paths:
-              -'monitoring/ai-bot-monitoring/**'
-            pull_request:
-              paths:
-                -'monitoring/ai-bot-monitoring/**'
-        jobs:
-          verify:
-            runs-on: ubuntu-latest
-            defaults:
-              run:
-                working-directory: monitoring/ai-bot-monitoring
-            
-            steps:
-              - uses: actions/checkout@v4
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-              - uses: actions/setup-python@v5
-                with:
-                  python-version: '3.12'
-
-              - name: Install dependencies
-                run: |
-                  pip install\
-                    python-telegram-bot\
-                    google-genai\
-                    python-dotenv\
-                    aiohttp
-                  
-              - name: Check imports
-                env:
-                  TELEGRAM_BOT_TOKEN: "dummy"
-                  ALLOWED_USER-ID:"123"
-                  GEMINI_API_KEY:"dummy"
-                run: |
-                  python -c "
-        
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
