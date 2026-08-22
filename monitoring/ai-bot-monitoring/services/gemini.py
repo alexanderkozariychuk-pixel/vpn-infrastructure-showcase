@@ -64,7 +64,7 @@ def init() -> None:
 def _get_model() -> genai.Client:
     if client is None:
         raise RuntimeError("Gemini is not initialized. Call init() first.")
-    return _model
+    return client
 
 
 # ----------------------------------------------------------------------
@@ -81,7 +81,7 @@ async def _generate(
     Run Gemini generation in a thread pool (SDK is synchronous).
     Returns the response text or an error message.
     """
-    c = _get_client()
+    c = _get_model()
     loop = asyncio.get_event_loop()
 
     try:

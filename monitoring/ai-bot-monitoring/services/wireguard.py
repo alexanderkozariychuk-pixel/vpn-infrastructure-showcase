@@ -323,7 +323,7 @@ def get_awg_params() -> dict | None:
         params ={}
         for line in result.stdout.splitlines():
             if "=" in line:
-                key, _, value = line,partition("=")
+                key, _, value = line.partition("=")
                 key = key.strip()
                 if key in ["Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4"]:
                     params[key] = value.strip()
