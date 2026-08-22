@@ -3604,3 +3604,78 @@ README.
 - Diagnose from a sample that actually includes production. Concluded the
   infrastructure was down after snapshotting only the two migration nodes; prod
   was never in the loop that was written.
+
+  ---
+
+  ## 2026-08-22
+
+### 🐛 The README on GitHub was never the rewritten one
+Assumed it had been pushed a week ago; the commit message even described
+the rewrite. Checking `origin` — not a stale local clone — showed the
+original draft: 14261 bytes, zero hits for `Project Phases`, `PMTU`,
+`canary`. The local working tree matched `origin` exactly, so the new
+file had never left `~/Downloads`. Lesson: the commit message is not
+evidence of the commit's contents.
+
+### 📝 README rewritten, with monitoring stated honestly
+Merged the rewrite with the contacts already added on the live version.
+The old text claimed an observability stack "across four servers" and
+`Monitoring — ✅ Operational, all nodes`; that host was decommissioned in
+August. Now `🔧 Rebuilding` in Current Status, with the same note in
+Monitoring, Tech Stack and Project Phases. Also dropped the link to
+`docs/runbook.md` (untracked, so it 404s) and corrected the Ansible role
+names — the README claimed a `firewall` role that doesn't exist.
+
+### 🐛 `docs/` was in `.gitignore` — new documentation silently uncommittable
+Files tracked before the rule survived; `docs/runbook.md` was created
+after it and never entered git. `git status` stayed clean the whole time.
+Removed the rule; `runbook.md` appeared as untracked immediately.
+
+### 🔧 Three broken Python packages
+`monitoring/ai-bot-monitoring/{handlers,services,utils}` each held
+`__init.py__` instead of `__init__.py`, so none of them imported as a
+package. Renamed via `git mv` to preserve history.
+
+### 🐛 The lint workflow had never parsed
+`.github/workflows/lint.yml` was truncated mid-string and nested an entire
+workflow (`on:`, `jobs:`, `runs-on:`) inside a single step. GitHub was
+showing "invalid workflow file", not a failing run — so CI had been dead,
+not red. It also referenced `infrastructure/terraform/` and `scripts/`,
+neither of which exists any more.
+
+### 🔧 Workflow rebuilt against paths that exist
+Four independent jobs instead of one chain, so a failure no longer masks
+everything after it: Ansible syntax, shellcheck on the real `.sh` paths,
+ruff, gitleaks. Terraform steps dropped — it lives in `archive/` and the
+README now frames it as an earlier phase. Ruff limited to `E9,F63,F7,F82`
+(syntax errors and undefined names), because full style enforcement on
+this codebase would produce a permanently red, permanently ignored badge.
+Gitleaks closes a roadmap item that came out of the `.gitignore` leak.
+
+### 🐛 First green CI run immediately found three runtime bugs
+All `F821`, all would have raised `NameError`:
+- `gemini.py:67` — `_get_model()` returned `_model`; the global is `client`
+- `gemini.py:84` — `_generate()` called `_get_client()`; the function is
+  `_get_model()`
+- `wireguard.py:326` — `line,partition("=")`, a comma instead of a dot,
+  while line 64 of the same file has it correct
+
+The bot has been marked "exploring" in the roadmap; with these names it
+could never have run at all.
+
+### 📋 Next
+Controlled restart of `awg-quick@awg0` on the exit node — procedure and
+rollback prepared yesterday. Then, one change at a time: remove the dead
+`awg-de` interface and the six peers that have never handshaked (checking
+the portal database first so server and DB don't diverge). After that,
+`docs/architecture.md`, which still describes decommissioned nodes and
+contains a real entry-node IP.
+
+### 📌 Rules reinforced
+- A clean `git status` proves nothing about whether a file is tracked; an
+  ignore rule added after a commit hides only new files, silently.
+- A commit message describes intent, not contents. Check the diff.
+- An invalid workflow file reads as "no CI", not "broken CI" — nothing
+  turns red, so nothing draws attention.
+- CI earns its keep on the first run or not at all: this one found three
+  latent `NameError`s within minutes of going green.
