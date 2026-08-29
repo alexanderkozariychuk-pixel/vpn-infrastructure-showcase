@@ -3679,3 +3679,44 @@ contains a real entry-node IP.
   turns red, so nothing draws attention.
 - CI earns its keep on the first run or not at all: this one found three
   latent `NameError`s within minutes of going green.
+
+  ---
+
+  ## 2026-08-29
+
+
+### ✅ Exit node back under systemd after 59 days
+`awg-quick@awg0` had been `failed` since the 30 June boot while the
+interface carried all production traffic. Preflight first, changing
+nothing: kernel and DKMS state, rollback file present, config untouched
+since 5 July, and — the one that mattered — `systemd-run` confirming
+`iptables` resolves to `/usr/sbin/iptables` inside systemd's own
+environment, ruling out the June PATH failure before starting rather
+than discovering it during.
+
+Then `awg-quick down` + `systemctl start`: unit `active`, the dead
+`awg-de` peer dropped on its own (it exists in runtime but not in the
+config), handshake back in 8 seconds, FORWARD and MASQUERADE counts
+unchanged at 4 and 2 as predicted — `PostDown` removes one duplicate,
+`PostUp` re-adds one. Traffic climbed from 4.76 MiB to 89 MiB within
+minutes, so no client noticed. Interface counters reset with the new
+device; the previous 1.90 TiB history is gone.
+
+The unit is now `enabled` *and* proven to start from its config file.
+With 7.0.0-30 installed and DKMS already built for it, a reboot is no
+longer a gamble.
+
+### 📋 Next
+Ansible inventory: 37 peers exist only in the live config on the server,
+and `group_vars/` contains nothing but `.example` files. One run of
+`deploy-awg.yml` would wipe them — the exact failure that already cost
+35 peers once. Then cleanup: remove `awg-de` entirely and the peers that
+have never handshaked.
+
+### 📌 Rules reinforced
+- Check the failure condition, not just the fix. The June failure was a
+  PATH problem under systemd; `systemd-run` reproduces that environment,
+  an interactive shell does not.
+- A restart whose every side effect was predicted in advance is a
+  verification, not a change. Nothing in the outcome was a surprise —
+  which is the point.
