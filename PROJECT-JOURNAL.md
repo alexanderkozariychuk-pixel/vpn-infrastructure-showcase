@@ -3720,3 +3720,114 @@ have never handshaked.
 - A restart whose every side effect was predicted in advance is a
   verification, not a change. Nothing in the outcome was a surprise —
   which is the point.
+
+  ---
+
+## 2026-09-02
+
+### 🛠 Public landing and offer page — the portal no longer opens on a login form
+A cold visitor previously landed on registration/sign-in with no explanation
+of what the product is. Split it: `/` serves a public landing (what the
+service is, price, three-step onboarding, what's included), `/offer` serves
+the terms as a standalone public page, and the SPA moved to `/app`. Both new
+pages reuse the app's existing tokens rather than introducing a second visual
+language.
+
+`start_url` in the manifest went from `/` to `/app` **before** the landing
+shipped — otherwise every already-installed PWA would have started opening
+the marketing page instead of the account.
+
+### 🐛 Deployed to the wrong machine and read the result as a bug
+Ran `docker compose build && up` locally, then tested against the live
+domain and got 404s on the new routes. Spent a round chasing a phantom
+before spotting `Network pwa_sovereign Created` in the output — on a host
+that had been running the stack, that network would already exist. The
+containers were on the workstation; the domain points at the app server,
+still on the old image.
+
+### 🐛 The repo had been behind the server since 5 August
+Before running `deploy.sh`, checked what it would overwrite:
+
+```
+rsync -avn --itemize-changes ... | grep '^<f'
+```
+
+Nine files instead of the five that were touched. Four extra:
+`services/mailer.py`, `api/register.py`, `api/password_reset.py`,
+`api/support.py` — the Gmail SMTP → Resend HTTPS migration was made directly
+on the server and never came back to the repo. `deploy.sh` uses rsync without
+`--delete`, so nothing would have been deleted, but those four would have been
+**overwritten with the older local versions**, silently reverting outbound
+mail to SMTP ports the hosting network blocks. Registration, password reset
+and support mail would have stopped arriving while provisioning kept working,
+so the breakage would not have been obvious.
+
+Pulled the server versions back, verified by md5 on both sides, then confirmed
+the change set was coherent: `send_email` is `async` now, and all three callers
+`await` it. Taking only `mailer.py` would have left three un-awaited coroutines
+— mail failing with no error.
+
+### 🐛 Replacing a route block silently removed two others
+Rewriting the `@app.get("/")` block took `/reset` and `/api` with it.
+`/reset` returned 200 but `/reset?token=…` returned `{"detail":"Not Found"}`
+— the 404 came from FastAPI's router, not from the page, which is what
+pointed at a missing route rather than a broken frontend. Both restored.
+
+Lesson for next time: replace a whole file when the change touches structure,
+not a described block.
+
+### 🔧 Production IPs removed from source defaults
+`grep` for the decommissioned Beget address turned up four `os.getenv`
+fallbacks: `PORTAL_BASE_URL`, `SITE_URL`, `BRIDGE_IP`, `BRIDGE_ENDPOINT`.
+The first two now default to the domain. The last two default to an empty
+string on purpose — if the variable is missing, the app should fail loudly
+rather than quietly address a node that no longer exists.
+
+Also cleaned two stale strings in the admin panel: an exit node labelled
+`Stockholm` with a hardcoded IP of a retired server, and a stat still called
+`IPIP Tunnel` although IPIP was retired in May. The IP was replaced with an
+element id to be filled from the backend, not with the current address —
+`index.html` is in the public repo.
+
+### 🔧 FreeKassa integration prepared ahead of moderation
+Second payment provider alongside the crypto gateway. `services/freekassa.py`
+plus two endpoints reusing the existing `provision_basic` path, so both
+providers converge on one provisioning routine.
+
+Details worth recording:
+
+- The notification is a **GET**, so parameters arrive in the query string,
+  and the response body must be exactly `YES` as plain text. FastAPI returns
+  JSON by default, which would not be accepted.
+- Retries on a non-`YES` response are off until their support enables them,
+  so a dropped notification is lost. Idempotency here guards against
+  duplicates, not against loss.
+- The signature is plain MD5 over a colon-joined string — weak on its own.
+  Real protection is the combination of source-IP allowlist, amount checked
+  against the server-side `PLANS` table rather than the request, and
+  idempotency on our own order id.
+- Behind nginx, `request.client.host` is the proxy. The allowlist check reads
+  `X-Real-IP` and is only meaningful because nginx *sets* that header
+  (`proxy_set_header X-Real-IP $remote_addr;`) rather than passing through
+  whatever the client sent. Verified in the live config, not the template.
+- The payment domain rotates between mirrors, so it lives in an environment
+  variable — a mirror change is a restart, not a rebuild.
+- The amount string is used verbatim in both the URL and its signature.
+  Sending `300` and signing `300.00` fails with no useful error.
+
+Verified the endpoint returns `403` to an unsigned request from an
+unlisted IP — the route is up and the source check works.
+
+### 🐛 A 502 that was a race, not a failure
+`deploy.sh` returns as soon as the container reports `Started`, and the
+verification `curl` fired before uvicorn was listening. Container logs showed
+migrations applied, startup complete, and a `200` already served. Worth adding
+a readiness wait to the end of `deploy.sh` so this isn't diagnosed twice.
+
+### 📋 Next
+Payment button on the frontend — the SPA still only calls the crypto
+endpoint. Store which provider a payment used: `Payment` has no such column,
+so rows from the two gateways are indistinguishable, which will matter for
+reconciliation and refunds. Add `--exclude='.ruff_cache'` was already done;
+still pending is the readiness wait in `deploy.sh`.
+
