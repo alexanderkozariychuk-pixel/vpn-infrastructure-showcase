@@ -29,7 +29,7 @@ BRIDGE_USER = os.getenv("BRIDGE_USER", "vpnadmin")
 BRIDGE_IP   = os.getenv("BRIDGE_IP", "")
 BRIDGE_AWG  = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
 BRIDGE_PUB  = os.getenv("BRIDGE_PUBLIC_KEY", "kCq1FK/tYvvB68h9luTRX5PAV0a2pIn2klbyNUKRMm0=")
-BRIDGE_ENDPOINT = os.getenv("BRIDGE_ENDPOINT", "212.67.14.85:8443")
+BRIDGE_ENDPOINT = os.getenv("BRIDGE_ENDPOINT", "")
 
 # Obfuscation params matching Bridge awg0
 AWG_PARAMS = {

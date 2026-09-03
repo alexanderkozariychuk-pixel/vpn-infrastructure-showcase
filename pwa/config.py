@@ -13,7 +13,7 @@ AWG_SERVICE = f"awg-quick@{AWG_INTERFACE}"
 BACKBONE_PEER_IP = os.getenv("BACKBONE_PEER_IP", "10.77.77.2")
 
 # Bridge
-BRIDGE_IP = os.getenv("BRIDGE_IP", "212.67.14.85")
+BRIDGE_IP = os.getenv("BRIDGE_IP", "")
 BRIDGE_USER = os.getenv("BRIDGE_USER", "vpnadmin")
 BRIDGE_AWG_INTERFACE = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
 
