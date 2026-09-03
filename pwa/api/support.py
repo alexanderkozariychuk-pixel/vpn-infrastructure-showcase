@@ -53,7 +53,7 @@ async def submit_ticket(ticket: SupportTicket):
 
     try:
         subject, html, text = support_ticket_email(category, details, ticket.email)
-        send_email(SUPPORT_INBOX, subject, html, text)
+        await send_email(SUPPORT_INBOX, subject, html, text)
     except Exception as e:
         logger.error("Support ticket email failed (from %s): %s", ticket.email, e)
 

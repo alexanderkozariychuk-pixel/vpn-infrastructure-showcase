@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +57,7 @@ async def register(
     # send welcome email (best-effort — never blocks registration)
     try:
         subject, html, text = welcome_email(user.username, req.lang)
-        send_email(user.email, subject, html, text)
+        await send_email(user.email, subject, html, text)
     except Exception as e:
         logger.error("Welcome email failed for %s: %s", user.email, e)
 

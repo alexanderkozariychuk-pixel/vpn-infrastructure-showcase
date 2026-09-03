@@ -1,52 +1,42 @@
 """
-services/mailer.py — SMTP email sending via Gmail.
+services/mailer.py — transactional email via Resend HTTP API.
 
-Reads SMTP credentials from environment:
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+Outbound SMTP (587/465) is blocked at the hosting network level (confirmed
+2026-08-05), so this sends over HTTPS instead. Reads:
+  RESEND_API_KEY, MAIL_FROM
 
 All sends are best-effort: failures are logged, never raised into the
 request path, so a mail outage can't break registration/payment/etc.
 """
 import os
-import ssl
-import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import httpx
 
 logger = logging.getLogger(__name__)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "Sovereign <sovrn.support@gmail.com>")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "Sovereign <support@sov3r3ign.com>")
+RESEND_API = "https://api.resend.com/emails"
 
 
-def send_email(to: str, subject: str, body_html: str, body_text: str = "") -> bool:
+async def send_email(to: str, subject: str, body_html: str, body_text: str = "") -> bool:
     """
-    Send an email. Returns True on success, False on failure.
+    Send an email via Resend. Returns True on success, False on failure.
     Never raises — failures are logged so callers can ignore the result safely.
     """
-    if not SMTP_USER or not SMTP_PASS:
-        logger.warning("SMTP not configured (SMTP_USER/SMTP_PASS empty) — skipping email to %s", to)
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping email to %s", to)
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_FROM
-    msg["To"] = to
-
+    payload = {"from": MAIL_FROM, "to": [to], "subject": subject, "html": body_html}
     if body_text:
-        msg.attach(MIMEText(body_text, "plain", "utf-8"))
-    msg.attach(MIMEText(body_html, "html", "utf-8"))
+        payload["text"] = body_text
+    headers = {"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"}
 
     try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls(context=context)
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, [to], msg.as_string())
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(RESEND_API, headers=headers, json=payload)
+            resp.raise_for_status()
         logger.info("Email sent to %s: %s", to, subject)
         return True
     except Exception as e:
@@ -70,7 +60,7 @@ def _wrap(inner_html: str) -> str:
       {inner_html}
     </div>
     <div style="text-align:center;margin-top:24px;color:#5a7a8a;font-size:12px">
-      sovrn.support@gmail.com
+      support@sov3r3ign.com
     </div>
   </div>
 </body>

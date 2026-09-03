@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 RESET_TOKEN_TTL_HOURS = 1
-PORTAL_BASE_URL = os.getenv("PORTAL_BASE_URL", "http://212.67.14.85")
+PORTAL_BASE_URL = os.getenv("PORTAL_BASE_URL", "https://sov3r3ign.com")
 
 
 class ForgotRequest(BaseModel):
@@ -61,7 +61,7 @@ async def forgot_password(
         reset_url = f"{PORTAL_BASE_URL}/reset?token={token}"
         try:
             subject, html, text = password_reset_email(reset_url, req.lang)
-            send_email(user.email, subject, html, text)
+            await send_email(user.email, subject, html, text)
         except Exception as e:
             logger.error("Reset email failed for %s: %s", user.email, e)
 
