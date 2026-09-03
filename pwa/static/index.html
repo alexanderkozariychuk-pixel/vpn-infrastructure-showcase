@@ -1586,11 +1586,11 @@
           </div>
           <div class="stat">
             <div class="stat-label" data-i18n="stat-exit">Exit Node</div>
-            <div class="stat-value accent" style="font-size: 16px;padding-top:8px">Stockholm</div>
-            <div class="stat-sub">185.104.151.175</div>
+            <div class="stat-value accent" style="font-size: 16px;padding-top:8px">Germany</div>
+            <div class="stat-sub" id="adm-exit-ip">—</div>
           </div>
           <div class="stat">
-            <div class="stat-label">IPIP Tunnel</div>
+            <div class="stat-label">Backbone</div>
             <div class="stat-value" id="adm-tunnel" style="font-size: 16px;padding-top:8px">—</div>
           </div>
         </div>
@@ -2394,7 +2394,7 @@ function doReset() {
     if (!r.ok) throw new Error(data.detail || 'Reset failed');
     okEl.textContent = currentLang === 'ru'
       ? 'Пароль обновлён. Перенаправляем на вход…' : 'Password updated. Redirecting to sign in…';
-    setTimeout(() => { window.location.href = '/'; }, 2000);
+    setTimeout(() => { window.location.href = '/app'; }, 2000);
   })
   .catch(e => {
     errEl.textContent = currentLang === 'ru'

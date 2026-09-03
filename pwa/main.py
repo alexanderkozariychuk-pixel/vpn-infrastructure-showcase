@@ -47,15 +47,23 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/")
-async def root():
-    return FileResponse("static/index.html")
+async def landing():
+    return FileResponse("static/landing.html")
 
+
+@app.get("/offer")
+async def offer_page():
+    return FileResponse("static/offer.html")
+
+
+@app.get("/app")
+async def app_page():
+    return FileResponse("static/index.html")
 
 @app.get("/reset")
 async def reset_page():
     # serves the same SPA; frontend reads ?token= and shows the reset form
     return FileResponse("static/index.html")
-
 
 @app.get("/api")
 async def api_root():

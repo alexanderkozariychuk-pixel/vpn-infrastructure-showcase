@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovereign — VPN с доступом там, где обычный не работает</title>
+<meta name="description" content="Платный VPN-сервис на AmneziaWG. Российские сайты и банки работают напрямую. 300 ₽ в месяц.">
+<meta name="theme-color" content="#080c0f">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c0f;
+    --bg-2: #0d1318;
+    --bg-3: #111920;
+    --border: #1e2d38;
+    --border-bright: #2a4055;
+    --text: #d8eaf6;
+    --text-dim: #7a9fb5;
+    --text-bright: #e8f4ff;
+    --accent: #00d4ff;
+    --accent-dim: #006a80;
+    --accent-glow: rgba(0, 212, 255, 0.15);
+    --green: #00ff88;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Unbounded', sans-serif;
+    --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 0; border-bottom: 1px solid var(--border);
+  }
+  .mark {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 18px; letter-spacing: -0.02em; color: var(--text-bright);
+  }
+  .mark span { color: var(--accent); }
+  .signin {
+    font-size: 14px; color: var(--text-dim); text-decoration: none;
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px;
+    transition: border-color .15s, color .15s;
+  }
+  .signin:hover, .signin:focus-visible { color: var(--text-bright); border-color: var(--border-bright); }
+
+  .hero { padding: 88px 0 72px; }
+  .hero h1 {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(30px, 6vw, 46px); line-height: 1.15;
+    letter-spacing: -0.03em; color: var(--text-bright);
+    max-width: 15ch;
+  }
+  .hero p {
+    margin-top: 24px; max-width: 54ch;
+    font-size: 17px; color: var(--text-dim);
+  }
+
+  .buy {
+    margin-top: 40px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .price {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: 34px; color: var(--text-bright); letter-spacing: -0.02em;
+  }
+  .price small { font-family: var(--font-body); font-size: 15px; color: var(--text-dim); font-weight: 400; }
+  .cta {
+    display: inline-block; text-decoration: none;
+    background: var(--accent); color: #04191f;
+    font-weight: 600; font-size: 16px;
+    padding: 14px 30px; border-radius: 7px;
+    box-shadow: 0 0 0 0 var(--accent-glow);
+    transition: box-shadow .2s, transform .1s;
+  }
+  .cta:hover, .cta:focus-visible { box-shadow: 0 0 28px 0 var(--accent-glow); }
+  .cta:active { transform: translateY(1px); }
+
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  h2 {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: 22px; letter-spacing: -0.02em; color: var(--text-bright);
+    margin-bottom: 28px;
+  }
+
+  ol.steps { list-style: none; counter-reset: s; }
+  ol.steps li {
+    counter-increment: s; position: relative;
+    padding-left: 44px; margin-bottom: 24px;
+  }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 1px;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--border-bright); color: var(--accent);
+    font-family: var(--font-mono); font-size: 13px;
+    display: grid; place-items: center;
+  }
+  ol.steps b { color: var(--text-bright); font-weight: 600; display: block; }
+  ol.steps span { color: var(--text-dim); font-size: 15px; }
+
+  dl.facts dt {
+    color: var(--text-bright); font-weight: 600; margin-top: 22px;
+  }
+  dl.facts dt:first-child { margin-top: 0; }
+  dl.facts dd { color: var(--text-dim); font-size: 15px; max-width: 60ch; }
+
+  .note {
+    margin-top: 32px; padding: 18px 20px;
+    background: var(--bg-2); border-left: 2px solid var(--accent-dim);
+    border-radius: 0 6px 6px 0;
+    font-size: 15px; color: var(--text-dim);
+  }
+  .note b { color: var(--text); font-weight: 600; }
+
+  footer {
+    padding: 40px 0 64px; border-top: 1px solid var(--border);
+    font-size: 14px; color: var(--text-dim);
+  }
+  footer nav { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 22px; }
+  footer a { color: var(--text-dim); text-decoration: none; border-bottom: 1px solid var(--border); }
+  footer a:hover, footer a:focus-visible { color: var(--accent); border-color: var(--accent-dim); }
+  .legal { font-family: var(--font-mono); font-size: 12px; color: #4d6b7d; line-height: 1.8; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="mark">Sovereign</div>
+    <a class="signin" href="/app">Войти</a>
+  </header>
+
+  <div class="hero">
+    <h1>Интернет без блокировок, банки без переключений</h1>
+    <p>Sovereign — платный VPN на протоколе AmneziaWG. Работает там, где обычный
+       WireGuard уже не проходит. Российские сайты, банки и Госуслуги идут напрямую,
+       мимо туннеля — выключать ничего не нужно.</p>
+    <div class="buy">
+      <div class="price">300 ₽ <small>в месяц</small></div>
+      <a class="cta" href="/app">Подключиться</a>
+    </div>
+  </div>
+
+  <section>
+    <h2>Как это работает</h2>
+    <ol class="steps">
+      <li><b>Регистрация и оплата</b><span>Почта, пароль, оплата картой, СБП или криптовалютой.</span></li>
+      <li><b>Конфигурация приходит сразу</b><span>Файл настроек формируется автоматически и появляется в личном кабинете. Ждать ответа поддержки не нужно.</span></li>
+      <li><b>Подключение в приложении</b><span>Открываете файл в AmneziaWG, нажимаете переключатель. Пять минут, один раз.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Что входит</h2>
+    <dl class="facts">
+      <dt>Безлимитный трафик</dt>
+      <dd>Без ограничений скорости и объёма.</dd>
+
+      <dt>Российские сервисы работают напрямую</dt>
+      <dd>Банковские приложения и Госуслуги не видят VPN и не блокируют вход. Отключать подключение для оплаты не нужно.</dd>
+
+      <dt>Устойчивость к блокировкам</dt>
+      <dd>Уникальные параметры маскировки трафика на каждом узле. Соединение выглядит как обычный UDP, поэтому проходит там, где стандартный WireGuard уже режется.</dd>
+
+      <dt>Цепочка из двух узлов</dt>
+      <dd>Точка входа и точка выхода — разные серверы у разных провайдеров в разных странах.</dd>
+
+      <dt>Поддержка</dt>
+      <dd>Форма обращения в личном кабинете, отвечаем в течение дня.</dd>
+    </dl>
+
+    <div class="note">
+      <b>Одна конфигурация — одно устройство.</b> Нужен второй телефон или компьютер —
+      напишите в поддержку, выдадим отдельную.
+    </div>
+  </section>
+
+  <footer>
+    <nav>
+      <a href="/offer">Публичная оферта</a>
+      <a href="/app">Личный кабинет</a>
+      <a href="mailto:alexanderkozariychuk@gmail.com">Поддержка</a>
+    </nav>
+    <div class="legal">
+      Sovereign · sov3r3ign.com<br>
+      Сервис не предназначен для доступа к материалам, запрещённым законодательством РФ.
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Returning visitors with a session go straight to the app.
+  // CONFIRM the key name against how the SPA stores its JWT — if it differs,
+  // this check silently does nothing and everyone sees the landing.
+  try {
+    if (localStorage.getItem('token')) location.replace('/app');
+  } catch (e) { /* storage blocked — stay on the landing */ }
+</script>
+
+</body>
+</html>

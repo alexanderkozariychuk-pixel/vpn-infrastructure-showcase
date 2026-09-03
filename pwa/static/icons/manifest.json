@@ -2,7 +2,7 @@
   "name": "Sovereign VPN",
   "short_name": "Sovereign",
   "description": "Secure private access. Fast, encrypted connectivity.",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#080c0f",
   "theme_color": "#080c0f",
