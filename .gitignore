@@ -119,3 +119,4 @@ infrastructure/ansible/playbooks/deploy-backbone.yml
 infrastructure/ansible/roles/outline/
 infrastructure/ansible/roles/fou-backbone/
 
+.ruff_cache/

@@ -8,6 +8,7 @@ rsync -av \
   --exclude='venv' \
   --exclude='__pycache__' \
   --exclude='.git' \
+  --exclude='.ruff_cache' \
   --exclude='.env' \
   ~/Projects/vpn-infrastructure-showcase/pwa/ \
   -e "ssh" \
