@@ -3831,3 +3831,172 @@ so rows from the two gateways are indistinguishable, which will matter for
 reconciliation and refunds. Add `--exclude='.ruff_cache'` was already done;
 still pending is the readiness wait in `deploy.sh`.
 
+---
+
+## 2026-09-05
+
+### 🐛 Portal unreachable for a third day — four wrong hypotheses before the evidence
+The app server was reachable from nowhere on 22 or 443 while being
+perfectly healthy inside: interface UP, outbound `ping 8.8.8.8` at 0%
+loss, nginx and sshd listening, containers running. Ruled out in order,
+each by measurement rather than reasoning:
+
+- **DNS** — the A records had pointed at the right host all along.
+- **SNI filtering** — a request by bare IP and one with a foreign SNI
+  hung identically. If the domain name were the trigger, both would have
+  passed. The RKN registry had nothing on the address either.
+- **PMTU black hole** — `ping -M do` failed at *every* size, 1400 down to
+  900. When ICMP doesn't pass at all, that test says nothing about MTU;
+  there was never anything to rule out.
+- **DDoS scrubber** — plausible (they let the handshake through and drop
+  the session), but the packet capture killed it.
+
+### 🔎 The evidence: a 42-byte banner retransmitted seven times
+`tcpdump` on the server, with a parallel SSH attempt from home:
+
+```
+SYN → SYN-ACK → ACK                        three packets, 11 ms
+45.152.198.101.22 > ...: length 42
+  SSH-2.0-OpenSSH_10.2p1                   the banner
+... and six more retransmits, exponential backoff, no ACK ever
+```
+
+**Forty-two bytes.** That single number kills MTU, fragmentation and any
+size-based filtering at once. The connection establishes and then the
+return path is gone for everything after the handshake. Client side reads
+`Connection timed out during banner exchange` — the same string as the
+Vienna node in July.
+
+### 🗺 The diagnosis came from outside, not from the server
+Captures on the machine showed what arrived; they could not show what
+*didn't*. What produced the real signature was splitting the external
+checks in two: `TCP connect` succeeded from every probe worldwide, while
+`HTTP` timed out from about half of them — and inconsistently within the
+same city, one node in Shiraz answering while its neighbour didn't.
+A port that is open everywhere but a session that dies selectively is not
+a server fault.
+
+### 🐛 A traceroute clue that turned out to be worthless
+TCP traceroute from home died at hop `185.37.128.224` with flag `!X`
+(*administratively prohibited*) — looked like a smoking gun until the
+control test: the trace to the **working** Beget node dies at the same hop
+with the same flag. That router simply refuses TCP probes; real traffic
+passes through it fine. Always run the control before believing the clue.
+
+### 🗺 Four addresses, same behaviour
+The provider swapped the IP three times over two days. The first
+replacement failed the same way, the second worked for a few hours, then
+the fault returned. A manual reboot brought everything up cleanly inside
+and changed nothing outside. Four addresses with identical symptoms is a
+property of the platform, not an incident. Support declined compensation,
+attributed it to the ISP, and offered another IP change for a fee.
+Decision: migrate.
+
+### 🔧 Extracting .env with no SSH and only a VNC console
+Nothing in the database needed saving, but `.env` is deliberately excluded
+from the repo and existed nowhere else. Retyping 28 variables off a VNC
+screen invites a silent typo in a signing secret that only surfaces on a
+real payment.
+
+Outbound worked selectively, so: `gpg --symmetric` on the file, then
+attempts at three paste services (connection refused, uploads disabled,
+DNS failure), then `api.github.com` answered 200 — base64 into a private
+gist, link retyped by hand, decrypted locally. Verified by byte count:
+1226 on both sides.
+
+Then the cleanup that matters more than the containers: the provisioner's
+public key revoked from `/home/pwa-provisioner/.ssh/authorized_keys` on
+**both** production nodes, backups kept alongside. An abandoned host must
+not retain access to live infrastructure.
+
+### 🔎 Mapping who talks to what, before moving it
+`provisioner.py` SSHes only to the entry node as a hardcoded
+`pwa-provisioner`, calling the `pwa-add-peer` wrapper; `net_manager.py`
+separately reaches the exit node as the same user. The `EXIT_USER` value
+in `.env` is declared and never used for the connection — a config/code
+mismatch that had been invisible because nothing depended on it.
+
+The private key was not in `/root/.ssh` where the code's default pointed,
+but in a directory mounted into the container. Found by reading the
+compose file, not by guessing.
+
+---
+
+## 2026-09-06
+
+### 🔧 Portal migrated to a new host
+Chose the provider that already runs the entry node — four months without
+an incident there, against three days of failure on the other. Paying more
+for a platform whose connectivity is proven by use rather than by a
+pricing page.
+
+Separate machine from the VPN node, per the standing rule: Docker's chain
+manipulation and WireGuard forwarding do not share a host.
+
+Order of operations, each step verified before the next:
+
+- **swap first.** 2 GB of RAM for postgres plus the app is tight enough
+  that a spike means the OOM killer takes a container. Two gigabytes of
+  swap costs nothing and removes the class.
+- **Docker from the vendor repository**, not the distribution's.
+- **repo cloned, then the provisioner keypair generated fresh** — the old
+  private key was destroyed with the previous host by design. This time
+  the `.pub` was kept next to the private key, which it hadn't been
+  before, so deriving it from the private key isn't needed later.
+- **public half added back to both production nodes**, then verified by
+  calling the wrappers through the new key from the new server. Wrappers
+  and sudoers rules on the nodes were untouched throughout — only the key
+  changed.
+- **`.env` restored** from the encrypted copy, byte count checked.
+- **stack built**, four migrations applied to an empty database, uvicorn
+  bound to `127.0.0.1:8000` only — never exposed directly.
+- **firewall before nginx**: SSH allowed first, then 80 and 443, then
+  default-deny, then enable. Access confirmed in a second session before
+  closing the first.
+- **certificate last**, after DNS pointed at the new host, since HTTP-01
+  needs the domain to resolve here.
+
+### 🔧 Closed a July annoyance while rebuilding
+The container mounts its SSH directory read-only, so `known_hosts` could
+never be written — meaning host keys were accepted unverified on every
+call. Now the keys are collected on the host during setup and placed in
+the mounted directory, so the check actually works while the mount stays
+read-only.
+
+### 🐛 A maintenance page, and a scripted edit that broke the config
+Wanted the site dark while revising copy. Attempted an in-place edit of
+the nginx config with a Python string replacement; it produced an
+unterminated `location` block. `nginx -t` caught it and refused to reload,
+so the running configuration was never affected.
+
+Worse was the ordering bug: the backup copy was taken *after* the edit, so
+the `.bak` contained the damaged version too. Both recovered by writing
+the whole file out fresh.
+
+Two lessons, one of them repeated: back up before touching, not after —
+and for anything structural, write the file whole rather than patching it
+with a script.
+
+### 🐛 Mail worked, the test didn't
+Password reset produced no email and no log line at all. Not a failure —
+the database was newly migrated and empty, and the reset path deliberately
+stays silent for unknown addresses so it can't be used to enumerate them.
+Registering an account and watching the same path produced
+`HTTP/1.1 200 OK` from the mail API and a `sent` log line.
+
+The message landed in spam despite `spf=pass`, `dkim=pass` (twice) and
+`dmarc=pass`. Authentication isn't the problem: `p=NONE` in the DMARC
+record, a domain a month old, and a body that is mostly one button with a
+token in the URL. Tightening the policy is the next step.
+
+Also moved the support address in the mail footer out of the template and
+into a variable — the value already existed in configuration and the
+template was ignoring it.
+
+### 📋 Next
+Run the provisioning path end to end from the new host — payment through
+to a peer on the node and a config in the account. It's the one thing the
+migration hasn't proven. Then remove the test accounts before any real
+traffic arrives.
+
+
