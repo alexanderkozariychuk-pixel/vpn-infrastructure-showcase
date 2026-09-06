@@ -12,7 +12,7 @@ rsync -av \
   --exclude='.env' \
   ~/Projects/vpn-infrastructure-showcase/pwa/ \
   -e "ssh" \
-  ru-aeza:/opt/pwa/vpn-infrastructure-showcase/pwa/
+  sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/
 
-ssh ru-aeza \
+ssh sov-app \
   "cd /opt/pwa/vpn-infrastructure-showcase/pwa && sudo docker compose build pwa && sudo docker compose up -d --force-recreate pwa"

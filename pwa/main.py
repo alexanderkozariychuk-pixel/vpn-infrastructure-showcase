@@ -50,11 +50,17 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def landing():
     return FileResponse("static/landing.html")
 
-
 @app.get("/offer")
 async def offer_page():
     return FileResponse("static/offer.html")
+    
+@app.get("/about")
+async def about_page():
+    return FileResponse("static/about.html")
 
+@app.get("/privacy")
+async def privacy_page():
+    return FileResponse("static/privacy.html")
 
 @app.get("/app")
 async def app_page():
