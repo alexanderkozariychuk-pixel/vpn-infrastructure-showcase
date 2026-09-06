@@ -92,13 +92,43 @@ def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
     result = subprocess.run(
         ["ssh",
          "-i", PWA_SSH_KEY,
-         "-o", "StrictHostKeyChecking=accept-new",
+          "-o", "StrictHostKeyChecking=yes",
+         "-o", "UserKnownHostsFile=/root/.ssh/known_hosts",
          "-o", "ConnectTimeout=5",
          f"{PWA_SSH_USER}@{BRIDGE_IP}",
          cmd],
         capture_output=True, text=True, timeout=timeout,
     )
     return result.stdout.strip(), result.stderr.strip()
+
+def _bridge_used_ips() -> set[str]:
+    """
+    Addresses currently assigned on the entry node.
+
+    The local Config table is a mirror, not the source of truth: it can be
+    empty after a fresh migration, or stale after manual peer work. Asking
+    the node itself means the first candidate is already correct and the
+    retry loop below stays a guard against races rather than the mechanism
+    that finds the address.
+
+    Returns an empty set on failure — the caller still has the retry loop
+    and the wrapper's own duplicate-IP rejection behind it.
+    """
+    try:
+        stdout, _ = _ssh_bridge("sudo pwa-awg-show")
+    except Exception as e:
+        logger.warning("Could not read peer list from bridge: %s", e)
+        return set()
+
+    used: set[str] = set()
+    for line in stdout.splitlines():
+        line = line.strip()
+        if line.startswith("allowed ips:"):
+            for part in line.split(":", 1)[1].split(","):
+                addr = part.strip().split("/")[0]
+                if addr:
+                    used.add(addr)
+    return used
 
 def _encrypt(plain: str) -> str:
     return _fernet.encrypt(plain.encode()).decode()
@@ -187,7 +217,12 @@ async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> boo
 
     client_name = f"auto-{user.username}"
     loop = asyncio.get_event_loop()
-    tried_ips: set[str] = set()
+
+    # Seed from the node's live state, not from the local mirror.
+    tried_ips: set[str] = await loop.run_in_executor(None, _bridge_used_ips)
+    logger.info("Bridge reports %d addresses in use", len(tried_ips))
+
+    peer_ip = None
     peer_ip = None
     for attempt in range(10):
         peer_ip = await _find_free_ip(db, "Basic", exclude=tried_ips)
