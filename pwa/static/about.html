@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>О сервисе — Sovereign</title>
+<meta name="robots" content="noindex, follow">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c0f; --bg-2: #0d1318; --border: #1e2d38; --border-bright: #2a4055;
+    --text: #d8eaf6; --text-dim: #7a9fb5; --text-bright: #e8f4ff;
+    --accent: #00d4ff; --accent-dim: #006a80;
+    --font-display: 'Unbounded', sans-serif;
+    --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.65; }
+  .wrap { max-width: 700px; margin: 0 auto; padding: 0 24px 80px; }
+  header { padding: 24px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .mark { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--text-bright); text-decoration: none; letter-spacing: -0.02em; }
+  h1 { font-family: var(--font-display); font-weight: 400; font-size: 26px; letter-spacing: -0.02em; color: var(--text-bright); margin: 48px 0 24px; }
+  h2 { font-size: 15px; color: var(--accent); margin: 40px 0 14px; font-weight: 600; }
+  p { color: var(--text-dim); font-size: 15px; max-width: 68ch; margin-bottom: 12px; }
+  .nav-cards { display: grid; gap: 12px; margin: 32px 0; }
+  .nav-card { display: block; text-decoration: none; background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; transition: border-color .15s; }
+  .nav-card:hover, .nav-card:focus-visible { border-color: var(--border-bright); }
+  .nav-card b { color: var(--text-bright); font-weight: 600; display: block; font-size: 16px; }
+  .nav-card span { color: var(--text-dim); font-size: 14px; }
+  .contact { background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-top: 12px; font-size: 15px; }
+  .contact div { color: var(--text-dim); margin-bottom: 6px; }
+  .contact div:last-child { margin-bottom: 0; }
+  .contact b { color: var(--text-bright); font-weight: 600; }
+  a { color: var(--accent); }
+  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="mark" href="/">Sovereign</a>
+  <a href="/app" style="font-size:14px;color:var(--text-dim);text-decoration:none;border-bottom:1px solid var(--border)">Личный кабинет</a>
+</header>
+
+<h1>О сервисе</h1>
+
+<p>Sovereign — платный сервис, который ускоряет уже имеющийся интернет для частных лиц. Работает с марта 2026 года.</p>
+
+<p>После оплаты подписки клиент получает доступ в личный кабинет, персональный
+файл и техническую поддержку. Файл формируется 
+автоматически и становится доступен сразу после подтверждения оплаты.</p>
+
+<h2>Документы</h2>
+
+<div class="nav-cards">
+  <a class="nav-card" href="/offer">
+    <b>Пользовательское соглашение</b>
+    <span>Условия оказания услуг, порядок оплаты и возврата средств</span>
+  </a>
+  <a class="nav-card" href="/privacy">
+    <b>Политика конфиденциальности</b>
+    <span>Какие данные обрабатываются и как они защищены</span>
+  </a>
+</div>
+
+<h2>Поддержка</h2>
+
+<p>Обращения принимаются через форму в личном кабинете или по электронной почте.
+Отвечаем в течение рабочего дня.</p>
+
+<div class="contact">
+  <div><b>Электронная почта:</b> <a href="mailto:sovrn.support@gmail.com">sovrn.support@gmail.com</a></div>
+  <div><b>Форма обращения:</b> <a href="/app">в личном кабинете</a></div>
+  <div><b>Время ответа:</b> в течение рабочего дня</div>
+</div>
+
+<p style="margin-top:16px">При обращении укажите модель устройства, оператора связи
+или интернет-провайдера и описание проблемы — это позволит решить вопрос быстрее.</p>
+
+<h2>Оплата</h2>
+
+<p>Подписка оплачивается помесячно. Доступна оплата банковской картой,
+через Систему быстрых платежей и криптовалютой. Комиссию платёжных систем
+оплачивает исполнитель — вы платите ту сумму, которая указана на сайте.</p>
+
+<footer><a href="/">На главную</a></footer>
+
+</div>
+</body>
+</html>
