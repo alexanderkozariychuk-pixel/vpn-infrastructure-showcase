@@ -9,7 +9,7 @@
     ss_password: "{{ shadowsocks_password }}"
     ss_port: 8388
     ss_method: "aes-256-gcm"
-    bulgaria_ip: "185.237.223.94"
+    bulgaria_ip: "<bulgaria-node>"
     tun2socks_version: "v2.5.2"
     tun_interface: "tun0"
     tun_address: "198.18.0.1"

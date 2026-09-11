@@ -1060,7 +1060,7 @@ This is a systemic issue, not a configuration error.
 - WiFi: handshake on first attempt, internet works
 - LTE: handshake on first attempt, internet works ✅
 - Speed: 16.45 Mbps download, 205ms ping
-- Exit IP confirmed: 185.237.223.94 (Bulgaria)
+- Exit IP confirmed: <bulgaria-node> (Bulgaria)
 
 #### Strategic decisions
 
@@ -2547,7 +2547,7 @@ Closed the diagnostic gap noted on 2026-07-01: `mailer` (and other module) logs 
 
 Cloud4Box has now caused three incidents (disk-fill, kernel/DKMS, connectivity). Decided to drop it. Also noticed Gemini stopped working from Cloud4Box IPs (Moldova + Germany) — datacenter IP reputation likely flagged by Google.
 
-### 🛠 New relay — Aeza Vienna (45.86.245.86)
+### 🛠 New relay — Aeza Vienna (<vienna-node>)
 
 - Chose Vienna over US (Charlotte) — better ping (99 vs 129ms), European connectivity to Beget likely more reliable, and for AI/YouTube/Telegram an Austrian IP is statistically no worse than US.
 - Rented, provisioned Ubuntu 26.04.
@@ -2574,7 +2574,7 @@ Spent the session isolating why direct SSH home → Vienna fails while home → 
 **Working state / what's not on fire:**
 - Clients are online — service via Beget direct exit serves YouTube (200), Telegram (302), X (200).
 - What Beget direct does NOT reach: Instagram (000), ChatGPT (403), Gemini (blocked) — so a working outbound tunnel is still needed, specifically for AI + Instagram, not for everything.
-- Vienna server is healthy and manageable via ProxyJump: `ssh -J sovadmin@45.134.217.122 root@45.86.245.86`.
+- Vienna server is healthy and manageable via ProxyJump: `ssh -J sovadmin@<exit-node> root@<vienna-node>`.
 - Reconfirmed: with the client `awg0` tunnel up, SSH to infra servers breaks (`No route to host`) — the client config routes everything into the tunnel with no exclusions for infra IPs. For infra work, bring the client tunnel down.
 
 ### 💡 Strategic thread (to revisit rested)
@@ -2595,7 +2595,7 @@ Spent the session isolating why direct SSH home → Vienna fails while home → 
 
 Finally pinned the three-day Vienna access problem with a paired tcpdump. The cause is **not** DPI, not IP/port blocking, not Aeza's fault, not the cross-border route as such — it's a **PMTU black hole on the path Vienna → RU networks**.
 
-**Decisive test — bought a RU node on Aeza (45.151.101.104) to test connectivity WITHIN one provider**, removing the cross-border/inter-provider variable entirely:
+**Decisive test — bought a RU node on Aeza (<ru-node>) to test connectivity WITHIN one provider**, removing the cross-border/inter-provider variable entirely:
 - RU-Aeza → Vienna-Aeza: small packets fine (ping 0% loss), TCP handshake completes, `nc` to :22 succeeds.
 - But SSH still failed with the same "timeout during banner exchange" — reproducing the problem *inside* Aeza. This proved the issue is specific to the path to the Vienna node, not the ISP (SkyNet/Tele2 both showed it too) and not cross-border transit generically.
 
@@ -2617,7 +2617,7 @@ Wrote a support ticket with the full reproducible diagnosis (ping size threshold
 
 ### 📊 Current state (nothing on fire)
 - Clients online via Beget direct exit (YouTube/Telegram/X work; Instagram/ChatGPT/Gemini need the tunnel — still pending).
-- RU-Aeza node (45.151.101.104) healthy and paid — half of the planned single-provider architecture is in place.
+- RU-Aeza node (<ru-node>) healthy and paid — half of the planned single-provider architecture is in place.
 - Vienna node paid but awaiting relocation.
 - Lease clock: **Beget 7 days** (holds prod — real deadline), Cloud4Box 3 weeks, Aeza-Vienna ~1 month.
 
@@ -2633,9 +2633,9 @@ Wrote a support ticket with the full reproducible diagnosis (ping size threshold
 
 ### 🗺 Vienna resolved — refunded, replaced with Aeza Frankfurt
 
-Support ticket to Aeza (packet-level PMTU black-hole diagnosis from 2026-07-07) succeeded — refunded the Vienna server, rented **Aeza Frankfurt (178.20.209.224)** instead, same price.
+Support ticket to Aeza (packet-level PMTU black-hole diagnosis from 2026-07-07) succeeded — refunded the Vienna server, rented **Aeza Frankfurt (<fra-node>)** instead, same price.
 
-**Verified connectivity BEFORE building anything** (lesson from Vienna applied): ran the same large-packet test suite from both the home workstation and the RU-Aeza node (45.151.101.104) to Frankfurt — `ping -M do -s 1400` passes cleanly (0% loss) from both sources; only the 1500-MTU edge (`-s 1472`) fails, which is normal/expected, not a black hole. Confirmed real SSH connects (not just `nc`/ping) — the actual test that mattered with Vienna.
+**Verified connectivity BEFORE building anything** (lesson from Vienna applied): ran the same large-packet test suite from both the home workstation and the RU-Aeza node (<ru-node>) to Frankfurt — `ping -M do -s 1400` passes cleanly (0% loss) from both sources; only the 1500-MTU edge (`-s 1472`) fails, which is normal/expected, not a black hole. Confirmed real SSH connects (not just `nc`/ping) — the actual test that mattered with Vienna.
 
 **Hit and fixed the same `ssh.socket` activation issue as Vienna** on the fresh Frankfurt image (sshd inactive, systemd holding port 22, real SSH timing out while `nc` "succeeded"). Fixed via VNC console: `systemctl disable --now ssh.socket && systemctl enable --now ssh`.
 
@@ -2653,7 +2653,7 @@ After the third round of manual SSH/AWG setup in three days, decided (rightly) t
 - `roles/amneziawg/tasks/install.yml` — rewritten to pin the PPA to `noble`, import the key via gpg (no apt-key), and added a post-install check that DKMS actually built the module for the running kernel (`failed_when` instead of silent failure).
 - `roles/common/tasks/main.yml` — added the `ssh.socket` → `ssh.service` fix. Made SSH hardening (disable root login / password auth) **opt-in** via `ssh_hardening: true` flag instead of unconditional — deferred until everything works and clients are migrated, so root access isn't lost mid-setup.
 - `roles/amneziawg/templates/awg0.conf.j2` — made the obfuscation block (`Jc/Jmin/Jmax/S1/S2/H1-4`) conditional on `awg_obfuscation` (default false), added `MTU` (default 1300) and an optional `Endpoint` for peers. Reasoning: build the inter-node tunnel in layers — plain AmneziaWG first, obfuscation added afterward — to isolate failures instead of debugging everything at once.
-- `inventory/hosts.ini` — replaced the dead Moldova/Bulgaria/Beget-bridge entries with the current topology: `ru-aeza` (45.151.101.104, entry) and `fra-aeza` (178.20.209.224, exit), both on Aeza's backbone.
+- `inventory/hosts.ini` — replaced the dead Moldova/Bulgaria/Beget-bridge entries with the current topology: `ru-aeza` (<ru-node>, entry) and `fra-aeza` (<fra-node>, exit), both on Aeza's backbone.
 - Decision: a separate `amneziawg-backbone` role for the inter-node tunnel (awg1), kept cleanly apart from the client-facing `awg0` role — avoids parameterizing one role for two different jobs.
 
 ### 🔁 Both Aeza nodes got reinstalled (clean state)
@@ -2833,7 +2833,7 @@ Reframe worth keeping: the inter-provider connectivity loss that triggered days 
 ### 🔧 Root cause — one-way backbone tunnel (peer pointed at a dead node)
 Users were online via the RU node but on a **domestic exit only** (no foreign IP → no AI services / geo-blocked sites). Reading both ends found it without guessing:
 - Cloud4Box `awg0` peer for Beget: **`0 B received, 271 MiB sent`** → one-way tunnel, no handshake.
-- Beget's backbone iface (`awg1`) had the *correct* key (`vpZ1KP…`) and address (`10.77.77.2/30`) for Germany — but its single `[Peer]` `Endpoint` pointed at **the old Vienna node (`45.86.245.86`)**, a leftover from an abandoned relay attempt. PSKs had also drifted (`RkDHQU…` vs the `vCyQst…` Cloud4Box expected).
+- Beget's backbone iface (`awg1`) had the *correct* key (`vpZ1KP…`) and address (`10.77.77.2/30`) for Germany — but its single `[Peer]` `Endpoint` pointed at **the old Vienna node (`<vienna-node>`)**, a leftover from an abandoned relay attempt. PSKs had also drifted (`RkDHQU…` vs the `vCyQst…` Cloud4Box expected).
 
 ### 🔁 Bring-up — cleared a stale default that blocked the interface
 `awg-quick up awg1` failed: `RTNETLINK answers: File exists` — PostUp's `ip route add default via 10.77.77.1 dev awg1 table 200` collided with a **stale `default via 100.100.1.1 dev eth0`** the emergency domestic-exit had left in table 200. Deleted the stale default → interface came up → **handshake with Cloud4Box immediately, transfer both ways**.
@@ -3856,7 +3856,7 @@ each by measurement rather than reasoning:
 
 ```
 SYN → SYN-ACK → ACK                        three packets, 11 ms
-45.152.198.101.22 > ...: length 42
+<ru-node>.22 > ...: length 42
   SSH-2.0-OpenSSH_10.2p1                   the banner
 ... and six more retransmits, exponential backoff, no ACK ever
 ```
@@ -3998,5 +3998,85 @@ Run the provisioning path end to end from the new host — payment through
 to a peer on the node and a config in the account. It's the one thing the
 migration hasn't proven. Then remove the test accounts before any real
 traffic arrives.
+
+---
+
+## 2026-09-07
+
+### ✅ End-to-end provisioning verified on the new host
+The one thing the migration hadn't proven. Ran it with a synthetic signed
+webhook against a real pending order rather than waiting for a live
+payment — same approach as the original gateway integration.
+
+First attempt failed, and the failure was informative:
+
+```
+ip in use: 10.88.88.46/32   → retrying with next IP
+ip in use: 10.88.88.47/32   → retrying with next IP
+...
+Exhausted retries finding a free IP
+```
+
+`_find_free_ip` seeds its "used" set from the local `Config` table. That
+table is a **mirror**, not the source of truth: it was empty after a
+migration onto a fresh database, so the search started at the bottom of
+the pool while the node had everything through .52 assigned. Ten retries
+fell one address short.
+
+Worth noting what *didn't* happen: no partial state. The payment stayed
+`pending`, the subscription inactive, `configs` empty, the peer count on
+the node unchanged. The wrapper's duplicate-IP rejection — added in July
+after the one-way-traffic incident — did exactly its job, and the failure
+path rolled back cleanly.
+
+### 🔧 Seed the address search from the node, not the mirror
+Fixed by asking the entry node for its live peer list through the existing
+read-only wrapper, and passing that as the exclusion set. The first
+candidate is now correct by construction; the retry loop drops back to
+being a guard against races rather than the mechanism that finds an
+address.
+
+This also covers the other way the mirror drifts: peers issued by hand
+never appear in the database at all.
+
+### 🐛 A read-only mount producing misleading stderr
+Every wrapper call was emitting:
+
+```
+hostfile_replace_entries: mkstemp: Read-only file system
+```
+
+`StrictHostKeyChecking=accept-new` makes ssh try to *update* known_hosts,
+and the directory is mounted read-only by design. The command itself
+succeeded — but the provisioner concatenates stdout and stderr when a call
+fails, so this noise would have buried the real reason for any genuine
+wrapper rejection.
+
+Switched to strict checking with an explicit known_hosts path. The host
+keys were already collected during setup, so nothing needs writing, and
+the check is now actually enforced rather than accepting whatever the far
+end presents.
+
+### 🛠 Payment method selection
+Until today the portal only called the crypto endpoint — the second
+provider had been integrated on the backend for days with no way to reach
+it from the interface.
+
+Added a checkout step between the plan card and the gateway: order summary
+on one side, two payment methods on the other, card first. Both endpoints
+take the same request shape and return the same `{ok, url}`, so only the
+address differs — response handling, error paths and the redirect stay
+shared rather than duplicated per provider.
+
+The terms link opens from the checkout itself, which also answers "where
+exactly did the customer agree".
+
+### 📋 Next
+Add the longer billing periods to the plan. Three things need settling in
+the backend first: `PLANS` carries a `days` field that the provisioning
+path currently ignores, so a longer term would silently grant a month;
+and re-purchasing on an active subscription would issue a second peer
+instead of extending the existing one.
+
 
 

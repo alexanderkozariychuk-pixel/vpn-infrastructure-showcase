@@ -19,8 +19,8 @@ class PeerStatus:
 
 def get_amnezia_status():
     # Данные берем из окружения или прописываем вручную для теста
-    MOLDOVA_IP = "45.140.146.134" 
-    MOLDOVA_USER = "alex"
+    MOLDOVA_IP = os.getenv("MONITOR_TARGET_IP", "")
+    MOLDOVA_USER = os.getenv("MONITOR_TARGET_USER", "")
 
     # Команда для выполнения через SSH
     # -o StrictHostKeyChecking=no чтобы бот не завис на вопросе "доверять ли серверу"

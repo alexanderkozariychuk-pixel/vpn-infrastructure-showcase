@@ -64,7 +64,7 @@ echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
 
 | Test | Description | Result |
 |------|-------------|--------|
-| **Ping** | `ping 45.140.146.134` from mobile network | Successful (server reachable) |
+| **Ping** | `ping <relay-node>` from mobile network | Successful (server reachable) |
 | **DNS** | `nslookup google.com` | Resolved, but HTTP access blocked |
 | **AmneziaWG (first attempt)** | Connect immediately after enabling mobile data | Handshake timeout after 5 seconds |
 | **AmneziaWG (retry immediately)** | Re‑attempt connection without any delay | Still fails (may extend block) |
@@ -73,7 +73,7 @@ echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
 | **AmneziaWG (MTU 1280)** | Reduce MTU on client | Same pattern: fails first, works after delay |
 | **Port change** | Move AmneziaWG to UDP/8443 | Same intermittent behaviour |
 | **Xray Reality (TCP/443)** | Switch to Xray on TCP/443 | Fails initially, sometimes works after delay |
-| **SSH (TCP/22)** | `ssh root@45.140.146.134` | Works reliably (port 22 not filtered) |
+| **SSH (TCP/22)** | `ssh root@<relay-node>` | Works reliably (port 22 not filtered) |
 
 #### Results
 - The server IP is reachable (ping, SSH work).

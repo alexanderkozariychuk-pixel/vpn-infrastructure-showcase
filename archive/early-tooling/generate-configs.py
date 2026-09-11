@@ -8,8 +8,8 @@ import os
 
 # --- Server settings ---
 SERVER_PUBLIC_KEY = "BeaOUxJPWwtFTimRt9Xx7wDGvYENT4742r7n9SLN/gs="
-SERVER_ENDPOINT = "45.140.146.95:443"
-SERVER_SSH = "vpnadmin@45.140.146.95"
+SERVER_ENDPOINT = "<relay-node>:443"
+SERVER_SSH = "vpnadmin@<relay-node>"
 AWG_CONF = "/etc/amnezia/amneziawg/awg0.conf"
 
 # --- AWG obfuscation params ---
