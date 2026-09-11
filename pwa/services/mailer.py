@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "Sovereign <support@sov3r3ign.com>")
+SUPPORT_INBOX = os.getenv("SUPPORT_INBOX", "sovrn.support@gmail.com")
 RESEND_API = "https://api.resend.com/emails"
 
 
@@ -60,7 +61,7 @@ def _wrap(inner_html: str) -> str:
       {inner_html}
     </div>
     <div style="text-align:center;margin-top:24px;color:#5a7a8a;font-size:12px">
-      support@sov3r3ign.com
+      {SUPPORT_INBOX}
     </div>
   </div>
 </body>
