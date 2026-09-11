@@ -7,16 +7,16 @@ terraform {
 }
 
 provider "yandex" {
-  token     = "y0__xC5063lCBjB3RMgjqT6hhcyP4miCsfODqQFIAP05aHjxllKWA"
-  cloud_id  = "b1ghuve6menqskf2ha6r"
-  folder_id = "b1gjqm14p47edvaj74tk"
+  token     = var.yandex_token  # never hardcode: see repository history
+  cloud_id  = var.cloud_id
+  folder_id = var.folder_id
   zone      = "ru-central1-a"
 }
 
 resource "yandex_storage_bucket" "tf-state" {
-  bucket     = "tf-state-13880990akoz"
+  bucket     = var.state_bucket
   acl        = "private"
-  folder_id  = "b1gjqm14p47edvaj74tk"
+  folder_id = var.folder_id
   force_destroy = false
 
   versioning {
