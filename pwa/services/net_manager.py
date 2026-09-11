@@ -189,7 +189,11 @@ def get_system_health() -> tuple[dict, dict, str | None]:
     local = {}
     try:
         res = subprocess.run(
-            _METRICS_CMD, shell=True,
+            # nosec B602 — _METRICS_CMD is a module-level literal: a pipeline
+            # of uptime/free/df into awk, with no interpolation anywhere. The
+            # shell is required for the pipes; no caller-supplied value reaches
+            # it. If that ever changes, this suppression must go with it.
+            _METRICS_CMD, shell=True,  # nosec B602
             capture_output=True, text=True, timeout=5,
         )
         local = _parse_metrics(res.stdout)

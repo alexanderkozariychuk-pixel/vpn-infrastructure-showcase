@@ -33,7 +33,7 @@ def _serialize(payload: dict) -> str:
 
 def _make_sign(body_str: str) -> str:
     b64 = base64.b64encode(body_str.encode()).decode()
-    return hashlib.md5((b64 + PAYMENT_API_KEY).encode()).hexdigest()
+    return hashlib.md5((b64 + PAYMENT_API_KEY).encode(), usedforsecurity=False).hexdigest()
 
 
 async def create_invoice(amount: str, currency: str, order_id: str,

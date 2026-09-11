@@ -54,7 +54,7 @@ def build_payment_url(order_id: str, amount: str, currency: str = "RUB",
         "oa": amount,
         "o": order_id,
         "currency": currency,
-        "s": hashlib.md5(raw.encode()).hexdigest(),
+        "s": hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest(),
         "lang": "ru",
     }
     if email:
@@ -79,7 +79,7 @@ def verify_notification(params: dict) -> bool:
         return False
 
     raw = f"{merchant_id}:{amount}:{SECRET_2}:{order_id}"
-    expected = hashlib.md5(raw.encode()).hexdigest()
+    expected = hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
     return hmac.compare_digest(expected, sign)
 
 

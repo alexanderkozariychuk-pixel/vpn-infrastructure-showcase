@@ -1,6 +1,7 @@
 """
 AIKVPN Network Manager: Focus on IPIP and AWG interface health.
 """
+import os
 import logging
 import subprocess
 from dataclasses import dataclass

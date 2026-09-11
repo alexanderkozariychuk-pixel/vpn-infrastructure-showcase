@@ -74,7 +74,7 @@ jobs:
       # deliberately — B603/B607 are expected there and are suppressed at
       # the call site with a comment explaining why, not globally.
       - name: Run bandit
-        run: bandit -r pwa/ -ll -f screen
+        run: bandit -r pwa/ -ll -f screen -x pwa/venv
 
   image:
     name: Image scan
@@ -88,10 +88,11 @@ jobs:
       # The base image carries most of the surface; rebuilding on an old
       # python:3.12-slim is the likeliest way to ship a known CVE here.
       - name: Trivy
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: pwa:ci
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '0'
-          format: table
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.0 image \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 0 \
+            pwa:ci
