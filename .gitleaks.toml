@@ -1,0 +1,31 @@
+# Extends the built-in ruleset rather than replacing it.
+[extend]
+useDefault = true
+
+# The Yandex Cloud OAuth token that sat in this repository from August to
+# September 2026 was caught by the generic-api-key rule, but only on a
+# full-history scan — and generic rules are entropy-dependent, so a shorter
+# or lower-entropy token of the same shape would slip through. An explicit
+# pattern removes that dependence.
+[[rules]]
+id = "yandex-cloud-oauth"
+description = "Yandex Cloud OAuth token"
+regex = '''y0_[A-Za-z0-9_\-]{40,}'''
+keywords = ["y0_"]
+
+[[rules]]
+id = "yandex-cloud-iam"
+description = "Yandex Cloud IAM token"
+regex = '''t1\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{40,}'''
+keywords = ["t1."]
+
+[allowlist]
+description = "Placeholders and generated artefacts"
+regexes = [
+  '''YOUR_[A-Z_]+''',
+  '''CHANGE_ME''',
+  '''<[a-z\-]+>''',
+]
+paths = [
+  '''archive/terraform-yandex-cloud/aeza/schema\.json''',
+]

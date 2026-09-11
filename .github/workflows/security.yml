@@ -1,0 +1,97 @@
+name: Security
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Dependency advisories appear after the code stops changing, so a
+    # weekly run catches what a push-triggered one never would.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The action's default push-event mode scans only the commits being
+      # pushed. Three real secrets sat in this repository for months and
+      # were invisible to it, because they predated the scanner. Scanning
+      # the whole history on every run is the only way a finding means
+      # "this repository is clean" rather than "this push is clean".
+      - name: Gitleaks
+        run: |
+          VERSION=8.21.2
+          curl -sSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          tar xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --redact --no-banner --verbose
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      # Reports known advisories against the pinned requirements. Failing
+      # the build on a transitive advisory with no fix available would
+      # make this permanently red and therefore ignored, so it reports
+      # rather than blocks; the weekly schedule is what makes it useful.
+      - name: Audit pwa dependencies
+        run: pip-audit -r pwa/requirements.txt --desc
+        continue-on-error: true
+
+  sast:
+    name: Python SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      # Medium severity and above. The provisioning path shells out to ssh
+      # deliberately — B603/B607 are expected there and are suppressed at
+      # the call site with a comment explaining why, not globally.
+      - name: Run bandit
+        run: bandit -r pwa/ -ll -f screen
+
+  image:
+    name: Image scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t pwa:ci ./pwa
+
+      # The base image carries most of the surface; rebuilding on an old
+      # python:3.12-slim is the likeliest way to ship a known CVE here.
+      - name: Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: pwa:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+          format: table

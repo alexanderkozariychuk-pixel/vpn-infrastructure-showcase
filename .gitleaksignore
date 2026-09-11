@@ -1,0 +1,21 @@
+# Known historical leaks. Both credentials were revoked on 2026-09-08.
+#
+# The secrets remain reachable in git history and always will: a secret that
+# has been public must be treated as permanently compromised, so rotation is
+# the fix and rewriting history would only hide the record. These entries
+# keep the full-history scan meaningful — a finding that isn't on this list
+# is a new one.
+#
+# Note on the two entries for main.tf: a gitleaks fingerprint includes the
+# rule id, so the same secret produces a different fingerprint once a more
+# specific rule matches it first. Adding a rule silently un-ignores anything
+# it now claims.
+#
+# Yandex Cloud OAuth token, committed 2026-08-05, revoked 2026-09-08.
+979c21483e1782ec3932f451658bc0810049d441:archive/terraform-yandex-cloud/yc-backend-setup/main.tf:generic-api-key:10
+979c21483e1782ec3932f451658bc0810049d441:archive/terraform-yandex-cloud/yc-backend-setup/main.tf:yandex-cloud-oauth:10
+#
+# 4VPS API token, committed 2026-04-05, revoked 2026-09-08. Same token in
+# two files; the surrounding code was removed from the tree long before.
+1b9d4dd89a83de82f4812443b8484d6aea177438:scripts/providers/fourvps/create_vps.py:generic-api-key:34
+1b9d4dd89a83de82f4812443b8484d6aea177438:scripts/providers/fourvps/discover.py:generic-api-key:4

@@ -63,16 +63,3 @@ jobs:
       # code that cannot run, not code that reads differently.
       - name: Ruff check
         run: ruff check pwa/ monitoring/ --select E9,F63,F7,F82 --output-format=github
-
-  secrets:
-    name: Secret scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
