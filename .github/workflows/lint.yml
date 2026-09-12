@@ -63,3 +63,22 @@ jobs:
       # code that cannot run, not code that reads differently.
       - name: Ruff check
         run: ruff check pwa/ monitoring/ --select E9,F63,F7,F82 --output-format=github
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      # The suite covers the webhook boundary: the point where an
+      # unauthenticated request turns into a paid subscription. Cases are
+      # written around what must be rejected, not around the happy path.
+      - name: Run pytest
+        run: pytest -q
