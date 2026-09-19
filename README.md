@@ -145,6 +145,14 @@ Billing is handled by a crypto payment gateway over an HTTPS API with HMAC-signe
 
 ---
 
+## Operational Runbook
+
+[`docs/runbook.md`](docs/runbook.md) is the incident-response procedure set for this infrastructure — symptom-first, every entry drawn from a production incident that actually happened here. It covers the seven recurring failure classes: a live handshake with no traffic, tunnels that die on kernel upgrades, nodes healthy from inside and unreachable from outside, SSH lockouts, runtime-only state lost on reboot, monitoring that reports success while showing nothing, and deploys that appear to succeed.
+
+It also records the tests that produced nothing, because those cost the most time. The recurring theme is stated plainly: a check that passes on the machine is not evidence the machine works.
+
+---
+
 ## Research Log
 
 [`docs/troubleshooting.md`](docs/troubleshooting.md) is a dated research log from earlier stages — real investigations into mobile-network DPI behavior, not a generic FAQ. Highlights:
@@ -196,7 +204,7 @@ Billing is handled by a crypto payment gateway over an HTTPS API with HMAC-signe
 pwa/                      FastAPI client portal + billing + provisioning
 infrastructure/ansible/   Server configuration as code (roles, inventories, playbooks)
 monitoring/               Prometheus / Grafana / Alertmanager configuration
-docs/                     Architecture and dated research log
+docs/                     Architecture, operational runbook, dated research log
 archive/                  Superseded approaches, kept with honest post-mortems
 ```
 
