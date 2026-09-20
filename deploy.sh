@@ -1,7 +1,20 @@
 #!/bin/bash
-# Deploys pwa/ to the app server (Aeza-RU) — the PWA has lived here since
-# 2026-07-19, not on Beget. Do not point this back at Beget/entry — that
-# node only ever ran the code before the app-server split.
+# Deploys pwa/ to the app server, wherever `sov-app` currently points.
+#
+# The app server is a host of its own and never a VPN node: Docker rewrites
+# FORWARD, which is what broke traffic the one time the two were co-located.
+# The portal moved Beget → Aeza (2026-07-19) → Beget again (2026-09-06), so
+# the alias is the source of truth and naming a provider here only goes stale.
+#
+# This syncs pwa/ and nothing else. The node-side wrappers under
+# infrastructure/wrappers/ are installed on the ENTRY node by hand — different
+# machine, different trust boundary; see that directory's README.
+#
+# rsync overwrites the server copy with the local one. Edits made directly on
+# the server are lost, which has happened before — dry-run first when the last
+# deploy was a while ago:
+#
+#   rsync -avn --delete ~/Projects/vpn-infrastructure-showcase/pwa/ sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/
 set -e
 
 rsync -av \
