@@ -179,6 +179,32 @@ def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> t
     return False, out
 
 
+# ── remove peer from Bridge ───────────────────────────────────────────
+
+def _remove_peer_from_bridge(pub: str) -> tuple[bool, str]:
+    """Remove a peer via the validated wrapper on the entry node.
+
+    The wrapper (pwa-del-peer) re-checks the key format, refuses anything
+    outside the client subnet — so the backbone peer is unreachable through
+    this path — and removes the peer from the config file before the runtime,
+    so a failed edit leaves a working tunnel rather than a silently returning
+    peer.
+
+    A peer that is already gone is reported as a failure by the wrapper, not
+    silently swallowed: the caller decides whether that is expected.
+    """
+    import shlex
+    stdout, stderr = _ssh_bridge(f"sudo pwa-del-peer {shlex.quote(pub)}")
+
+    out = (stdout + " " + stderr).strip()
+    if stdout.startswith("ok:"):
+        logger.info("Peer removed from bridge: %s", pub[:12])
+        return True, "ok"
+
+    logger.error("pwa-del-peer refused peer %s: %s", pub[:12], out)
+    return False, out
+
+
 # ── build client config text ──────────────────────────────────────────
 
 def _build_conf(priv: str, psk: str, peer_ip: str) -> str:

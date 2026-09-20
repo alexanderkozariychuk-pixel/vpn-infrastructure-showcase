@@ -12,6 +12,7 @@ from db.base import get_db
 from db.models import User
 from auth.jwt import require_auth
 from services.provisioner import get_client_config
+from services.subscriptions import has_active_subscription
 
 router = APIRouter()
 
@@ -26,7 +27,7 @@ async def client_config(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not user.is_subscribed:
+    if not has_active_subscription(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     conf = await get_client_config(user, db)
@@ -47,7 +48,7 @@ async def client_config_raw(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not user.is_subscribed:
+    if not has_active_subscription(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     conf = await get_client_config(user, db)

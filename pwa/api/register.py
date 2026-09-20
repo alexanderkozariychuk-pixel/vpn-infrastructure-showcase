@@ -1,6 +1,8 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.base import get_db
@@ -32,6 +34,11 @@ class UserResponse(BaseModel):
 class AssignPeerRequest(BaseModel):
     username: str
     peer_ip: str
+    # Every subscription carries an end date. Granting one by hand without a
+    # date used to produce a row the gate reads as permanent access; it now
+    # reads as no access at all, so the default is an explicit month rather
+    # than nothing.
+    days: int = Field(default=30, ge=1, le=365)
 
 
 @router.post("/api/client/register", response_model=UserResponse, status_code=201)
@@ -101,10 +108,18 @@ async def assign_peer(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=f"User '{req.username}' not found")
+    now = datetime.now(timezone.utc)
+    base = max(now, user.subscribed_until or now)
     user.peer_ip = req.peer_ip
     user.is_subscribed = True
+    user.subscribed_until = base + timedelta(days=req.days)
     await db.commit()
-    return {"ok": True, "username": user.username, "peer_ip": user.peer_ip}
+    return {
+        "ok": True,
+        "username": user.username,
+        "peer_ip": user.peer_ip,
+        "subscribed_until": user.subscribed_until,
+    }
 
 
 @router.get("/api/client/me")

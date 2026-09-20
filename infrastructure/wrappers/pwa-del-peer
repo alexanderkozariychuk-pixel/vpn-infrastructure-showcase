@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+#
+# pwa-del-peer — remove one client peer from the entry node, by public key.
+#
+# Installed at /usr/local/bin/pwa-del-peer on the entry node, owned by root,
+# mode 0755. The portal reaches it as the restricted pwa-provisioner user
+# through a sudoers entry that permits this wrapper and nothing else.
+#
+# It is the mirror of pwa-add-peer and follows the same two rules:
+#
+#   1. Re-validate every argument here. The caller is a web application; its
+#      checks are a convenience, this is the boundary.
+#   2. Runtime and config change together. A peer removed only at runtime
+#      comes back on the next reboot, which is the same class of bug that
+#      cost four incidents in June.
+#
+# Refuses to touch anything outside the client subnet, so the backbone peer
+# cannot be removed through this path even if the portal is compromised.
+#
+# Exit status is 0 only when the peer is gone from both places. Output is
+# "ok: ..." on success and "error: ..." on refusal, matching pwa-add-peer.
+
+set -euo pipefail
+
+IFACE="${PWA_AWG_INTERFACE:-awg0}"
+CONF="/etc/amnezia/amneziawg/${IFACE}.conf"
+CLIENT_SUBNET_PREFIX="10.88.88."
+
+die() { echo "error: $*" >&2; exit 1; }
+
+[[ $# -eq 1 ]] || die "usage: pwa-del-peer <public-key>"
+PUB="$1"
+
+# X25519 public key, base64: 43 payload characters and one '='. Anything else
+# never reaches awg or the config file.
+[[ "$PUB" =~ ^[A-Za-z0-9+/]{43}=$ ]] || die "malformed public key"
+
+[[ -f "$CONF" ]] || die "config not found: $CONF"
+
+# ── the peer must exist, and must be a client ────────────────────────────────
+#
+# Reading allowed-ips from the running interface rather than from the file:
+# the file is what survives a reboot, the runtime is what carries traffic, and
+# a peer that is only in one of them is exactly what this script exists to
+# clean up. The subnet check is what keeps the backbone out of reach.
+
+ALLOWED="$(awg show "$IFACE" allowed-ips 2>/dev/null | awk -v k="$PUB" '$1 == k { print $2 }')"
+
+IN_CONFIG=0
+if grep -qF -- "$PUB" "$CONF"; then
+    IN_CONFIG=1
+fi
+
+if [[ -z "$ALLOWED" && "$IN_CONFIG" -eq 0 ]]; then
+    die "peer not found in runtime or config"
+fi
+
+if [[ -n "$ALLOWED" ]]; then
+    case "$ALLOWED" in
+        "${CLIENT_SUBNET_PREFIX}"*) : ;;
+        *) die "refusing: $ALLOWED is outside the client subnet" ;;
+    esac
+fi
+
+# ── config first, and only then runtime ──────────────────────────────────────
+#
+# This order is deliberate. If the config edit fails the peer keeps working and
+# nothing is lost; the reverse order would drop a paying customer's tunnel and
+# leave the peer in the file to return on reboot.
+
+BACKUP="${CONF}.bak-$(date +%Y%m%d-%H%M%S)"
+TMP="$(mktemp "${CONF}.XXXXXX")"
+trap 'rm -f "$TMP"' EXIT
+
+if [[ "$IN_CONFIG" -eq 1 ]]; then
+    before="$(grep -c '^\[Peer\]' "$CONF" || true)"
+
+    # Buffer each [Peer] block and emit it unless it carries the target key.
+    # Line-based rather than paragraph mode so the rest of the file — the
+    # [Interface] section, comments, blank lines — is reproduced byte for byte.
+    awk -v key="$PUB" '
+        function flush(   i) {
+            if (inpeer && !drop) for (i = 0; i < n; i++) print buf[i]
+        }
+        /^\[Peer\]/ { flush(); inpeer = 1; drop = 0; n = 0; buf[n++] = $0; next }
+        inpeer {
+            buf[n++] = $0
+            if ($0 ~ /^[[:space:]]*PublicKey[[:space:]]*=/) {
+                v = $0
+                sub(/^[^=]*=[[:space:]]*/, "", v)
+                gsub(/[[:space:]]+$/, "", v)
+                if (v == key) drop = 1
+            }
+            next
+        }
+        { print }
+        END { flush() }
+    ' "$CONF" > "$TMP"
+
+    after="$(grep -c '^\[Peer\]' "$TMP" || true)"
+
+    # Exactly one block, no more and no fewer. A rewrite that removed two peers
+    # — or none — is a bug in the matching above, and must not reach the file.
+    if [[ "$after" -ne $(( before - 1 )) ]]; then
+        die "refusing to write: peer blocks went from $before to $after"
+    fi
+    if grep -qF -- "$PUB" "$TMP"; then
+        die "refusing to write: key still present after removal"
+    fi
+    if ! grep -q '^\[Interface\]' "$TMP"; then
+        die "refusing to write: result has no [Interface] section"
+    fi
+
+    cp -p "$CONF" "$BACKUP"
+    cat "$TMP" > "$CONF"
+fi
+
+# ── runtime ──────────────────────────────────────────────────────────────────
+
+if [[ -n "$ALLOWED" ]]; then
+    if ! awg set "$IFACE" peer "$PUB" remove; then
+        die "config updated (backup at $BACKUP) but runtime removal failed"
+    fi
+fi
+
+echo "ok: removed ${ALLOWED:-<config-only>}"
