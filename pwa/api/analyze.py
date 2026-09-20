@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from openai import AsyncOpenAI
-from auth.jwt import require_auth
+from auth.jwt import require_admin
 from services.net_manager import get_analysis_data
 from config import OPENROUTER_API_KEY
 
@@ -57,7 +57,7 @@ async def _analyze(logs: str, metrics: str) -> str:
 
 
 @router.post("/api/analyze")
-async def analyze(_: dict = Depends(require_auth)):
+async def analyze(_: dict = Depends(require_admin)):
     loop = asyncio.get_running_loop()
     logs, metrics = await loop.run_in_executor(executor, get_analysis_data)
     result = await _analyze(logs, metrics)

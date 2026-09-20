@@ -46,3 +46,23 @@ async def require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
     return decode_token(credentials.credentials)
+
+
+async def require_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict:
+    """
+    Admin-only guard.
+
+    require_auth only proves the token is valid — every registered client holds
+    one. Routes that read production node state, expose other users' data or
+    grant subscriptions must check the role claim, which is set server-side in
+    the login handler and never taken from the request.
+    """
+    payload = decode_token(credentials.credentials)
+    if payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return payload

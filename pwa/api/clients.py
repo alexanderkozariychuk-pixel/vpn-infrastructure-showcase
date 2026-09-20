@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-from auth.jwt import require_auth
+from auth.jwt import require_admin
 from services.net_manager import get_bridge_status_data
 from db.base import get_db
 from db.models import Config
@@ -37,7 +37,7 @@ def _classify_handshake(handshake: str) -> str:
 
 
 @router.get("/api/clients")
-async def get_clients(_: dict = Depends(require_auth), db: AsyncSession = Depends(get_db)):
+async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     peers, err = await run_sync(get_bridge_status_data)
     if err:
         return {"ok": False, "error": err}
@@ -71,7 +71,7 @@ async def get_clients(_: dict = Depends(require_auth), db: AsyncSession = Depend
 
 
 @router.get("/api/clients/{name}")
-async def get_client(name: str, _: dict = Depends(require_auth), db: AsyncSession = Depends(get_db)):
+async def get_client(name: str, _: dict = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     peers, err = await run_sync(get_bridge_status_data)
     if err:
         return {"ok": False, "error": err}

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.base import get_db
 from db.models import User, Payment
-from auth.jwt import hash_password, require_auth
+from auth.jwt import hash_password, require_auth, require_admin
 from services.mailer import send_email, welcome_email
 import logging
 
@@ -74,7 +74,7 @@ async def register(
 @router.get("/api/client/list", response_model=list[UserResponse])
 async def list_clients(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_auth),
+    _: dict = Depends(require_admin),
 ):
     result = await db.execute(select(User))
     users = result.scalars().all()
@@ -95,7 +95,7 @@ async def list_clients(
 async def assign_peer(
     req: AssignPeerRequest,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(require_auth),
+    _: dict = Depends(require_admin),
 ):
     result = await db.execute(select(User).where(User.username == req.username))
     user = result.scalar_one_or_none()

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from services.net_manager import get_full_status_data, get_system_health, get_network_quality
-from auth.jwt import require_auth
+from auth.jwt import require_admin
 
 router = APIRouter()
 executor = ThreadPoolExecutor()
@@ -14,7 +14,7 @@ async def run_sync(func, *args):
 
 
 @router.get("/api/status")
-async def get_status(_: dict = Depends(require_auth)):
+async def get_status(_: dict = Depends(require_admin)):
     peers, err = await run_sync(get_full_status_data)
     if err:
         return {"ok": False, "error": err}
@@ -41,7 +41,7 @@ async def get_status(_: dict = Depends(require_auth)):
 
 
 @router.get("/api/health")
-async def get_health(_: dict = Depends(require_auth)):
+async def get_health(_: dict = Depends(require_admin)):
     local_m, remote_m, err = await run_sync(get_system_health)
     net_q = await run_sync(get_network_quality)
 
