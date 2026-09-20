@@ -1,14 +1,18 @@
-import asyncio
 """
-services/provisioner.py — Auto-provisioning of AWG peers after payment.
+services/provisioner.py — issuing and activating AWG peers.
 
-Flow (Basic plan):
+Issuing a device:
   1. Generate AWG keypair + PSK
-  2. Find next free IP in the Basic pool (10.88.88.42–10.88.88.99)
-  3. Add peer to Bridge awg0 via SSH (awg set)
-  4. Save Config row to DB (private key encrypted with Fernet)
-  5. Mark user as subscribed
+  2. Find the next free address in the client pool
+  3. Add the peer to Bridge awg0 through the pwa-add-peer wrapper
+  4. Save a Config row (private key and PSK encrypted with Fernet)
+
+Activating a payment extends `subscribed_until` from whichever is later — now
+or the end of the period already paid for — and issues a device only on a first
+purchase. The two are separate on purpose: a renewal is not a request for
+another peer, which is what a repeat purchase used to produce.
 """
+import asyncio
 import os
 import base64
 import subprocess
@@ -22,6 +26,7 @@ from cryptography.hazmat.primitives.serialization import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db.models import User, Config, Payment
+from config import plan_info
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +44,15 @@ AWG_PARAMS = {
     "H3": "970047041",  "H4": "133143559",
 }
 
-# IP pools per plan
-POOLS = {
-    "Basic":  ("10.88.88", 42, 99),   # 10.88.88.42 – 10.88.88.99
-    "Family": ("10.88.88", 100, 149), # reserved for future
-}
+# One address pool for every client, regardless of plan.
+#
+# Splitting the subnet per plan made sense when a subscription meant exactly
+# one peer. With tiers that allow several devices, the tier no longer predicts
+# how many addresses a customer consumes, and a per-plan range would run out
+# while the neighbouring one sat empty. Addresses below .42 are the hand-issued
+# peers that predate the portal; the node's own list is what is actually
+# checked, so they are excluded whether or not they appear in this database.
+CLIENT_POOL = ("10.88.88", 42, 199)
 
 # Fernet key for encrypting private keys in DB
 _fernet_key = os.getenv("FERNET_KEY")
@@ -139,10 +148,14 @@ def _decrypt(cipher: str) -> str:
 
 # ── find free IP ───────────────────────────────────────────────────────
 
-async def _find_free_ip(db: AsyncSession, plan: str, exclude: set[str] | None = None) -> str | None:
-    """Return next available VPN IP for the given plan."""
-    prefix, start, end = POOLS.get(plan, ("10.88.88", 42, 99))
-    result = await db.execute(select(Config.peer_ip))
+async def _find_free_ip(db: AsyncSession, exclude: set[str] | None = None) -> str | None:
+    """Return the next free address in the client pool."""
+    prefix, start, end = CLIENT_POOL
+    # Only active rows hold an address. A revoked config's peer is off the node,
+    # so keeping its address reserved would leak the pool one expiry at a time.
+    # The node's own list arrives separately in `exclude` and remains the
+    # authority — this query is the mirror, and the mirror can be stale.
+    result = await db.execute(select(Config.peer_ip).where(Config.is_active.is_(True)))
     used = {row[0] for row in result.fetchall() if row[0]}
     if exclude:
         used |= exclude
@@ -227,11 +240,18 @@ def _build_conf(priv: str, psk: str, peer_ip: str) -> str:
 
 # ── main entry point ──────────────────────────────────────────────────
 
-async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> bool:
+async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Config | None:
     """
-    Full auto-provisioning for Basic plan:
-      generate keys → find free IP → add to Bridge → save Config → activate user.
-    Returns True on success.
+    Create one peer for a user: keys → free address → node → Config row.
+
+    Deliberately does not touch the subscription. Issuing a device and paying
+    for a plan are different events — a customer adding a second phone in the
+    middle of a paid period is not making a payment, and a renewal is not a
+    request for another device. Keeping them apart is what stopped a repeat
+    purchase from silently handing out a second peer.
+
+    The row is added to the session but not committed: the caller decides what
+    else belongs in the same transaction.
     """
     try:
         priv = _awg_genkey()
@@ -239,7 +259,7 @@ async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> boo
         psk  = _awg_genpsk()
     except Exception as e:
         logger.error("Key generation failed: %s", e)
-        return False
+        return None
 
     client_name = f"auto-{user.username}"
     loop = asyncio.get_event_loop()
@@ -249,29 +269,28 @@ async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> boo
     logger.info("Bridge reports %d addresses in use", len(tried_ips))
 
     peer_ip = None
-    peer_ip = None
-    for attempt in range(10):
-        peer_ip = await _find_free_ip(db, "Basic", exclude=tried_ips)
+    for _ in range(10):
+        peer_ip = await _find_free_ip(db, exclude=tried_ips)
         if not peer_ip:
-            logger.error("No free IPs in Basic pool")
-            return False
-        ok, reason = await loop.run_in_executor(None, _add_peer_to_bridge, pub, psk, peer_ip, client_name)
+            logger.error("No free addresses left in the client pool")
+            return None
+        ok, reason = await loop.run_in_executor(
+            None, _add_peer_to_bridge, pub, psk, peer_ip, client_name
+        )
         if ok:
             break
         tried_ips.add(peer_ip)
         if "ip in use" not in reason:
             logger.error("Failed to add peer to Bridge for user %s: %s", user.username, reason)
-            return False
+            return None
         logger.warning("IP %s already in use on Bridge (stale local tracking) - retrying with next IP", peer_ip)
     else:
         logger.error("Exhausted retries finding a free IP for user %s", user.username)
-        return False
+        return None
 
-    # save Config to DB
-    conf_text = _build_conf(priv, psk, peer_ip)
     config = Config(
         user_id=user.id,
-        name="Basic",
+        name=name,
         peer_ip=peer_ip,
         private_key=_encrypt(priv),
         public_key=pub,
@@ -279,31 +298,90 @@ async def provision_basic(user: User, payment: Payment, db: AsyncSession) -> boo
         is_active=True,
     )
     db.add(config)
+    logger.info("Issued config '%s' for %s → %s", name, user.username, peer_ip)
+    return config
 
-    # activate subscription
+
+async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bool:
+    """
+    Turn a confirmed payment into subscription time.
+
+    Extends from whichever is later — now, or the end of the period already
+    paid for — so renewing early keeps the days that are left instead of
+    throwing them away.
+
+    A first purchase gets one config. A renewal gets none: the customer already
+    has their devices, and issuing another peer per payment is how a repeat
+    purchase used to leave an extra tunnel behind. Additional devices, up to
+    the plan's limit, are requested from the portal.
+    """
+    info = plan_info(payment.plan)
+    if not info:
+        logger.error("Unknown plan %r on payment %s — not activating", payment.plan, payment.id)
+        return False
+
+    existing = (
+        await db.execute(
+            select(Config).where(Config.user_id == user.id, Config.is_active.is_(True))
+        )
+    ).scalars().all()
+
+    if not existing:
+        config = await issue_config(user, db, name="device-1")
+        if config is None:
+            # The payment is real; the peer is not. Leave the payment pending
+            # so the failure stays visible and recovery is deliberate — marking
+            # it paid here would hide a customer who owes nothing and has
+            # nothing.
+            logger.error("Provisioning failed for %s on payment %s", user.username, payment.id)
+            return False
+        user.peer_ip = config.peer_ip
+
     now = datetime.now(timezone.utc)
+    base = max(now, user.subscribed_until or now)
+
     user.is_subscribed = True
-    user.plan = "Basic"
-    user.peer_ip = peer_ip
-    user.subscribed_until = now + timedelta(days=30)
+    user.plan = payment.plan
+    user.subscribed_until = base + timedelta(days=info["days"])
     payment.status = "paid"
     payment.paid_at = now
 
     await db.commit()
-    logger.info("Provisioned Basic for user %s → %s", user.username, peer_ip)
+    logger.info(
+        "Activated %s for %s until %s (%s)",
+        payment.plan, user.username, user.subscribed_until.date(),
+        "renewal" if existing else "first purchase",
+    )
     return True
 
 
-async def get_client_config(user: User, db: AsyncSession) -> str | None:
-    """Return decrypted .conf text for the user's active config."""
+async def active_configs(user: User, db: AsyncSession) -> list[Config]:
+    """Every config the user currently holds, newest first."""
     result = await db.execute(
         select(Config)
-        .where(Config.user_id == user.id, Config.is_active == True)
+        .where(Config.user_id == user.id, Config.is_active.is_(True))
         .order_by(Config.created_at.desc())
     )
-    config = result.scalar_one_or_none()
-    if not config:
-        return None
-    priv = _decrypt(config.private_key)
-    psk  = _decrypt(config.preshared_key)
-    return _build_conf(priv, psk, config.peer_ip)
+    return list(result.scalars().all())
+
+
+def render_config(config: Config) -> str:
+    """Decrypted .conf text for one config row."""
+    return _build_conf(
+        _decrypt(config.private_key),
+        _decrypt(config.preshared_key),
+        config.peer_ip,
+    )
+
+
+async def get_client_config(user: User, db: AsyncSession) -> str | None:
+    """
+    The user's most recent config, as .conf text.
+
+    Kept for the single-config view in the portal. This used to call
+    scalar_one_or_none on a query that can match several rows, which raises —
+    so the first customer with two devices would have got a 500 rather than a
+    config.
+    """
+    configs = await active_configs(user, db)
+    return render_config(configs[0]) if configs else None

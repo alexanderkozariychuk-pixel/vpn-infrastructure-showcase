@@ -6,12 +6,11 @@ Flow:
        Heleket create_invoice, returns {url} to redirect the user
   user pays on Heleket
     -> POST /api/payment/webhook (public) -> verify signature, on 'paid'/'paid_over'
-       calls provision_basic -> AWG peer added to Bridge, Config saved to DB.
+       calls activate_payment -> subscription extended, and on a first purchase
+       an AWG peer is added to the Bridge and its Config saved.
 """
 import os
-import asyncio
 import logging
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +19,8 @@ from db.base import get_db
 from db.models import User, Payment
 from auth.jwt import require_auth
 from services import heleket
-from services.provisioner import provision_basic
+from services.provisioner import activate_payment
+from config import PLANS, plan_info
 from fastapi.responses import PlainTextResponse
 from services import freekassa
 
@@ -28,10 +28,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 SITE_URL = os.getenv("SITE_URL", "https://sov3r3ign.com")
-
-PLANS = {
-    "Basic": {"amount": "300", "currency": "RUB", "days": 30},
-}
 
 PAID_STATUSES = {"paid", "paid_over"}
 
@@ -112,19 +108,13 @@ async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         result = await db.execute(select(User).where(User.id == payment.user_id))
         user = result.scalar_one_or_none()
 
-        if user and payment.plan == "Basic":
-            # run provisioner in thread (SSH calls are blocking)
-            ok = await provision_basic(user, payment, db)
+        if user:
+            # One path for every plan. Branching on the plan name is what left
+            # anything that was not "Basic" activated with no config at all.
+            ok = await activate_payment(user, payment, db)
             if not ok:
-                logger.error("Provisioning failed for user %s", user.username)
-                # still ack to Heleket — manual recovery needed
-        elif user:
-            # other plans: just activate, no auto-provisioning yet
-            payment.status = "paid"
-            payment.paid_at = datetime.now(timezone.utc)
-            user.is_subscribed = True
-            user.plan = payment.plan
-            await db.commit()
+                logger.error("Activation failed for user %s on order %s", user.username, order_id)
+                # still ack to Heleket — manual recovery, no retry storm
     else:
         payment.status = status or "unknown"
         await db.commit()
@@ -211,7 +201,8 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
         paid = float(params.get("AMOUNT", "0"))
     except ValueError:
         paid = 0.0
-    expected = float(PLANS[payment.plan]["amount"]) if payment.plan in PLANS else None
+    info = plan_info(payment.plan)
+    expected = float(info["amount"]) if info else None
     if expected is None or paid + 0.01 < expected:
         logger.error("FreeKassa amount mismatch on order %s: got %s, expected %s",
                      order_id, paid, expected)
@@ -225,19 +216,12 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
         logger.error("FreeKassa webhook: user missing for order %s", order_id)
         return "YES"
 
-    if payment.plan == "Basic":
-        # Same provisioning path as Heleket — blocking SSH goes to the
-        # executor inside provision_basic, database work stays in this loop.
-        ok = await provision_basic(user, payment, db)
-        if not ok:
-            logger.error("Provisioning failed for user %s (FreeKassa order %s)",
-                         user.username, order_id)
-            # Still acknowledge — manual recovery, no retry storm.
-    else:
-        payment.status = "paid"
-        payment.paid_at = datetime.now(timezone.utc)
-        user.is_subscribed = True
-        user.plan = payment.plan
-        await db.commit()
+    # Same activation path as Heleket — blocking SSH goes to the executor
+    # inside issue_config, database work stays in this loop.
+    ok = await activate_payment(user, payment, db)
+    if not ok:
+        logger.error("Activation failed for user %s (FreeKassa order %s)",
+                     user.username, order_id)
+        # Still acknowledge — manual recovery, no retry storm.
 
     return "YES"

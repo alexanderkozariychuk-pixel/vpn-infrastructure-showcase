@@ -17,6 +17,7 @@ Two things fix that, and both are needed:
     while the tunnel keeps carrying traffic.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -87,7 +88,11 @@ async def expire_due_subscriptions(db: AsyncSession, now: datetime | None = None
 
         all_removed = True
         for config in configs:
-            ok, reason = _remove_peer_from_bridge(config.public_key)
+            # SSH is blocking; keep it off the event loop so this behaves the
+            # same way when called from a request as it does from cron.
+            ok, reason = await asyncio.get_event_loop().run_in_executor(
+                None, _remove_peer_from_bridge, config.public_key
+            )
             if ok:
                 config.is_active = False
                 stats["peers_removed"] += 1
