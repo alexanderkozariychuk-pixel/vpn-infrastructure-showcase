@@ -75,15 +75,25 @@ trap 'rm -f "$TMP"' EXIT
 if [[ "$IN_CONFIG" -eq 1 ]]; then
     before="$(grep -c '^\[Peer\]' "$CONF" || true)"
 
-    # Buffer each [Peer] block and emit it unless it carries the target key.
-    # Line-based rather than paragraph mode so the rest of the file — the
-    # [Interface] section, comments, blank lines — is reproduced byte for byte.
+    # Buffer a whole peer block and emit it unless it carries the target key.
+    #
+    # pwa-add-peer writes each peer as "### <name>" followed by [Peer], so the
+    # block starts at the comment, not at [Peer] — dropping from [Peer] alone
+    # would leave the name behind and the config would slowly fill with
+    # headers for clients that no longer exist.
+    #
+    # Line-based rather than paragraph mode, so the [Interface] section and
+    # everything outside a peer block is reproduced byte for byte. Peers added
+    # by hand, with no ### header, are handled by starting a new block at
+    # [Peer] when one is already open.
     awk -v key="$PUB" '
         function flush(   i) {
-            if (inpeer && !drop) for (i = 0; i < n; i++) print buf[i]
+            if (!drop) for (i = 0; i < n; i++) print buf[i]
+            n = 0; drop = 0; seen_peer = 0
         }
-        /^\[Peer\]/ { flush(); inpeer = 1; drop = 0; n = 0; buf[n++] = $0; next }
-        inpeer {
+        /^###/      { flush(); buf[n++] = $0; next }
+        /^\[Peer\]/ { if (seen_peer) flush(); seen_peer = 1; buf[n++] = $0; next }
+        n > 0 {
             buf[n++] = $0
             if ($0 ~ /^[[:space:]]*PublicKey[[:space:]]*=/) {
                 v = $0
