@@ -4080,3 +4080,159 @@ instead of extending the existing one.
 
 
 
+---
+
+## 2026-09-20
+
+### 🚨 The admin panel was open to every registered customer
+Eight routes were guarded by `require_auth`, which only proves the token
+decodes — and every client holds one of those. The route names are
+published in this repository.
+
+```
+POST /api/admin/assign-peer   set is_subscribed on any account, by username
+GET  /api/client/list         every user's email address
+GET  /api/clients[/{name}]    live peer table from the entry node
+GET  /api/logs[/{service}]    journalctl from the production nodes
+GET  /api/status, /api/health node state over the provisioning SSH path
+POST /api/analyze             the LLM path, billed per call
+```
+
+The first line is a free subscription. The rest is the admin panel. Fixed
+with `require_admin`, which checks the `role` claim — set server-side at
+login, never read from the request. The client-facing routes stay on
+`require_auth`.
+
+Worth noting how it survived: the admin is a username with a password, so it
+*felt* separated. The token it received was shaped exactly like everyone
+else's, and nothing ever compared them.
+
+### 🚨 Subscriptions never ended
+`subscribed_until` was written at payment time and read nowhere. Access was
+gated on the `is_subscribed` boolean alone, nothing set it back to False, and
+no code in the project removed a peer from a node. One payment bought
+permanent access; the difference between a one-month and a six-month plan was
+decorative. Selling the longer periods in that state would have been selling
+lifetime access at a six-month price.
+
+Three parts now: a `pwa-del-peer` wrapper on the node, a gate that compares
+against the clock, and an hourly sweep. The sweep only records a revocation
+the node confirmed — a row marked revoked while its peer still carries traffic
+is the state nobody thinks to look for.
+
+### 🐛 Three billing defects, each losing money in a different direction
+`days` was hardcoded to 30 in the activation path, so a six-month plan would
+have granted a month. The end date was overwritten instead of extended, so
+renewing ten days early threw those days away. And provisioning ran on every
+payment, so a renewal issued a second peer and left it behind — the one from
+yesterday's `📋 Next`, confirmed.
+
+Issuing a device and paying for a plan are now separate operations. A first
+purchase gets one device, a renewal gets none, the rest are requested from the
+portal up to the plan's limit.
+
+Two more surfaced while fixing those. The `payment.plan == "Basic"` branch in
+both webhooks quietly activated any other plan with no config at all — exactly
+the state Extended would have shipped in. And `get_client_config` called
+`scalar_one_or_none` on a query matching every active config, which raises on
+more than one row: the first customer with two devices would have got a 500
+instead of a `.conf` file.
+
+### 🛠 Plans, and a pricing page that can disagree with the server
+Two tiers, three periods. Basic carries two devices — a phone and a laptop is
+what one person has, not an upgrade — and Extended five. The plan key encodes
+tier and period together, so `Payment.plan` carries everything a webhook needs
+without a schema change.
+
+The portal keeps its own copy of the table, because it renders prices before
+any request is made. A test parses that copy out of the HTML and compares it
+against the server's. A stale number there cannot be *paid* — the server reads
+the amount from its own table — but it can be *shown*, and a customer who
+clicks 1700 and lands on a gateway asking 3200 does not come back.
+
+That test caught a real error immediately: the discount labels said −17% and
+−22%, figures worked out against the old 300 ₽ monthly price and never
+recomputed when the table moved to 350 ₽. The real discounts are 12.8–14.3%
+and 17.9–19.0%. One label sits on a tab shared
+by both tiers, so it has to hold for the worse of the two; the test now
+asserts the claim is never above what any tier actually gives. Advertising may
+understate, never overstate.
+
+### 🔎 Reading pwa-add-peer before trusting my own assumptions about it
+`pwa-del-peer` was written against what the portal's code implied about the
+config format. Reading the existing wrapper on the node showed it writes each
+peer as `### <name>` followed by `[Peer]` — so a block starts at the comment.
+Dropping from `[Peer]` alone would have left the header behind, and the config
+would have slowly filled with names of clients that no longer exist. In a file
+that gets read at three in the morning.
+
+Nothing about that was visible from the application side. The tests passed
+either way.
+
+### ✅ Expiry verified on the live system, not only in tests
+Wrapper installed, sudoers extended after a `visudo -c` on a copy, console
+open throughout. Then, end to end:
+
+```
+baseline                      38 runtime / 38 config / 34 headers
+pwa-add-peer deltest          39 / 39
+pwa-del-peer <key>            38 / 38 / 33   ok: removed 10.88.88.198/32
+```
+
+Malformed key, absent peer and empty call all refused before anything opened.
+The container → SSH → sudoers → wrapper chain checked separately with a bad
+key, which came back `error: malformed public key` from inside the container.
+
+Then the real thing: `test1` expired by hand in the database, sweep run
+manually.
+
+```
+1 due, 1 revoked, 1 peers removed, 0 failures
+37 runtime / 37 config / 32 headers
+is_subscribed = f, is_active = f
+```
+
+32 live handshakes before and after — no real client touched. Timestamped
+backup written on every removal.
+
+### 📌 38 peers, 33 headers
+Five peers predate the portal and were added by hand. They are not in the
+database, so expiry does not apply to them at all: those people use the
+service outside billing entirely. That is where converting existing users has
+to start.
+
+### 🐛 CI passed until the tests covered something real
+The Tests job installed `requirements-dev.txt` alone — four tools. That was
+enough while the suite touched one dependency-free module, and collection
+failed the moment it imported fastapi, sqlalchemy and dotenv. The tests
+exercise the application, so the application's dependencies are test
+dependencies. Verified by building a clean virtualenv and running the exact
+install command the workflow now uses.
+
+The async fixture also leaked a loop per `asyncio.run()` while the session
+stayed bound to the first one, so aiosqlite's thread raised "Event loop is
+closed" at teardown. The suite passed regardless, which is the reason to fix
+it: a warning that only appears at teardown is what a flaky failure looks like
+before it starts failing.
+
+First attempt at that fix failed instructively. The loop went in a module
+global — but pytest imports `conftest.py` as a plugin, and `from conftest
+import ...` in a test module produces a *second copy* of the file. The global
+the fixture set in one copy was still None in the other. It now travels on the
+fixture object.
+
+### 📋 Next
+A real card payment through the whole chain — checkout, redirect, webhook,
+activation, config, email. It is the only link that has never carried live
+money, and the first paying customer is the wrong place to discover that.
+
+Refund terms in the offer before selling six-month subscriptions, not after.
+
+The monitoring stack is still gone with fra-aeza. Taking money six months up
+front for infrastructure nobody can see is the wrong order.
+
+Smaller: `Payment` has no `provider` column, so rows from the two gateways are
+indistinguishable — which will matter at the first refund. `pwa-add-peer`,
+`pwa-awg-show` and `pwa-logs` still live only on the nodes, with no history.
+`docs/troubleshooting.md` is half about 3X-UI, Xray and Uptime Kuma, all of
+which are in `archive/`.
