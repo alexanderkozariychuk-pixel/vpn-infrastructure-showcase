@@ -786,9 +786,48 @@
 
 
     /* PRICING */
+
+    /* Period selector — one row above the plan cards. The cards always show
+       the selected period, so the price on screen is the price charged. */
+    .period-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .period-tab {
+      flex: 1;
+      min-width: 92px;
+      padding: 10px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+      text-align: center;
+    }
+    .period-tab:hover { border-color: var(--border-bright); color: var(--text-bright); }
+    .period-tab.active { border-color: var(--accent); color: var(--accent); }
+    .period-save {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      opacity: 0.75;
+    }
+    .plan-permo {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: -4px;
+      margin-bottom: 8px;
+      min-height: 16px;
+    }
+
     .plans-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 16px;
       margin-bottom: 24px;
     }
@@ -1413,22 +1452,53 @@
 
           <!-- Block 2: plan selection -->
           <div class="card-title" style="margin:8px 0 16px;padding:0" data-i18n="choose-plan">Choose a plan</div>
-          <div class="plans-grid">
-            <div class="plan-card featured">
-              <div class="plan-badge" data-i18n="badge-popular">Popular</div>
-              <div class="plan-name" data-i18n="plan-basic-name">Basic</div>
-              <div class="plan-desc" data-i18n="plan-basic-desc">1 device · Standard exit</div>
-              <div class="plan-price">300 <span data-i18n="per-mo">₽/mo</span></div>
-              <div class="plan-promo">&nbsp;</div>
-              <ul class="plan-features">
-                <li data-i18n="feat-1dev">1 device config</li>
-                <li data-i18n="feat-home">Works on home WiFi</li>
-                <li data-i18n="feat-mobile">Works on mobile network</li>
-                <li data-i18n="feat-stockholm">Obfuscated exit node</li>
-              </ul>
-              <button class="plan-btn" onclick="openCheckout('Basic')" data-i18n="btn-get-started">Get Started →</button>
+
+          <div id="plans-block">
+            <div class="period-tabs" id="period-tabs">
+              <button class="period-tab" data-period="1m" onclick="selectPeriod('1m')">
+                <span data-i18n="period-1m">1 month</span>
+                <span class="period-save">&nbsp;</span>
+              </button>
+              <button class="period-tab" data-period="3m" onclick="selectPeriod('3m')">
+                <span data-i18n="period-3m">3 months</span>
+                <span class="period-save" data-i18n="period-save-3m">−12%</span>
+              </button>
+              <button class="period-tab active" data-period="6m" onclick="selectPeriod('6m')">
+                <span data-i18n="period-6m">6 months</span>
+                <span class="period-save" data-i18n="period-save-6m">−17%</span>
+              </button>
             </div>
 
+            <div class="plans-grid">
+              <div class="plan-card" data-tier="basic">
+                <div class="plan-name" data-i18n="plan-basic-name">Basic</div>
+                <div class="plan-desc" data-i18n="plan-basic-desc">2 devices · Obfuscated exit</div>
+                <div class="plan-price"><span class="plan-amount">1700</span> <span data-i18n="rub">₽</span></div>
+                <div class="plan-permo"></div>
+                <ul class="plan-features">
+                  <li data-i18n="feat-percfg">A separate config per device</li>
+                  <li data-i18n="feat-home">Works on home WiFi</li>
+                  <li data-i18n="feat-mobile">Works on mobile network</li>
+                  <li data-i18n="feat-stockholm">Obfuscated exit node</li>
+                </ul>
+                <button class="plan-btn" onclick="openCheckout('basic')" data-i18n="btn-get-started">Get Started →</button>
+              </div>
+
+              <div class="plan-card featured" data-tier="ext">
+                <div class="plan-badge" data-i18n="badge-popular">Popular</div>
+                <div class="plan-name" data-i18n="plan-ext-name">Extended</div>
+                <div class="plan-desc" data-i18n="plan-ext-desc">5 devices · Whole household</div>
+                <div class="plan-price"><span class="plan-amount">3200</span> <span data-i18n="rub">₽</span></div>
+                <div class="plan-permo"></div>
+                <ul class="plan-features">
+                  <li data-i18n="feat-percfg">A separate config per device</li>
+                  <li data-i18n="feat-home">Works on home WiFi</li>
+                  <li data-i18n="feat-mobile">Works on mobile network</li>
+                  <li data-i18n="feat-stockholm">Obfuscated exit node</li>
+                </ul>
+                <button class="plan-btn featured-btn" onclick="openCheckout('ext')" data-i18n="btn-get-started">Get Started →</button>
+              </div>
+            </div>
           </div>
 
                     <!-- Block 3: checkout -->
@@ -1463,16 +1533,20 @@
             <div class="checkout-side">
               <div class="checkout-side-title" data-i18n="checkout-order">Ваш заказ</div>
               <div class="checkout-row">
-                <span id="checkout-plan">Basic</span>
-                <span id="checkout-price">300 ₽</span>
+                <span id="checkout-plan">—</span>
+                <span id="checkout-price">—</span>
               </div>
               <div class="checkout-row checkout-muted">
                 <span data-i18n="checkout-period">Период</span>
-                <span data-i18n="checkout-month">1 месяц</span>
+                <span id="checkout-period-value">—</span>
+              </div>
+              <div class="checkout-row checkout-muted">
+                <span data-i18n="checkout-devices">Устройств</span>
+                <span id="checkout-devices">—</span>
               </div>
               <div class="checkout-total">
                 <span data-i18n="checkout-total">Итого</span>
-                <span id="checkout-total">300 ₽</span>
+                <span id="checkout-total">—</span>
               </div>
                <button class="checkout-back" onclick="closeCheckout()" data-i18n="checkout-back">Назад к тарифам</button>
             </div>
@@ -1840,7 +1914,7 @@ const translations = {
     'feat-3dev': '3 device configs',
     'feat-home': 'Works on home WiFi',
     'feat-mobile': 'Works on mobile network',
-    'feat-stockholm': 'Obfuscated exit node',
+    'feat-stockholm': 'Traffic obfuscated against DPI',
     'feat-basic-incl': 'Basic plan included',
     'feat-allowlist': 'Allowlist bypass config',
     'feat-residential': 'Residential exit node',
@@ -2001,11 +2075,21 @@ const translations = {
     'page-plans': 'Plans',
     'page-plans-sub': 'Choose your access level',
     'plan-basic-name': 'Basic',
-    'plan-basic-desc': '1 device · Standard exit',
-    'plan-basic-promo': 'First month — 250 ₽',
+    'plan-basic-desc': '2 devices · Obfuscated exit',
+    'plan-basic-promo': '',
+    'plan-ext-name': 'Extended',
+    'plan-ext-desc': '5 devices · Whole household',
     'plan-fam-name': 'Family',
     'plan-fam-desc': '3 devices · Best value',
     'badge-popular': 'Popular',
+    'rub': '₽',
+    'period-1m': '1 month',
+    'period-3m': '3 months',
+    'period-6m': '6 months',
+    'period-save-3m': '−12%',
+    'period-save-6m': '−17%',
+    'feat-percfg': 'A separate config per device',
+    'checkout-devices': 'Devices',
     'btn-get-started': 'Get Started →',
     'payment-label': 'PAYMENT · CRYPTO BILLING COMING SOON',
     'payment-sub': 'To subscribe now — contact support on the site',
@@ -2063,7 +2147,7 @@ const translations = {
     'feat-3dev': '3 конфига устройств',
     'feat-home': 'Работает на домашнем WiFi',
     'feat-mobile': 'Работает в мобильной сети',
-    'feat-stockholm': 'Обфусцированный выходной узел',
+    'feat-stockholm': 'Обфускация трафика под DPI',
     'feat-basic-incl': 'Базовый тариф включён',
     'feat-allowlist': 'Конфиг обхода белых списков',
     'feat-residential': 'Резидентный выходной узел',
@@ -2224,11 +2308,21 @@ const translations = {
     'page-plans': 'Тарифы',
     'page-plans-sub': 'Выберите подходящий план',
     'plan-basic-name': 'Базовый',
-    'plan-basic-desc': '1 устройство · Стандартный выход',
-    'plan-basic-promo': 'Первый месяц — 250 ₽',
+    'plan-basic-desc': '2 устройства · Обфусцированный выход',
+    'plan-basic-promo': '',
+    'plan-ext-name': 'Расширенный',
+    'plan-ext-desc': '5 устройств · На всю семью',
     'plan-fam-name': 'Семейный',
     'plan-fam-desc': '3 устройства · Лучшее соотношение',
     'badge-popular': 'Популярный',
+    'rub': '₽',
+    'period-1m': '1 месяц',
+    'period-3m': '3 месяца',
+    'period-6m': '6 месяцев',
+    'period-save-3m': '−12%',
+    'period-save-6m': '−17%',
+    'feat-percfg': 'Отдельный конфиг на каждое устройство',
+    'checkout-devices': 'Устройств',
     'btn-get-started': 'Подключиться →',
     'payment-label': 'ОПЛАТА · КРИПТОБИЛЛИНГ СКОРО',
     'payment-sub': 'Для подключения — напишите в поддержку на сайте',
@@ -2278,6 +2372,8 @@ function toggleLang() {
   localStorage.setItem('sov_lang', currentLang);
   document.getElementById('lang-btn').textContent = currentLang.toUpperCase();
   applyTranslations();
+  // The per-month line is built in JS, so applyTranslations cannot reach it.
+  if (typeof renderPlans === 'function') renderPlans();
 }
 
 (function initLang() {
@@ -2455,23 +2551,88 @@ async function loadPaymentHistory() {
 
 let checkoutPlan = null;
 
-function openCheckout(plan) {
+// Mirror of PLANS in pwa/config.py. Display only: the server reads the price
+// from its own table and compares it against what the gateway reports, so a
+// stale number here shows the customer the wrong figure but cannot be paid.
+// Keep the two in step when prices change.
+const PLANS = {
+  'basic-1m': {tier: 'basic', configs: 2, days: 30,  amount: 350},
+  'basic-3m': {tier: 'basic', configs: 2, days: 90,  amount: 900},
+  'basic-6m': {tier: 'basic', configs: 2, days: 180, amount: 1700},
+  'ext-1m':   {tier: 'ext',   configs: 5, days: 30,  amount: 650},
+  'ext-3m':   {tier: 'ext',   configs: 5, days: 90,  amount: 1700},
+  'ext-6m':   {tier: 'ext',   configs: 5, days: 180, amount: 3200},
+};
+
+// Six months is preselected because it is the one worth buying, for the
+// customer and for the service alike.
+let selectedPeriod = '6m';
+
+function planKey(tier, period) { return `${tier}-${period || selectedPeriod}`; }
+
+function selectPeriod(period) {
+  if (!PLANS[`basic-${period}`]) return;
+  selectedPeriod = period;
+  document.querySelectorAll('.period-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.period === period);
+  });
+  renderPlans();
+}
+
+function renderPlans() {
+  const months = {'1m': 1, '3m': 3, '6m': 6}[selectedPeriod] || 1;
+
+  document.querySelectorAll('.plan-card[data-tier]').forEach(card => {
+    const plan = PLANS[planKey(card.dataset.tier)];
+    if (!plan) return;
+
+    const amount = card.querySelector('.plan-amount');
+    if (amount) amount.textContent = plan.amount;
+
+    // Per-month figure, so the discount on the longer periods is legible
+    // rather than something the customer has to work out.
+    const permo = card.querySelector('.plan-permo');
+    if (permo) {
+      permo.textContent = months > 1
+        ? `${Math.round(plan.amount / months)} ${t('per-mo')}`
+        : '';
+    }
+  });
+}
+
+function openCheckout(tier) {
   if (!token) { showView('login', 'client'); return; }
-  checkoutPlan = plan;
 
-  const grid = document.querySelector('.plans-grid');
-  const co   = document.getElementById('checkout');
-  const out  = document.getElementById('pay-status');
+  const key  = planKey(tier);
+  const plan = PLANS[key];
+  if (!plan) return;
+  checkoutPlan = key;
 
-  if (grid) grid.style.display = 'none';
+  const block = document.getElementById('plans-block');
+  const co    = document.getElementById('checkout');
+  const out   = document.getElementById('pay-status');
+
+  const name = t(tier === 'ext' ? 'plan-ext-name' : 'plan-basic-name');
+  const price = `${plan.amount} ₽`;
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  set('checkout-plan', name);
+  set('checkout-price', price);
+  set('checkout-total', price);
+  set('checkout-period-value', t(`period-${selectedPeriod}`));
+  set('checkout-devices', plan.configs);
+
+  if (block) block.style.display = 'none';
   if (co) co.style.display = 'grid';
   if (out) { out.removeAttribute('data-i18n'); out.textContent = ''; }
 }
 
 function closeCheckout() {
-  const grid = document.querySelector('.plans-grid');
-  const co   = document.getElementById('checkout');
-  if (grid) grid.style.display = '';
+  const block = document.getElementById('plans-block');
+  const co    = document.getElementById('checkout');
+  if (block) block.style.display = '';
   if (co) co.style.display = 'none';
   checkoutPlan = null;
 }
@@ -2967,6 +3128,7 @@ function escHtml(s) {
     }
   }
   applyTranslations();
+  renderPlans();
   updateMapImage();
 })();
 </script>
