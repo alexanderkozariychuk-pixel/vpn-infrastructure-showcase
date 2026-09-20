@@ -15,7 +15,6 @@ than a mock:
     of state nobody thinks to look for.
 """
 
-import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -26,9 +25,6 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-a-real-key")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("FERNET_KEY", "8ZVnLbQ6fJ0xTjWn7l5cPq2sR9dY4hK1vG3mA6uE0oI=")
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
-
-from db.base import Base  # noqa: E402
 from db.models import Config, User  # noqa: E402
 from services import subscriptions  # noqa: E402
 from services.subscriptions import expire_due_subscriptions, has_active_subscription  # noqa: E402
@@ -73,22 +69,6 @@ def test_flag_cleared_is_refused_even_with_a_future_date():
 
 # ── the sweep ───────────────────────────────────────────────────────────────
 
-@pytest.fixture
-def db():
-    """A real session against an in-memory database, not a mock."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    maker = async_sessionmaker(engine, expire_on_commit=False)
-
-    async def _setup():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        return maker()
-
-    session = asyncio.run(_setup())
-    yield session
-    asyncio.run(session.close())
-
-
 def _seed(db, username, until, n_configs=1):
     # The id default fires at flush, so it is set here: the Config rows need
     # to reference it before anything reaches the database.
@@ -119,9 +99,9 @@ def test_expired_user_is_revoked_and_peers_removed(db, monkeypatch):
     )
 
     user, _ = _seed(db, "expired", NOW - timedelta(days=1), n_configs=2)
-    asyncio.run(db.commit())
+    db.run(db.commit())
 
-    stats = asyncio.run(expire_due_subscriptions(db, now=NOW))
+    stats = db.run(expire_due_subscriptions(db, now=NOW))
 
     assert stats["users_revoked"] == 1
     assert stats["peers_removed"] == 2
@@ -136,9 +116,9 @@ def test_still_paid_user_is_left_alone(db, monkeypatch):
     )
 
     user, _ = _seed(db, "paying", NOW + timedelta(days=5))
-    asyncio.run(db.commit())
+    db.run(db.commit())
 
-    stats = asyncio.run(expire_due_subscriptions(db, now=NOW))
+    stats = db.run(expire_due_subscriptions(db, now=NOW))
 
     assert stats["users_due"] == 0
     assert user.is_subscribed is True
@@ -157,9 +137,9 @@ def test_failed_removal_leaves_the_row_active_for_the_next_run(db, monkeypatch):
     )
 
     user, configs = _seed(db, "stuck", NOW - timedelta(days=1))
-    asyncio.run(db.commit())
+    db.run(db.commit())
 
-    stats = asyncio.run(expire_due_subscriptions(db, now=NOW))
+    stats = db.run(expire_due_subscriptions(db, now=NOW))
 
     assert stats["failures"] == 1
     assert stats["users_revoked"] == 0
@@ -183,9 +163,9 @@ def test_partial_failure_does_not_half_revoke_the_user(db, monkeypatch):
     monkeypatch.setattr(subscriptions, "_remove_peer_from_bridge", _flaky)
 
     user, configs = _seed(db, "partial", NOW - timedelta(days=2), n_configs=2)
-    asyncio.run(db.commit())
+    db.run(db.commit())
 
-    stats = asyncio.run(expire_due_subscriptions(db, now=NOW))
+    stats = db.run(expire_due_subscriptions(db, now=NOW))
 
     assert stats["peers_removed"] == 1
     assert stats["failures"] == 1
@@ -202,9 +182,9 @@ def test_undated_subscribers_are_reported_not_revoked(db, monkeypatch):
     )
 
     user, _ = _seed(db, "undated", None)
-    asyncio.run(db.commit())
+    db.run(db.commit())
 
-    stats = asyncio.run(expire_due_subscriptions(db, now=NOW))
+    stats = db.run(expire_due_subscriptions(db, now=NOW))
 
     assert stats["users_due"] == 0
     assert stats["undated"] == ["undated"]

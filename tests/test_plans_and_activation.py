@@ -13,7 +13,6 @@ The tests are written against a real in-memory database. `issue_config` is the
 only thing stubbed — it is the part that talks to a node over SSH.
 """
 
-import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -24,10 +23,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-a-real-key")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("FERNET_KEY", "8ZVnLbQ6fJ0xTjWn7l5cPq2sR9dY4hK1vG3mA6uE0oI=")
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
-
 from config import PLANS, config_limit, plan_info  # noqa: E402
-from db.base import Base  # noqa: E402
 from db.models import Config, Payment, User  # noqa: E402
 from services import provisioner  # noqa: E402
 from services.provisioner import activate_payment  # noqa: E402
@@ -84,21 +80,6 @@ def test_unknown_plan_keeps_one_device_rather_than_none():
 # ── activation ──────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def db():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    maker = async_sessionmaker(engine, expire_on_commit=False)
-
-    async def _setup():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        return maker()
-
-    session = asyncio.run(_setup())
-    yield session
-    asyncio.run(session.close())
-
-
-@pytest.fixture
 def issued(monkeypatch):
     """Stub the SSH path; record how many devices were handed out."""
     calls = []
@@ -137,7 +118,7 @@ def _seed(db, plan, until=None, with_config=False):
             peer_ip="10.88.88.42", private_key="enc", public_key="PUBOLD",
             preshared_key="enc", is_active=True,
         ))
-    asyncio.run(db.commit())
+    db.run(db.commit())
     return user, payment
 
 
@@ -145,7 +126,7 @@ def test_six_month_plan_grants_six_months(db, issued):
     """The hardcoded 30 days is the bug this guards."""
     user, payment = _seed(db, "basic-6m")
 
-    assert asyncio.run(activate_payment(user, payment, db)) is True
+    assert db.run(activate_payment(user, payment, db)) is True
     granted = (user.subscribed_until - NOW).days
     assert 179 <= granted <= 180
     assert payment.status == "paid"
@@ -155,7 +136,7 @@ def test_first_purchase_issues_exactly_one_device(db, issued):
     """Not the plan's whole limit — the rest are requested from the portal."""
     user, payment = _seed(db, "ext-6m")  # allows 5
 
-    asyncio.run(activate_payment(user, payment, db))
+    db.run(activate_payment(user, payment, db))
     assert issued == ["device-1"]
 
 
@@ -167,7 +148,7 @@ def test_renewal_extends_and_does_not_issue_another_peer(db, issued):
     ends = NOW + timedelta(days=10)
     user, payment = _seed(db, "basic-1m", until=ends, with_config=True)
 
-    asyncio.run(activate_payment(user, payment, db))
+    db.run(activate_payment(user, payment, db))
 
     assert issued == [], "a renewal handed out another peer"
     assert (user.subscribed_until - ends).days == 30
@@ -177,7 +158,7 @@ def test_renewal_after_a_lapse_starts_from_now(db, issued):
     """Expired for a month: the new period runs from today, not from the past."""
     user, payment = _seed(db, "basic-1m", until=NOW - timedelta(days=30), with_config=True)
 
-    asyncio.run(activate_payment(user, payment, db))
+    db.run(activate_payment(user, payment, db))
 
     assert user.subscribed_until > NOW
     assert (user.subscribed_until - datetime.now(timezone.utc)).days >= 29
@@ -186,7 +167,7 @@ def test_renewal_after_a_lapse_starts_from_now(db, issued):
 def test_upgrading_tier_raises_the_device_limit(db, issued):
     user, payment = _seed(db, "ext-3m", until=NOW + timedelta(days=5), with_config=True)
 
-    asyncio.run(activate_payment(user, payment, db))
+    db.run(activate_payment(user, payment, db))
 
     assert user.plan == "ext-3m"
     assert config_limit(user.plan) == 5
@@ -197,7 +178,7 @@ def test_unknown_plan_does_not_activate_anything(db, issued):
     """A plan name that no longer exists must not quietly grant a subscription."""
     user, payment = _seed(db, "nonsense")
 
-    assert asyncio.run(activate_payment(user, payment, db)) is False
+    assert db.run(activate_payment(user, payment, db)) is False
     assert user.is_subscribed is False
     assert payment.status == "pending"
     assert issued == []
@@ -214,6 +195,6 @@ def test_failed_provisioning_leaves_the_payment_pending(db, monkeypatch):
     monkeypatch.setattr(provisioner, "issue_config", _fail)
     user, payment = _seed(db, "basic-1m")
 
-    assert asyncio.run(activate_payment(user, payment, db)) is False
+    assert db.run(activate_payment(user, payment, db)) is False
     assert payment.status == "pending"
     assert user.is_subscribed is False

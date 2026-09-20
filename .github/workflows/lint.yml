@@ -74,11 +74,18 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install test dependencies
-        run: pip install -r requirements-dev.txt
+      # The suite imports the application — auth guards, the plan table, the
+      # provisioning and expiry paths — so it needs the runtime dependencies
+      # as well as the tooling. Installing only requirements-dev.txt passed
+      # while the tests touched one dependency-free module, then broke the
+      # moment they covered anything real.
+      - name: Install dependencies
+        run: pip install -r pwa/requirements.txt -r requirements-dev.txt
 
-      # The suite covers the webhook boundary: the point where an
-      # unauthenticated request turns into a paid subscription. Cases are
-      # written around what must be rejected, not around the happy path.
+      # Cases are written around what must be rejected rather than the happy
+      # path: a client token on an admin route, an expired subscription, a
+      # renewal that must not issue a second peer, a webhook signature that
+      # does not match, and a price on the pricing page that disagrees with
+      # the one the server charges.
       - name: Run pytest
         run: pytest -q

@@ -1,5 +1,13 @@
-# Tooling only — not installed into the runtime image.
+# Tooling and test-only dependencies — not installed into the runtime image.
+#
+# The suite exercises real application code, so it also needs what the
+# application needs: install pwa/requirements.txt alongside this file.
 pytest==8.3.4
 bandit[toml]==1.8.0
 pip-audit==2.7.3
 ruff==0.8.4
+
+# Async SQLite driver, tests only. Production is PostgreSQL through asyncpg;
+# this lets the subscription and billing tests run against a real database
+# instead of a mock, with no service to stand up in CI.
+aiosqlite==0.22.1
