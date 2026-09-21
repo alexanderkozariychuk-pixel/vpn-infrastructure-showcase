@@ -30,6 +30,11 @@ from services import subscriptions  # noqa: E402
 from services.subscriptions import expire_due_subscriptions, has_active_subscription  # noqa: E402
 
 
+# Frozen on purpose, and correct here: everything under test takes `now` as an
+# argument, so no system clock is involved and the result is the same on any
+# day. Where a function reads the clock itself — activate_payment does — the
+# anchor has to be the real clock instead, or the expected values drift by a
+# day for every day that passes.
 NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 
 

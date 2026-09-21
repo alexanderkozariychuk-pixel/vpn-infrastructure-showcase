@@ -1166,6 +1166,15 @@
     .pay-method-name { color: var(--text-bright); font-weight: 600; font-size: 15px; }
     .pay-method-sub  { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
     .pay-method-arrow { color: var(--accent); font-size: 18px; }
+    .pay-note {
+      margin-top: 4px;
+      padding: 12px 14px;
+      border: 1px dashed var(--border);
+      color: var(--text-dim);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     .checkout-terms { margin-top: 18px; font-size: 13px; }
     .checkout-terms a { color: var(--text-dim); }
 
@@ -1509,13 +1518,16 @@
                 <span data-i18n="checkout-method">Выберите способ оплаты</span>
               </div>
 
-              <div class="pay-method" onclick="startPayment('rub')">
+              <div class="pay-method" id="pay-method-card" onclick="startPayment('rub')">
                 <div>
                   <div class="pay-method-name" data-i18n="pay-card">Банковская карта, СБП</div>
                   <div class="pay-method-sub" data-i18n="pay-card-sub">МИР, Visa, Mastercard</div>
                 </div>
                 <span class="pay-method-arrow">→</span>
               </div>
+
+              <div class="pay-note" id="pay-card-unavailable" style="display:none"
+                   data-i18n="pay-card-longterm">Полугодовая подписка оплачивается только криптовалютой.</div>
 
               <div class="pay-method" onclick="startPayment('crypto')">
                 <div>
@@ -1899,6 +1911,7 @@ const translations = {
     'checkout-method': 'Select a payment method',
     'pay-card': 'Bank card, SBP',
     'pay-card-sub': 'MIR, Visa, Mastercard',
+    'pay-card-longterm': 'The six-month plan is paid with cryptocurrency only.',
     'pay-crypto': 'Cryptocurrency',
     'pay-crypto-sub': 'USDT, BTC, ETH',
     'checkout-terms': 'Terms of use',
@@ -2132,6 +2145,7 @@ const translations = {
     'checkout-method': 'Выберите способ оплаты',
     'pay-card': 'Банковская карта, СБП',
     'pay-card-sub': 'МИР, Visa, Mastercard',
+    'pay-card-longterm': 'Полугодовая подписка оплачивается только криптовалютой.',
     'pay-crypto': 'Криптовалюта',
     'pay-crypto-sub': 'USDT, BTC, ETH',
     'checkout-terms': 'Условия использования',
@@ -2556,12 +2570,12 @@ let checkoutPlan = null;
 // stale number here shows the customer the wrong figure but cannot be paid.
 // Keep the two in step when prices change.
 const PLANS = {
-  'basic-1m': {tier: 'basic', configs: 2, days: 30,  amount: 350},
-  'basic-3m': {tier: 'basic', configs: 2, days: 90,  amount: 900},
-  'basic-6m': {tier: 'basic', configs: 2, days: 180, amount: 1700},
-  'ext-1m':   {tier: 'ext',   configs: 5, days: 30,  amount: 650},
-  'ext-3m':   {tier: 'ext',   configs: 5, days: 90,  amount: 1700},
-  'ext-6m':   {tier: 'ext',   configs: 5, days: 180, amount: 3200},
+  'basic-1m': {tier: 'basic', configs: 2, days: 30,  amount: 350,  card: true},
+  'basic-3m': {tier: 'basic', configs: 2, days: 90,  amount: 900,  card: true},
+  'basic-6m': {tier: 'basic', configs: 2, days: 180, amount: 1700, card: false},
+  'ext-1m':   {tier: 'ext',   configs: 5, days: 30,  amount: 650,  card: true},
+  'ext-3m':   {tier: 'ext',   configs: 5, days: 90,  amount: 1700, card: true},
+  'ext-6m':   {tier: 'ext',   configs: 5, days: 180, amount: 3200, card: false},
 };
 
 // Six months is preselected because it is the one worth buying, for the
@@ -2623,6 +2637,15 @@ function openCheckout(tier) {
   set('checkout-total', price);
   set('checkout-period-value', t(`period-${selectedPeriod}`));
   set('checkout-devices', plan.configs);
+
+  // Six months is crypto-only: that much obligation should not rest on the
+  // card rail, which can end without warning and not by our decision. Hide
+  // the option rather than let it fail after the click — the endpoint
+  // refuses it too, this is only so nobody meets that refusal.
+  const card = document.getElementById('pay-method-card');
+  const note = document.getElementById('pay-card-unavailable');
+  if (card) card.style.display = plan.card ? '' : 'none';
+  if (note) note.style.display = plan.card ? 'none' : '';
 
   if (block) block.style.display = 'none';
   if (co) co.style.display = 'grid';

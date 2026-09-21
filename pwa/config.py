@@ -33,13 +33,25 @@ LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
 # Longer periods are discounted well past the usual 10–15%. That is deliberate:
 # a subscription paid six months up front is money now, which is worth more
 # here than the margin given up.
+#
+# `card` is why the six-month plans exist only in crypto.
+#
+# A six-month subscription is six months of obligation, and the card rail is
+# the part of this service that can end without warning and not by our
+# decision. Collecting half a year up front against it means holding refund
+# duties that would have to be discharged through a channel that is gone —
+# and a refund to different details than the payment is exactly what the
+# terms refuse, for good anti-fraud reasons. Crypto settles immediately, is
+# not tied to one jurisdiction, and survives a relocation.
+#
+# So: card buys one or three months. Crypto buys any period.
 PLANS = {
-    "basic-1m": {"tier": "basic", "configs": 2, "days": 30,  "amount": "350",  "currency": "RUB"},
-    "basic-3m": {"tier": "basic", "configs": 2, "days": 90,  "amount": "900",  "currency": "RUB"},
-    "basic-6m": {"tier": "basic", "configs": 2, "days": 180, "amount": "1700", "currency": "RUB"},
-    "ext-1m":   {"tier": "ext",   "configs": 5, "days": 30,  "amount": "650",  "currency": "RUB"},
-    "ext-3m":   {"tier": "ext",   "configs": 5, "days": 90,  "amount": "1700", "currency": "RUB"},
-    "ext-6m":   {"tier": "ext",   "configs": 5, "days": 180, "amount": "3200", "currency": "RUB"},
+    "basic-1m": {"tier": "basic", "configs": 2, "days": 30,  "amount": "350",  "currency": "RUB", "card": True},
+    "basic-3m": {"tier": "basic", "configs": 2, "days": 90,  "amount": "900",  "currency": "RUB", "card": True},
+    "basic-6m": {"tier": "basic", "configs": 2, "days": 180, "amount": "1700", "currency": "RUB", "card": False},
+    "ext-1m":   {"tier": "ext",   "configs": 5, "days": 30,  "amount": "650",  "currency": "RUB", "card": True},
+    "ext-3m":   {"tier": "ext",   "configs": 5, "days": 90,  "amount": "1700", "currency": "RUB", "card": True},
+    "ext-6m":   {"tier": "ext",   "configs": 5, "days": 180, "amount": "3200", "currency": "RUB", "card": False},
 }
 
 # Plan names written before periods existed. Payments created under the old
@@ -60,6 +72,17 @@ def plan_info(key: str | None) -> dict | None:
     if key in PLANS:
         return PLANS[key]
     return PLANS.get(_LEGACY_PLAN_ALIASES.get(key, ""))
+
+
+def card_allowed(plan_key: str | None) -> bool:
+    """
+    Whether this plan may be paid by card.
+
+    Defaults to False for anything unrecognised: a plan the table no longer
+    describes must not reach the card rail by accident.
+    """
+    info = plan_info(plan_key)
+    return bool(info and info.get("card"))
 
 
 def config_limit(plan_key: str | None) -> int:

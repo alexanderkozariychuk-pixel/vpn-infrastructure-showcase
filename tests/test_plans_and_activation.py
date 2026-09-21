@@ -29,7 +29,14 @@ from services import provisioner  # noqa: E402
 from services.provisioner import activate_payment  # noqa: E402
 
 
-NOW = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+# Anchored to the real clock, not to a literal date.
+#
+# `activate_payment` reads the system clock, so a frozen NOW only agrees with
+# it on the day the constant was written: a six-month grant measured from a
+# fixed date drifts by one day for every day that passes, and a subscription
+# seeded as "expires in ten days" becomes an expired one once that date goes
+# by. Every offset below is relative, so this holds on any day.
+NOW = datetime.now(timezone.utc)
 
 
 # ── the plan table ──────────────────────────────────────────────────────────

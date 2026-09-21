@@ -20,7 +20,7 @@ from db.models import User, Payment
 from auth.jwt import require_auth
 from services import heleket
 from services.provisioner import activate_payment
-from config import PLANS, plan_info
+from config import PLANS, card_allowed, plan_info
 from fastapi.responses import PlainTextResponse
 from services import freekassa
 
@@ -131,6 +131,16 @@ async def create_payment_freekassa(
     plan = req.plan
     if plan not in PLANS:
         raise HTTPException(status_code=400, detail="Unknown plan")
+
+    # Enforced here, not only in the interface. The portal hides the card
+    # option for these plans, but the endpoint is what a request actually
+    # reaches, and the rule it carries — six months of obligation must not
+    # rest on the rail that can disappear — is not a presentation detail.
+    if not card_allowed(plan):
+        raise HTTPException(
+            status_code=409,
+            detail="This period is available with cryptocurrency only",
+        )
 
     username = payload.get("sub")
     result = await db.execute(select(User).where(User.username == username))

@@ -158,3 +158,57 @@ def test_json_shape_is_what_the_endpoints_expect():
     for key in PLANS:
         assert json.dumps({"plan": key}), key
         assert re.fullmatch(r"[a-z]+-\d+m", key), f"unexpected plan key shape: {key}"
+
+
+# ── card availability ───────────────────────────────────────────────────────
+#
+# Six months is crypto-only. That rule lives in three places — the plan table,
+# the checkout, and the terms the customer accepts — and all three have to say
+# the same thing. A page offering a card button the endpoint refuses is worse
+# than no button at all.
+
+OFFER = INDEX.parent / "offer.html"
+
+
+def test_only_the_short_periods_take_a_card():
+    by_card = {key: bool(info.get("card")) for key, info in PLANS.items()}
+    for key, allowed in by_card.items():
+        expected = PLANS[key]["days"] < 180
+        assert allowed is expected, f"{key}: card={allowed}, days={PLANS[key]['days']}"
+
+
+def test_card_flag_agrees_between_server_and_portal(portal_plans):
+    mismatched = {
+        key: (portal_plans[key].get("card"), PLANS[key].get("card"))
+        for key in PLANS
+        if key in portal_plans
+        and str(portal_plans[key].get("card")).lower() != str(PLANS[key].get("card")).lower()
+    }
+    assert not mismatched, f"card availability differs: {mismatched}"
+
+
+def test_the_portal_hides_the_card_option_rather_than_failing_after_the_click():
+    html = INDEX.read_text(encoding="utf-8")
+    assert "pay-method-card" in html, "the card method needs an id to be hidden"
+    assert "plan.card ?" in html, "checkout does not branch on card availability"
+
+
+def test_the_terms_say_so_too():
+    """
+    The rule is a promise to the customer, not only a server-side check. If the
+    terms do not carry it, a six-month buyer has no written answer to 'why can
+    I not pay by card' — and no written answer to what happens if the channel
+    used for their payment stops existing.
+    """
+    # Markup wraps lines wherever it likes, so match the rendered text rather
+    # than the source: a phrase split across two lines is still the phrase.
+    raw = OFFER.read_text(encoding="utf-8")
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))
+
+    assert "только криптовалютой" in text, "terms do not state the crypto-only rule"
+    assert "иным согласованным с вами способом" in text, (
+        "terms lack the alternative-refund clause — a six-month buyer has no "
+        "written answer to what happens if the channel they paid through stops "
+        "existing"
+    )
+    assert "300 рублей в месяц" not in text, "terms still quote the old single price"
