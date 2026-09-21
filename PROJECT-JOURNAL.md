@@ -4236,3 +4236,108 @@ indistinguishable — which will matter at the first refund. `pwa-add-peer`,
 `pwa-awg-show` and `pwa-logs` still live only on the nodes, with no history.
 `docs/troubleshooting.md` is half about 3X-UI, Xray and Uptime Kuma, all of
 which are in `archive/`.
+
+---
+
+## 2026-09-21
+
+### 🗺 Six months is paid in crypto, and why
+A six-month subscription is six months of obligation. Two things that were
+each reasonable on their own turned out to combine into a trap.
+
+The card rail is the part of this service that can end without warning and not
+by our decision — the gateway's compliance is sensitive to how the service is
+categorised, and that is not something a wording choice controls. And the
+terms refuse a refund to details other than the ones paid from, which is the
+correct anti-fraud position.
+
+Put together: the channel goes, the duty to refund stays, and the document
+forbids the only remaining way to discharge it. Half a year of prepayments
+collected against that is the exposure.
+
+So the card buys one or three months and crypto buys any period. Crypto
+settles immediately, is not tied to one jurisdiction, and survives the move.
+It costs conversion — card is what most people reach for — and that is the
+price of not owing money through a channel that no longer exists.
+
+### 🛠 The rule lives in three places and had to be true in all of them
+A `card` flag on each plan, a 409 from the FreeKassa endpoint, and a checkout
+that hides the option rather than letting it fail after the click. The
+interface hiding it is a courtesy; the endpoint refusing it is the rule,
+because the endpoint is what a request actually reaches.
+
+Tests assert all three agree, including the terms. A page offering a button
+the server refuses is worse than no button.
+
+### 📄 The terms described a product that stopped existing a month ago
+Reading the offer before editing it was the useful part. It still said one
+price, one calendar month, one configuration per subscription, extra devices
+by writing to support — and, while the Extended plan is sold for a household,
+a clause stating a configuration is "for one person".
+
+The offer is the contract. Charging 1700 against a document that says 300 a
+month is something a customer can point at in a dispute and a gateway's
+compliance can point at in a review. Rewritten for both tiers and all three
+periods, with the crypto-only rule and its reason, self-service configs, and
+the household wording fixed. Numbering shifted by two; the two cross-references
+inside the document moved with it.
+
+The clause the whole change exists for:
+
+> Возврат производится на те же реквизиты, с которых поступила оплата. Если
+> это невозможно по причинам, не зависящим от вас — например, если платёжный
+> канал перестал быть доступен, — возврат производится иным согласованным с
+> вами способом. Отказать в возврате по этой причине сервис не вправе.
+
+Worth recording what did *not* need changing: the availability and liability
+clauses already covered every stage of what the networks might do, without
+naming any of it. "Работоспособность в конкретной сети не гарантируется
+заранее: поведение операторов связи различается по регионам" is how every
+infrastructure contract is written, and it is true rather than evasive — the
+operator's network genuinely is not ours to control. The refund clause also
+already tracked what consumer law actually allows; a blanket "no refunds"
+would have been void and would have protected nothing.
+
+### 🐛 A test that passed on the day it was written
+`test_six_month_plan_grants_six_months` measured the grant from a literal
+`2026-09-20` while `activate_payment` reads the system clock. One day later it
+reported 181 days against an expected 180.
+
+Two more in the same file were waiting their turn: a subscription seeded as
+"expires in ten days" from that same literal date stops being in the future on
+the 30th, and another on the 25th. All three would have failed on unrelated
+days, in unrelated commits, looking like something else entirely.
+
+Anchored to the real clock now. The frozen date stays in the expiry tests and
+says why: everything there takes `now` as an argument, so no clock is
+involved and freezing is what makes it deterministic. The distinction is the
+lesson — freeze the clock where it is injected, follow it where it is read.
+
+### ✅ Twenty-four hours of the sweep, on the hour
+The expiry cron has now run a full day without a gap — 24 consecutive hours
+from 20:00 on the 20th, each firing at :00:02 or :00:03.
+
+```
+2026-09-20 20:00:02  0 due, 0 revoked, 0 peers removed, 0 failures
+...
+2026-09-21 19:00:02  0 due, 0 revoked, 0 peers removed, 0 failures
+```
+
+Every line is zero because there is nothing to expire — the only subscriber
+was revoked by hand during yesterday's verification. That is the point: the
+run that matters is the one where nothing happens and it still happens on
+time. Together with yesterday's live revocation, subscription expiry is closed
+end to end — the wrapper, the gate, the sweep and the schedule.
+
+### 📋 Next
+Unchanged, and still gated on money rather than code: a real card payment
+through the whole chain, and the monitoring stack, which is still gone with
+fra-aeza.
+
+The five hand-added peers remain outside billing entirely — not in the
+database, so expiry does not reach them. They are also the warmest audience
+there is for the first conversion.
+
+Smaller, and none of it blocking: `Payment` still has no `provider` column;
+`pwa-add-peer`, `pwa-awg-show` and `pwa-logs` still exist only on the nodes;
+`docs/troubleshooting.md` is still half about tooling that lives in `archive/`.
