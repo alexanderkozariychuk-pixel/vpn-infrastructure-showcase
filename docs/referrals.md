@@ -17,7 +17,7 @@ Credit is money the service owes. Everything below is shaped by that.
 | Qualifying purchase | more than one month — so 3m or 6m |
 | Credit may cover | at most 50% of an order |
 | Credit expires | 6 months after it vests |
-| Invitee discount | yes — the double cost is accepted at this stage |
+| Invitee discount | 10% of the plan price |
 
 ## What a point is, precisely
 
@@ -189,23 +189,27 @@ Percentage-based rewards that scale with the purchase. Each adds an
 accounting or abuse surface that a service with no paying customers cannot
 justify.
 
-## Still open: the size of the invitee discount
+## What a referral costs
 
-A flat amount rather than a percentage. A percentage costs the most exactly
-where the margin is already thinnest — 10% of a 3200 ₽ order is 320 ₽ on top
-of the 175-point reward.
+10% off the plan price, plus the 175-point reward:
 
-Cost per referral at a flat 150 ₽:
+| Purchase | Cash after discount | Discount | Total cost | Share of order |
+|---|---|---|---|---|
+| basic-3m — 900 | 810 | 90 | 265 | 29% |
+| basic-6m — 1700 | 1530 | 170 | 345 | 20% |
+| ext-3m — 1700 | 1530 | 170 | 345 | 20% |
+| ext-6m — 3200 | 2880 | 320 | 495 | 15% |
 
-| Purchase | Cash after discount | Discount cost | Reward liability |
-|---|---|---|---|
-| basic-3m — 900 | 750 | 150 (17%) | 175 |
-| basic-6m — 1700 | 1550 | 150 (9%) | 175 |
-| ext-3m — 1700 | 1550 | 150 (9%) | 175 |
-| ext-6m — 3200 | 3050 | 150 (5%) | 175 |
+A flat discount was considered first, on the reasoning that a percentage costs
+most where the margin is thinnest. In absolute terms that is true — 320 ₽ off
+the largest order against 90 ₽ off the smallest. As a share of the order it is
+the other way round, because the flat 175-point reward dominates a small
+purchase: a flat 150 ₽ discount would have cost 325 ₽ on a 900 ₽ order, more
+than the percentage does.
 
-The liability is not a cost until it is redeemed, is capped at half an order,
-and expires in six months — so the real cost is below face value.
+The percentage is also the one that scales with what the buyer is committing
+to, which is what a discount is supposed to do.
 
-150 ₽ is meaningful against the cheapest qualifying purchase and bounded
-against the most expensive. It is one constant and can be changed later.
+The reward is a liability rather than a cost until it is redeemed, is capped
+at half an order, and expires six months after vesting — so the real figure
+sits below the one in the table. Both numbers are constants and can move.
