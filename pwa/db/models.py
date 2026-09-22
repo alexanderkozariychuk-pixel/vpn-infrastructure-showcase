@@ -77,11 +77,17 @@ class PromoCode(Base):
     code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)
     owner_user_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True)
     discount_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    # A cap on how many paid orders may carry this code. Checked against a
+    # count of those orders — there is deliberately no `uses` column, because
+    # a counter has to be incremented by someone and the one place doing it
+    # returned early for exactly the codes the cap was meant for.
     max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    uses: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Why this code exists — which blogger, which mailing, which month. A code
+    # with no record of its purpose is one nobody dares switch off.
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class CreditEntry(Base):

@@ -75,7 +75,7 @@ async def get_referral(
     promo = await credit.code_for(db, user)
     return {
         "code": promo.code if promo else None,
-        "uses": promo.uses if promo else 0,
+        "uses": await credit.uses_of(db, promo.code) if promo else 0,
         "discount_percent": promo.discount_percent if promo else credit.DEFAULT_DISCOUNT_PERCENT,
         "reward": credit.REFERRAL_REWARD,
         "eligible": has_active_subscription(user),
@@ -108,7 +108,7 @@ async def create_referral(
     await db.refresh(promo)
     return {
         "code": promo.code,
-        "uses": promo.uses,
+        "uses": await credit.uses_of(db, promo.code),
         "discount_percent": promo.discount_percent,
         "reward": credit.REFERRAL_REWARD,
     }

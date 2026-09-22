@@ -152,7 +152,11 @@ def test_unknown_expired_and_exhausted_codes_are_refused(db):
     db.add(PromoCode(id=str(uuid.uuid4()), code="EXPIRED1", owner_user_id=owner.id,
                      discount_percent=10, expires_at=NOW - timedelta(days=1)))
     db.add(PromoCode(id=str(uuid.uuid4()), code="USEDUP12", owner_user_id=owner.id,
-                     discount_percent=10, max_uses=1, uses=1))
+                     discount_percent=10, max_uses=1))
+    # Exhaustion is a paid order carrying the code, not a counter someone
+    # remembered to bump.
+    db.add(Payment(id=str(uuid.uuid4()), user_id=owner.id, plan="basic-3m",
+                   amount=810, status="paid", promo_code="USEDUP12"))
     db.add(PromoCode(id=str(uuid.uuid4()), code="INACTIVE", owner_user_id=owner.id,
                      discount_percent=10, is_active=False))
     db.run(db.commit())

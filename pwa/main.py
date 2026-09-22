@@ -26,6 +26,7 @@ from api.config import router as config_router
 from api.password_reset import router as password_reset_router
 from api.support import router as support_router
 from api.referral import router as referral_router
+from api.admin_promo import router as admin_promo_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
 app.add_middleware(
@@ -45,6 +46,7 @@ app.include_router(config_router)
 app.include_router(password_reset_router)
 app.include_router(support_router)
 app.include_router(referral_router)
+app.include_router(admin_promo_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -75,4 +77,11 @@ async def reset_page():
 
 @app.get("/api")
 async def api_root():
-    return {"status": "ok", "version": "0.8.0"}
+    """
+    Public on purpose: the portal pings it to measure latency.
+
+    It carries no version. Nothing needs one here, and a build number on an
+    unauthenticated endpoint is free reconnaissance for anyone deciding
+    whether this service is worth a closer look.
+    """
+    return {"status": "ok"}

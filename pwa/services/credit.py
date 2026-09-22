@@ -145,6 +145,26 @@ def _generate_code() -> str:
     return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(_CODE_LENGTH))
 
 
+async def unused_code(db: AsyncSession) -> str:
+    """
+    A generated code that is not already taken.
+
+    Collisions are vanishingly unlikely at this alphabet and length — 32^8 is
+    about 1.1 trillion — and the entropy is not there to stop guessing:
+    guessing someone's referral code gives the guesser a discount and its
+    owner the reward, which is nobody's idea of an attack. It is there so two
+    customers are never handed the same code. A duplicate would surface as a
+    unique-constraint failure inside a payment flow, which is the worst
+    possible moment to learn about it, so it is checked here instead.
+    """
+    for _ in range(10):
+        code = _generate_code()
+        clash = await db.execute(select(PromoCode).where(PromoCode.code == code))
+        if clash.scalars().first() is None:
+            return code
+    raise RuntimeError("could not generate an unused promo code")
+
+
 async def code_for(db: AsyncSession, user: User) -> PromoCode | None:
     """The customer's active referral code, if they have one."""
     result = await db.execute(
@@ -168,17 +188,7 @@ async def issue_code(db: AsyncSession, user: User) -> PromoCode:
     if existing:
         return existing
 
-    # Collisions are vanishingly unlikely at this alphabet and length, but a
-    # duplicate would fail a unique constraint inside a payment flow, which is
-    # the worst possible moment to find out.
-    for _ in range(10):
-        code = _generate_code()
-        clash = await db.execute(select(PromoCode).where(PromoCode.code == code))
-        if clash.scalars().first() is None:
-            break
-    else:
-        raise RuntimeError("could not generate an unused promo code")
-
+    code = await unused_code(db)
     promo = PromoCode(
         code=code,
         owner_user_id=user.id,
@@ -187,6 +197,33 @@ async def issue_code(db: AsyncSession, user: User) -> PromoCode:
     db.add(promo)
     logger.info("Issued referral code %s to %s", code, user.username)
     return promo
+
+
+async def uses_of(db: AsyncSession, code: str) -> int:
+    """
+    How many times a code has actually been used: paid orders that carried it.
+
+    Counted, not stored. The first version kept a `uses` column and
+    incremented it inside `reward_for_payment` — which returns early for a
+    code with no owner, so a campaign code's counter never moved and its
+    `max_uses` limit could never bite. A one-month purchase through a referral
+    code went uncounted for the same reason.
+
+    Deriving it removes the class of bug rather than that instance: there is
+    no second place that has to remember to increment, retried webhooks cannot
+    double-count, and the number is right even for rows written by hand.
+
+    A code at its limit can still be slightly over-subscribed — two customers
+    holding an unpaid order can both pay. Locking a marketing code against
+    that costs more than the extra use is worth.
+    """
+    result = await db.execute(
+        select(func.count()).select_from(Payment).where(
+            Payment.promo_code == code,
+            Payment.status == "paid",
+        )
+    )
+    return int(result.scalar_one())
 
 
 async def resolve_code(
@@ -220,7 +257,7 @@ async def resolve_code(
         return None, "inactive"
     if _aware(promo.expires_at) is not None and _aware(promo.expires_at) <= now:
         return None, "expired"
-    if promo.max_uses is not None and promo.uses >= promo.max_uses:
+    if promo.max_uses is not None and await uses_of(db, promo.code) >= promo.max_uses:
         return None, "used_up"
     if promo.owner_user_id == buyer.id:
         # Nobody refers themselves. Cheap to check and it removes the most
@@ -385,7 +422,6 @@ async def reward_for_payment(db: AsyncSession, payment: Payment, now: datetime |
         expires_at=vests_at + timedelta(days=CREDIT_LIFETIME_DAYS),
         note=f"referral: {payment.plan}",
     ))
-    promo.uses += 1
 
     logger.info(
         "Credited %d to %s for referred payment %s, vesting %s",

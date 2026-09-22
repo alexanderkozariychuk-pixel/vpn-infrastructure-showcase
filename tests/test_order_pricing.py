@@ -266,10 +266,7 @@ def test_a_repeated_notification_pays_the_referrer_once(db, issued):
     db.run(activate_payment(buyer, payment, db))
 
     assert db.run(credit.pending_balance(db, owner, now=NOW)) == credit.REFERRAL_REWARD
-    refreshed = db.run(db.execute(
-        select(PromoCode).where(PromoCode.id == promo.id)
-    )).scalars().one()
-    assert refreshed.uses == 1
+    assert db.run(credit.uses_of(db, promo.code)) == 1
 
 
 def test_a_monthly_plan_earns_the_referrer_nothing(db, issued):
