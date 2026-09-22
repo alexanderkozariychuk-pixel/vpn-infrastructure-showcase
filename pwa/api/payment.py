@@ -20,7 +20,7 @@ from db.models import User, Payment
 from auth.jwt import require_auth
 from services import heleket
 from services.provisioner import activate_payment
-from config import PLANS, card_allowed, plan_info
+from config import PLANS, card_allowed
 from fastapi.responses import PlainTextResponse
 from services import freekassa
 
@@ -206,14 +206,18 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
     if payment.status == "paid":
         return "YES"
 
-    # The amount comes from PLANS, never from the request.
+    # The expected amount is the one stored on this order, not the plan price.
+    #
+    # Both are server-computed and neither comes from the request, so the
+    # guarantee is unchanged — but once an order can carry a discount or spend
+    # credit, the plan price stops being what was asked for, and checking
+    # against it would reject every discounted payment as a mismatch.
     try:
         paid = float(params.get("AMOUNT", "0"))
     except ValueError:
         paid = 0.0
-    info = plan_info(payment.plan)
-    expected = float(info["amount"]) if info else None
-    if expected is None or paid + 0.01 < expected:
+    expected = float(payment.amount)
+    if paid + 0.01 < expected:
         logger.error("FreeKassa amount mismatch on order %s: got %s, expected %s",
                      order_id, paid, expected)
         payment.status = "amount_mismatch"

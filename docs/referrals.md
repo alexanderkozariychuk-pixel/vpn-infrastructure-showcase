@@ -43,7 +43,7 @@ the sum costs nothing.
 | `id` | |
 | `user_id` | whose balance this affects |
 | `delta` | signed; `+175` for a reward, negative for a spend |
-| `reason` | `referral_reward` \| `spend` \| `expiry` \| `adjustment` |
+| `reason` | `referral_reward` \| `spend` \| `expiry` (manual only) \| `adjustment` |
 | `payment_id` | the order this entry was spent on, for `spend` |
 | `source_payment_id` | the referred purchase that earned it, for `referral_reward` |
 | `vests_at` | when it becomes spendable — see vesting |
@@ -113,10 +113,19 @@ the oldest first.
 
 ### Expiry
 
-A nightly job writes an `expiry` entry cancelling anything past
-`expires_at`, so the ledger keeps explaining itself rather than the balance
-quietly changing. The expiry sweep already running for subscriptions is the
-obvious place to put it.
+Expiry is a condition on the sum, not a job. `balance()` counts entries whose
+`expires_at` is still in the future, so credit stops being spendable the
+moment it expires — nothing has to run, and there is no sweep that can fail
+quietly and leave expired credit spendable.
+
+The first draft did write a cancelling `expiry` entry as well, and
+double-counted: the sum already excluded the expired entry, so the offsetting
+one drove the balance to −175. The tests caught it. The ledger still explains
+itself without that entry — the original carries the date it expired on,
+which is what the customer needs to see.
+
+`reason = 'expiry'` stays in the schema for a manual write-off; nothing
+produces it automatically.
 
 ## The four holes, and what closes each
 
