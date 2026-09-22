@@ -4341,3 +4341,124 @@ there is for the first conversion.
 Smaller, and none of it blocking: `Payment` still has no `provider` column;
 `pwa-add-peer`, `pwa-awg-show` and `pwa-logs` still exist only on the nodes;
 `docs/troubleshooting.md` is still half about tooling that lives in `archive/`.
+
+---
+
+## 2026-09-22
+
+### 🗺 Referrals and account credit, end to end
+Shipped in five commits: the ledger, the order flow, the portal, the terms,
+and campaign codes. A customer with a live subscription mints one code; whoever
+buys with it gets 10% off, and on a purchase longer than a month the referrer
+gets 175 points — a point being one ruble off a future order, spendable after
+fourteen days, expiring six months later, covering at most half an order.
+
+Four decisions carried the design, and each one is really the same decision.
+
+**Credit is a ledger, not a column on `users`.** A stored number drifts from
+the events that produced it and cannot answer a customer asking why they have
+350 rather than 525. At this scale summing entries costs nothing, and the sum
+explains itself by construction.
+
+**Expiry is a condition on that sum, not a job.** The first draft had both — a
+nightly sweep writing a cancelling entry, and a filter on `expires_at`. They
+double-counted and drove a balance to −175. Keeping only the filter is also
+the safer half: it is correct the moment credit expires, with nothing
+scheduled that can fall behind and leave expired credit spendable.
+
+**Uses are counted from paid orders, not incremented.** See below — this one
+was found rather than chosen.
+
+**The checkout takes its price from the server.** Plan cards still render from
+the page's own table, because that happens before anyone logs in. From the
+checkout onwards every figure comes from `/api/payment/quote`, the same
+function that prices the payment. Two places computing one price eventually
+give two answers, and the customer is shown the wrong one.
+
+The request carries a plan, a code and a number of points, and never an
+amount. A test asserts that directly: the moment an amount can arrive from the
+client, the discount stops being something the server grants.
+
+### 🐛 A counter that would never have moved
+`max_uses` was checked against a `uses` column incremented inside
+`reward_for_payment` — which returns early for a code with no owner. Campaign
+codes have no owner. So a limit of 50 on a code posted to a public channel
+would never have taken effect: post it once, discount forever. The same early
+return meant a one-month purchase through a referral code went uncounted too.
+
+Only writing campaign codes exposed it. Counting paid orders carrying the code
+removes the class rather than the instance — nobody has to remember to
+increment, a retried webhook cannot double-count, and the number is right even
+for rows written by hand. The column is dropped in `c3e8a1f70b42`.
+
+### 🐛 The clause numbers in the terms were fiction
+Adding a section to the offer meant renumbering, which meant looking at how
+the numbers were produced: a CSS counter reset on every `<ol>`, with a
+hand-written rule per `start` value to put it back. Those rules went stale the
+first time a clause was inserted.
+
+Every section on the live page had been rendering from 1. "Возврат средств"
+showed 1–4 where the document, and its own cross-references, called it 12–15.
+A customer reading "компенсируются по пункту 13" found no clause 13.
+
+Found by opening the page in a browser and looking, not by reading the CSS.
+The screenshot is what settled it. The fix removes the per-list reset and
+counts once across the document — which is the numbering both pages already
+intended and needs no maintenance when a clause is added.
+
+The privacy policy had the same fault plus one it was hiding: its declared
+numbering jumped 8 → 12 and 11 → 16, clauses removed at some point without the
+starts being corrected. Invisible while every section restarted anyway.
+
+Three tests hold it now: starts must be contiguous, the per-list reset must
+not return, and every "пункт N" must point at a clause that exists.
+
+### 🐛 Three smaller ones, each found by a test that was really asking
+something else
+`has_active_subscription` compared a naive `subscribed_until` against an aware
+`now`. Postgres returns the offset so production was never affected — but
+SQLite does not, which meant the access gate could not be covered by a test at
+all. It now gates minting a referral code as well.
+
+A test that every non-client route is actually attached to `require_admin` —
+the guard was already proven correct; what had gone wrong in August was that
+eight routes were not wearing it. It found `GET /api` open. That one is the
+portal's latency ping and stays public, now listed explicitly with its reason;
+its `"version": "0.8.0"` is gone, because a build number on an
+unauthenticated endpoint is free reconnaissance.
+
+And on a screenshot of the live portal: "Истекает 9/19/2026" in a Russian
+interface. `toLocaleDateString()` with no argument follows the browser's
+locale, not the page's — and the language toggle is the only setting the
+customer actually chose.
+
+### 🗺 Refusals are tokens, not sentences
+A refused code has to say why, in the language the customer is reading. The
+server cannot know that language, so it returns `own_code` or `used_up` and
+the portal does the wording. A test asserts every reason the server can return
+has text in both languages — otherwise a reason added in six months surfaces
+as a bare `used_up` in front of a paying customer.
+
+### ✅ Verified on production
+Migrations ran themselves on container start, as they always have:
+`b7c1d9e42a10 -> c3e8a1f70b42`, no traceback, `Application startup complete`.
+`promo_codes` has no `uses` and does have `note`.
+
+A campaign code created through the admin endpoint, refused 403 to a client
+token and 422 at a 95% discount. In the live portal: Extended six months,
+3200 ₽, code START15 applied, −480 ₽, total 2720 ₽ — and the points switch
+correctly inert with nothing to spend.
+
+### 📋 Next
+Unchanged and still gated on money: a real card payment through the whole
+chain, and the monitoring stack, still gone with fra-aeza. The referral
+reward itself is the one piece that cannot be proven without a confirmed
+payment — everything up to it is covered by 133 tests and a live walkthrough.
+
+New, and worth doing before it is forgotten: the admin password is not known
+to its owner. It opens node state, the client list, and now code issuance. It
+should be rotated to something random and put in a password manager.
+
+Still open from before: `Payment` has no `provider` column; `pwa-add-peer`,
+`pwa-awg-show` and `pwa-logs` exist only on the nodes; `docs/troubleshooting.md`
+is still half about tooling that lives in `archive/`.
