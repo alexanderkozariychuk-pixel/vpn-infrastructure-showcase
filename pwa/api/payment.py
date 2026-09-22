@@ -19,6 +19,7 @@ from db.base import get_db
 from db.models import User, Payment
 from auth.jwt import require_auth
 from services import heleket
+from services import credit
 from services.provisioner import activate_payment
 from config import PLANS, card_allowed
 from fastapi.responses import PlainTextResponse
@@ -34,6 +35,75 @@ PAID_STATUSES = {"paid", "paid_over"}
 
 class CreatePaymentRequest(BaseModel):
     plan: str
+    # Both optional: an order without either is the ordinary full-price case.
+    code: str | None = None
+    use_credit: int = 0
+
+
+async def _current_user(db: AsyncSession, payload: dict) -> User:
+    result = await db.execute(select(User).where(User.username == payload.get("sub")))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+async def _open_order(
+    db: AsyncSession, user: User, req: CreatePaymentRequest
+) -> tuple[Payment, dict]:
+    """
+    Price an order and record it as pending.
+
+    The price comes from `credit.price_order` and nothing else, so the quote
+    the customer saw and the invoice they are sent cannot disagree. Note that
+    the request carries only what the customer *asked* for — a code and a
+    number of points — never an amount: every ruble here is computed on this
+    side.
+
+    A refused code stops the order rather than quietly charging full price.
+    Someone who typed a code is waiting for a discount, and an invoice that
+    silently ignores it is how a customer decides they were overcharged.
+    """
+    quote = await credit.price_order(
+        db, user, req.plan, code=req.code, use_credit=req.use_credit
+    )
+    if quote["promo_refused"]:
+        raise HTTPException(status_code=400, detail=quote["promo_refused"])
+
+    payment = Payment(
+        user_id=user.id,
+        plan=req.plan,
+        amount=quote["amount"],
+        currency=PLANS[req.plan]["currency"],
+        status="pending",
+        promo_code=quote["promo_code"],
+        credit_spent=quote["credit_spent"],
+    )
+    db.add(payment)
+    await db.commit()
+    await db.refresh(payment)
+    return payment, quote
+
+
+@router.post("/api/payment/quote")
+async def quote_payment(
+    req: CreatePaymentRequest,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    """
+    What this order would cost. Read-only; nothing is recorded.
+
+    The portal calls this as the customer types a code or moves the points
+    slider. A refused code is returned as text rather than an error, because
+    at this stage the customer is still editing.
+    """
+    if req.plan not in PLANS:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+    user = await _current_user(db, payload)
+    return await credit.price_order(
+        db, user, req.plan, code=req.code, use_credit=req.use_credit
+    )
 
 
 @router.post("/api/payment/create")
@@ -46,27 +116,13 @@ async def create_payment(
     if plan not in PLANS:
         raise HTTPException(status_code=400, detail="Unknown plan")
 
-    username = payload.get("sub")
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+    user = await _current_user(db, payload)
     info = PLANS[plan]
-    payment = Payment(
-        user_id=user.id,
-        plan=plan,
-        amount=int(info["amount"]),
-        currency=info["currency"],
-        status="pending",
-    )
-    db.add(payment)
-    await db.commit()
-    await db.refresh(payment)
+    payment, quote = await _open_order(db, user, req)
 
     try:
         invoice = await heleket.create_invoice(
-            amount=info["amount"],
+            amount=str(quote["amount"]),
             currency=info["currency"],
             order_id=payment.id,
             url_callback=f"{SITE_URL}/api/payment/webhook",
@@ -80,7 +136,7 @@ async def create_payment(
 
     payment.heleket_invoice_id = invoice.get("uuid")
     await db.commit()
-    return {"ok": True, "url": invoice.get("url"), "payment_id": payment.id}
+    return {"ok": True, "url": invoice.get("url"), "payment_id": payment.id, "quote": quote}
 
 
 @router.post("/api/payment/webhook")
@@ -142,31 +198,17 @@ async def create_payment_freekassa(
             detail="This period is available with cryptocurrency only",
         )
 
-    username = payload.get("sub")
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+    user = await _current_user(db, payload)
     info = PLANS[plan]
-    payment = Payment(
-        user_id=user.id,
-        plan=plan,
-        amount=int(info["amount"]),
-        currency=info["currency"],
-        status="pending",
-    )
-    db.add(payment)
-    await db.commit()
-    await db.refresh(payment)
+    payment, quote = await _open_order(db, user, req)
 
     url = freekassa.build_payment_url(
         order_id=payment.id,
-        amount=info["amount"],
+        amount=str(quote["amount"]),
         currency=info["currency"],
         email=user.email,
     )
-    return {"ok": True, "url": url, "payment_id": payment.id}
+    return {"ok": True, "url": url, "payment_id": payment.id, "quote": quote}
 
 
 @router.get("/api/payment/freekassa/webhook", response_class=PlainTextResponse)

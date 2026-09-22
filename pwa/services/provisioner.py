@@ -24,9 +24,11 @@ from cryptography.hazmat.primitives.serialization import (
     Encoding, PrivateFormat, PublicFormat, NoEncryption,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from db.models import User, Config, Payment
 from config import plan_info
+from services import credit
 
 logger = logging.getLogger(__name__)
 
@@ -345,6 +347,22 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     user.subscribed_until = base + timedelta(days=info["days"])
     payment.status = "paid"
     payment.paid_at = now
+
+    # Credit is consumed here, not at checkout, and it rides the same
+    # transaction as the activation: either the customer is subscribed and
+    # their points are spent, or neither happened. An order that is never paid
+    # never reaches this line and so spends nothing.
+    await credit.spend_on_payment(db, payment, now=now)
+
+    # The referral reward is the one part allowed to fail alone. Its unique
+    # constraint can fire on two notifications arriving together, and a reward
+    # that has to be written by hand is a far smaller problem than an
+    # activation rolled back under a customer who has already paid.
+    try:
+        async with db.begin_nested():
+            await credit.reward_for_payment(db, payment, now=now)
+    except IntegrityError:
+        logger.warning("Referral reward for payment %s was already recorded", payment.id)
 
     await db.commit()
     logger.info(

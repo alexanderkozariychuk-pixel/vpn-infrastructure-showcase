@@ -25,6 +25,7 @@ from api.payment import router as payment_router
 from api.config import router as config_router
 from api.password_reset import router as password_reset_router
 from api.support import router as support_router
+from api.referral import router as referral_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
 app.add_middleware(
@@ -43,6 +44,7 @@ app.include_router(payment_router)
 app.include_router(config_router)
 app.include_router(password_reset_router)
 app.include_router(support_router)
+app.include_router(referral_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 

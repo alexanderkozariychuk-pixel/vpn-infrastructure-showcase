@@ -68,7 +68,8 @@ def verify_notification(params: dict) -> bool:
 
     AMOUNT is used exactly as received: FreeKassa signs the string it sends,
     so normalising it here would break an otherwise valid signature. The
-    business check on the amount happens separately, against PLANS.
+    business check on the amount happens separately, against the amount stored
+    on the order — which, once discounts exist, is no longer the plan price.
     """
     sign = str(params.get("SIGN", "")).lower()
     merchant_id = str(params.get("MERCHANT_ID", ""))
