@@ -68,7 +68,7 @@ async def _open_order(
         db, user, req.plan, code=req.code, use_credit=req.use_credit
     )
     if quote["promo_refused"]:
-        raise HTTPException(status_code=400, detail=quote["promo_refused"])
+        raise HTTPException(status_code=400, detail=quote["promo_refused_text"])
 
     payment = Payment(
         user_id=user.id,

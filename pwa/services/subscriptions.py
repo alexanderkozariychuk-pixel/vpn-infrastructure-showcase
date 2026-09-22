@@ -38,12 +38,22 @@ def has_active_subscription(user: User, now: datetime | None = None) -> bool:
     through the admin assign-peer path, and "no end date recorded" must not
     read as "no end date exists" — that is how permanent free access gets
     granted by accident.
+
+    The end date is forced to UTC before comparing. Postgres hands back a
+    `timestamptz` with its offset and the comparison is fine; SQLite hands
+    back a naive value and raises. Production runs on Postgres, so this was
+    never a live fault — but a gate that only works on one backend cannot be
+    covered by a test, and an access check with no test is the wrong thing to
+    leave uncovered.
     """
     if not user.is_subscribed:
         return False
     if user.subscribed_until is None:
         return False
-    return user.subscribed_until > (now or datetime.now(timezone.utc))
+    until = user.subscribed_until
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return until > (now or datetime.now(timezone.utc))
 
 
 async def expire_due_subscriptions(db: AsyncSession, now: datetime | None = None) -> dict:

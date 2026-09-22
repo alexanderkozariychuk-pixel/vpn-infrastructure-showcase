@@ -212,3 +212,49 @@ def test_the_terms_say_so_too():
         "existing"
     )
     assert "300 рублей в месяц" not in text, "terms still quote the old single price"
+
+
+# ── the checkout takes its figures from the server ──────────────────────────
+
+def test_the_checkout_does_not_compute_the_discount_itself():
+    """
+    Two places computing one price eventually give two answers, and the
+    customer is shown the wrong one. The page renders plan cards from its own
+    table — that is before anyone has logged in — but from the checkout
+    onwards every figure comes from /api/payment/quote.
+    """
+    html = INDEX.read_text(encoding="utf-8")
+    assert "/api/payment/quote" in html, "the checkout never asks the server for a price"
+    assert "q.amount" in html and "q.credit_spent" in html, (
+        "the order summary is not being filled from the quote"
+    )
+    assert "discount_percent / 100" not in html, (
+        "the page is computing a discount of its own"
+    )
+
+
+def test_every_refusal_reason_has_wording_in_both_languages():
+    """
+    A code the customer cannot use has to say why, in the language they are
+    reading. The server returns a token precisely because it cannot know that
+    language — so a reason added there without wording here would surface as
+    a bare token like `used_up` in a Russian portal.
+    """
+    from services.credit import REFUSAL_TEXT
+
+    html = INDEX.read_text(encoding="utf-8")
+    start_en, start_ru = html.index("\n  en: {"), html.index("\n  ru: {")
+    en = set(re.findall(r"^\s*'([a-z0-9\-]+)':", html[start_en:start_ru], re.M))
+    ru = set(re.findall(r"^\s*'([a-z0-9\-]+)':", html[start_ru:], re.M))
+
+    for token in REFUSAL_TEXT:
+        key = "promo-no-" + token.replace("_", "-")
+        assert key in en, f"no English wording for refusal {token!r} ({key})"
+        assert key in ru, f"no Russian wording for refusal {token!r} ({key})"
+
+
+def test_the_referral_panel_is_wired_up():
+    html = INDEX.read_text(encoding="utf-8")
+    for needed in ("/api/client/credit", "/api/client/referral",
+                   "paytab-referral", "loadReferral"):
+        assert needed in html, f"referral panel is missing {needed}"

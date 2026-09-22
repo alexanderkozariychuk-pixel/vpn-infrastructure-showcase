@@ -1212,9 +1212,80 @@
     }
     .checkout-back:hover { color: var(--text-bright); border-color: var(--border-bright); }
 
+    /* ── PROMO CODE AND CREDIT ── */
+    .promo-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .promo-input {
+      flex: 1; min-width: 0;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text-bright); padding: 12px 14px;
+      font-family: var(--font-body); font-size: 15px; letter-spacing: 2px;
+      text-transform: uppercase; box-sizing: border-box;
+      transition: border-color .15s;
+    }
+    .promo-input:focus { outline: none; border-color: var(--accent); }
+    .promo-btn {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text-dim); padding: 0 18px; cursor: pointer;
+      font-family: inherit; font-size: 13px; white-space: nowrap;
+      transition: color .15s, border-color .15s;
+    }
+    .promo-btn:hover { color: var(--text-bright); border-color: var(--border-bright); }
+    .promo-msg { font-size: 12px; line-height: 1.5; min-height: 18px; }
+    .promo-msg.ok  { color: var(--accent); }
+    .promo-msg.bad { color: var(--red, #e06c6c); }
+
+    .credit-box {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; margin-top: 12px; cursor: pointer;
+    }
+    .credit-box.off { opacity: .55; cursor: default; }
+    .credit-label { color: var(--text-bright); font-weight: 600; font-size: 14px; }
+    .credit-sub { color: var(--text-dim); font-size: 12px; margin-top: 3px; line-height: 1.4; }
+    .credit-switch {
+      width: 42px; height: 24px; border-radius: 12px; flex-shrink: 0;
+      background: var(--border); position: relative; transition: background .15s;
+    }
+    .credit-switch::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--text-dim); transition: transform .15s, background .15s;
+    }
+    .credit-box.on .credit-switch { background: var(--accent); }
+    .credit-box.on .credit-switch::after { transform: translateX(18px); background: var(--bg); }
+
+    .checkout-row.discount span:last-child { color: var(--accent); }
+
+    /* ── REFERRAL PANEL ── */
+    .ref-figures { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+    .ref-figure {
+      flex: 1 1 140px;
+      background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px 18px;
+    }
+    .ref-figure-value { font-size: 26px; font-weight: 600; color: var(--text-bright); }
+    .ref-figure-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
+    .ref-code {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      background: var(--bg); border: 1px dashed var(--border-bright, var(--border));
+      border-radius: 8px; padding: 16px 18px;
+    }
+    .ref-code-value {
+      font-size: 22px; letter-spacing: 4px; font-weight: 600; color: var(--accent);
+      word-break: break-all;
+    }
+    .ref-ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .ref-ledger td { padding: 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .ref-ledger tr:last-child td { border-bottom: none; }
+    .ref-ledger .ref-delta { text-align: right; white-space: nowrap; font-weight: 600; }
+    .ref-delta.plus  { color: var(--accent); }
+    .ref-delta.minus { color: var(--text-dim); }
+    .ref-when { color: var(--text-dim); font-size: 12px; margin-top: 3px; }
+
     @media (max-width: 720px) {
       .checkout { grid-template-columns: 1fr; }
       .checkout-side { order: -1; }
+      .ref-code { flex-direction: column; align-items: stretch; }
     }
   </style>
 </head>
@@ -1447,6 +1518,7 @@
         <div class="subtabs">
           <div class="subtab active" data-paytab="sub" onclick="showPayTab('sub')" data-i18n="pay-tab-sub">Subscription</div>
           <div class="subtab" data-paytab="history" onclick="showPayTab('history')" data-i18n="pay-tab-history">Order History</div>
+          <div class="subtab" data-paytab="referral" onclick="showPayTab('referral')" data-i18n="pay-tab-referral">Referrals</div>
         </div>
 
         <!-- TAB: Subscription -->
@@ -1537,6 +1609,27 @@
                 <span class="pay-method-arrow">→</span>
               </div>
 
+              <div class="checkout-step" style="margin-top:26px">
+                <span class="checkout-num">2</span>
+                <span data-i18n="checkout-savings">Промокод и баллы</span>
+              </div>
+
+              <div class="promo-row">
+                <input class="promo-input" id="promo-input" maxlength="32"
+                       autocomplete="off" spellcheck="false"
+                       data-i18n-placeholder="promo-placeholder" placeholder="ПРОМОКОД">
+                <button class="promo-btn" onclick="applyPromo()" data-i18n="promo-apply">Применить</button>
+              </div>
+              <div class="promo-msg" id="promo-msg"></div>
+
+              <div class="credit-box off" id="credit-box" onclick="toggleCredit()">
+                <div>
+                  <div class="credit-label" data-i18n="credit-use">Списать баллы</div>
+                  <div class="credit-sub" id="credit-sub">—</div>
+                </div>
+                <div class="credit-switch"></div>
+              </div>
+
               <div class="checkout-terms">
                 <a href="/offer" target="_blank" data-i18n="checkout-terms">Условия использования</a>
               </div>
@@ -1556,6 +1649,14 @@
                 <span data-i18n="checkout-devices">Устройств</span>
                 <span id="checkout-devices">—</span>
               </div>
+              <div class="checkout-row discount" id="checkout-discount-row" style="display:none">
+                <span data-i18n="checkout-discount">Скидка по промокоду</span>
+                <span id="checkout-discount">—</span>
+              </div>
+              <div class="checkout-row discount" id="checkout-credit-row" style="display:none">
+                <span data-i18n="checkout-credit">Списано баллов</span>
+                <span id="checkout-credit">—</span>
+              </div>
               <div class="checkout-total">
                 <span data-i18n="checkout-total">Итого</span>
                 <span id="checkout-total">—</span>
@@ -1574,6 +1675,36 @@
           <div class="card">
             <div class="card-title" data-i18n="hist-title">Order history</div>
             <div id="hist-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
+          </div>
+        </div>
+
+        <!-- TAB: Referrals -->
+        <div class="paytab-panel" id="paytab-referral" style="display:none">
+          <div class="card">
+            <div class="card-title" data-i18n="ref-balance-title">Your points</div>
+            <div class="ref-figures">
+              <div class="ref-figure">
+                <div class="ref-figure-value" id="ref-balance">—</div>
+                <div class="ref-figure-label" data-i18n="ref-available">Available to spend</div>
+              </div>
+              <div class="ref-figure">
+                <div class="ref-figure-value" id="ref-pending">—</div>
+                <div class="ref-figure-label" data-i18n="ref-pending">Earned, becomes available in 14 days</div>
+              </div>
+            </div>
+            <div class="checkout-note" data-i18n="ref-rules">
+              1 балл = 1 ₽. Баллами можно оплатить до половины заказа.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" data-i18n="ref-code-title">Your referral code</div>
+            <div id="ref-code-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" data-i18n="ref-ledger-title">Points history</div>
+            <div id="ref-ledger-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
           </div>
         </div>
 
@@ -1922,6 +2053,40 @@ const translations = {
     'checkout-fee': 'We cover the payment provider fee',
     'checkout-back': 'Back to plans',
     'pay-error': 'Payment error',
+    'checkout-savings': 'Promo code and points',
+    'checkout-discount': 'Promo code discount',
+    'checkout-credit': 'Points applied',
+    'promo-placeholder': 'PROMO CODE',
+    'promo-apply': 'Apply',
+    'promo-applied': 'Code applied:',
+    'promo-no-unknown': 'No such code',
+    'promo-no-inactive': 'This code is no longer active',
+    'promo-no-expired': 'This code has expired',
+    'promo-no-used-up': 'This code has been used up',
+    'promo-no-own-code': 'You cannot use your own code',
+    'credit-use': 'Use points',
+    'credit-available': 'Available:',
+    'credit-max-here': 'can be applied here:',
+    'credit-none': 'You have no points yet',
+    'pay-tab-referral': 'Referrals',
+    'ref-balance-title': 'Your points',
+    'ref-available': 'Available to spend',
+    'ref-pending': 'Earned — available in 14 days',
+    'ref-rules': '1 point = 1 ₽. Points can cover up to half of an order, and expire six months after they become available.',
+    'ref-code-title': 'Your referral code',
+    'ref-copy': 'Copy',
+    'ref-create': 'Get my code',
+    'ref-uses': 'Purchases made with your code:',
+    'ref-explain': 'A friend gets {discount}% off their first purchase. When they buy more than one month, you get {reward} points — available to spend 14 days later.',
+    'ref-need-sub': 'A referral code comes with an active subscription.',
+    'ref-ledger-title': 'Points history',
+    'ref-ledger-empty': 'No movements yet',
+    'ref-vests': 'available from',
+    'ref-expires': 'expires',
+    'ref-r-reward': 'Referral reward',
+    'ref-r-spend': 'Applied to an order',
+    'ref-r-expiry': 'Expired',
+    'ref-r-adjustment': 'Adjustment',
     'feat-1dev': '1 device config',
     'feat-2dev': '2 device configs',
     'feat-3dev': '3 device configs',
@@ -2156,6 +2321,40 @@ const translations = {
     'checkout-fee': 'Комиссию платёжной системы оплачиваем мы',
     'checkout-back': 'Назад к тарифам',
     'pay-error': 'Ошибка оплаты',
+    'checkout-savings': 'Промокод и баллы',
+    'checkout-discount': 'Скидка по промокоду',
+    'checkout-credit': 'Списано баллов',
+    'promo-placeholder': 'ПРОМОКОД',
+    'promo-apply': 'Применить',
+    'promo-applied': 'Код применён:',
+    'promo-no-unknown': 'Такого кода нет',
+    'promo-no-inactive': 'Код больше не действует',
+    'promo-no-expired': 'Срок действия кода истёк',
+    'promo-no-used-up': 'Код исчерпан',
+    'promo-no-own-code': 'Свой собственный код применить нельзя',
+    'credit-use': 'Списать баллы',
+    'credit-available': 'Доступно:',
+    'credit-max-here': 'к этому заказу:',
+    'credit-none': 'Баллов пока нет',
+    'pay-tab-referral': 'Рефералы',
+    'ref-balance-title': 'Ваши баллы',
+    'ref-available': 'Доступно к списанию',
+    'ref-pending': 'Начислено — станет доступно через 14 дней',
+    'ref-rules': '1 балл = 1 ₽. Баллами можно оплатить до половины заказа. Баллы сгорают через полгода после того, как станут доступны.',
+    'ref-code-title': 'Ваш промокод',
+    'ref-copy': 'Копировать',
+    'ref-create': 'Получить промокод',
+    'ref-uses': 'Покупок по вашему коду:',
+    'ref-explain': 'Друг получает скидку {discount}% на первую покупку. Когда он оплатит больше месяца, вам начисляется {reward} баллов — они станут доступны через 14 дней.',
+    'ref-need-sub': 'Промокод доступен при активной подписке.',
+    'ref-ledger-title': 'История баллов',
+    'ref-ledger-empty': 'Движений пока нет',
+    'ref-vests': 'доступно с',
+    'ref-expires': 'сгорают',
+    'ref-r-reward': 'Реферальное начисление',
+    'ref-r-spend': 'Списание на заказ',
+    'ref-r-expiry': 'Сгорели',
+    'ref-r-adjustment': 'Корректировка',
     'feat-1dev': '1 конфиг устройства',
     'feat-2dev': '2 конфига устройств',
     'feat-3dev': '3 конфига устройств',
@@ -2514,7 +2713,7 @@ function showSetupTab(tab) {
 }
 
 function showPayTab(tab) {
-  ['sub', 'history'].forEach(t => {
+  ['sub', 'history', 'referral'].forEach(t => {
     const p = document.getElementById('paytab-' + t);
     if (p) p.style.display = (t === tab) ? 'block' : 'none';
   });
@@ -2522,6 +2721,7 @@ function showPayTab(tab) {
     s.classList.toggle('active', s.getAttribute('data-paytab') === tab);
   });
   if (tab === 'history') loadPaymentHistory();
+  if (tab === 'referral') loadReferral();
 }
 
 const PAY_STATUS_KEY = { paid: 'pay-st-paid', pending: 'pay-st-pending', error: 'pay-st-error' };
@@ -2614,6 +2814,111 @@ function renderPlans() {
   });
 }
 
+// What the customer is asking for. The amount is deliberately absent: it
+// comes back from the server with every quote, and is never computed here.
+let checkoutCode = null;
+let checkoutUseCredit = false;
+let checkoutQuote = null;
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function setRow(rowId, valueId, visible, value) {
+  const row = document.getElementById(rowId);
+  if (row) row.style.display = visible ? '' : 'none';
+  if (visible) setText(valueId, value);
+}
+
+/**
+ * Ask the server what this order costs, and show that.
+ *
+ * The prices in PLANS above are for the plan cards, before anyone has logged
+ * in. From the moment a customer is at the checkout the figures come from
+ * /api/payment/quote and nothing else — the same function that prices the
+ * payment itself. Computing the discount here as well would give two answers
+ * to one question, and the customer would eventually be shown the wrong one.
+ */
+async function refreshQuote() {
+  if (!checkoutPlan || !token) return;
+
+  const plan = PLANS[checkoutPlan];
+  try {
+    const res = await fetch(`${API}/api/payment/quote`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+      body: JSON.stringify({
+        plan: checkoutPlan,
+        code: checkoutCode,
+        // A number large enough to mean "as much as allowed". The server
+        // clamps it to the balance and to half the order, and reports back
+        // what it actually applied.
+        use_credit: checkoutUseCredit ? 1000000 : 0,
+      })
+    });
+    if (!res.ok) return;
+    checkoutQuote = await res.json();
+  } catch (e) {
+    return;   // Leave the last good figures up rather than blanking them.
+  }
+
+  const q = checkoutQuote;
+  setText('checkout-price', `${q.base_price} ₽`);
+  setText('checkout-total', `${q.amount} ₽`);
+  setRow('checkout-discount-row', 'checkout-discount', q.discount > 0, `−${q.discount} ₽`);
+  setRow('checkout-credit-row', 'checkout-credit', q.credit_spent > 0, `−${q.credit_spent} ₽`);
+
+  // A code that was accepted and then invalidated — by expiring, or by being
+  // used up — must not stay on screen looking applied.
+  const msg = document.getElementById('promo-msg');
+  if (msg) {
+    if (q.promo_refused) {
+      msg.className = 'promo-msg bad';
+      // The server sends a token, not a sentence — it cannot know which
+      // language this portal is in. Its English text is the fallback for a
+      // reason added on the server before this table catches up.
+      const key = 'promo-no-' + q.promo_refused.replace(/_/g, '-');
+      msg.textContent = translations[currentLang][key] || q.promo_refused_text || q.promo_refused;
+      checkoutCode = null;
+    } else if (q.promo_code) {
+      msg.className = 'promo-msg ok';
+      msg.textContent = `${t('promo-applied')} −${q.discount} ₽`;
+    }
+  }
+
+  const box = document.getElementById('credit-box');
+  const sub = document.getElementById('credit-sub');
+  const usable = q.credit_max;
+  if (box) {
+    // Off and inert when there is nothing to spend: a switch that does
+    // nothing when pressed is worse than one that is visibly unavailable.
+    box.classList.toggle('off', q.credit_available <= 0);
+    box.classList.toggle('on', checkoutUseCredit && q.credit_spent > 0);
+  }
+  if (sub) {
+    sub.textContent = q.credit_available > 0
+      ? `${t('credit-available')} ${q.credit_available} · ${t('credit-max-here')} ${Math.min(usable, q.credit_available)}`
+      : t('credit-none');
+  }
+}
+
+function applyPromo() {
+  const input = document.getElementById('promo-input');
+  const msg   = document.getElementById('promo-msg');
+  const code  = (input ? input.value : '').trim().toUpperCase();
+
+  checkoutCode = code || null;
+  if (msg && !code) { msg.className = 'promo-msg'; msg.textContent = ''; }
+  refreshQuote();
+}
+
+function toggleCredit() {
+  if (!checkoutQuote || checkoutQuote.credit_available <= 0) return;
+  checkoutUseCredit = !checkoutUseCredit;
+  refreshQuote();
+}
+
 function openCheckout(tier) {
   if (!token) { showView('login', 'client'); return; }
 
@@ -2628,15 +2933,25 @@ function openCheckout(tier) {
 
   const name = t(tier === 'ext' ? 'plan-ext-name' : 'plan-basic-name');
   const price = `${plan.amount} ₽`;
-  const set = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  };
+  const set = setText;
   set('checkout-plan', name);
   set('checkout-price', price);
   set('checkout-total', price);
   set('checkout-period-value', t(`period-${selectedPeriod}`));
   set('checkout-devices', plan.configs);
+
+  // A fresh checkout starts clean — a code typed for an order that was
+  // abandoned should not follow the customer into the next one.
+  checkoutCode = null;
+  checkoutUseCredit = false;
+  checkoutQuote = null;
+  const input = document.getElementById('promo-input');
+  const msg   = document.getElementById('promo-msg');
+  if (input) input.value = '';
+  if (msg) { msg.className = 'promo-msg'; msg.textContent = ''; }
+  setRow('checkout-discount-row', 'checkout-discount', false);
+  setRow('checkout-credit-row', 'checkout-credit', false);
+  refreshQuote();
 
   // Six months is crypto-only: that much obligation should not rest on the
   // card rail, which can end without warning and not by our decision. Hide
@@ -2665,8 +2980,9 @@ async function startPayment(method) {
   if (!token) { showView('login', 'client'); return; }
   if (!checkoutPlan) return;
 
-  // Both endpoints take {plan} and return {ok, url, payment_id}, so only
-  // the address differs — the response handling below stays shared.
+  // Both endpoints take {plan, code, use_credit} and return
+  // {ok, url, payment_id, quote}, so only the address differs — the response
+  // handling below stays shared.
   const endpoint = method === 'crypto'
     ? '/api/payment/create'
     : '/api/payment/freekassa/create';
@@ -2676,7 +2992,11 @@ async function startPayment(method) {
     const res = await fetch(`${API}${endpoint}`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-      body: JSON.stringify({plan: checkoutPlan})
+      body: JSON.stringify({
+        plan: checkoutPlan,
+        code: checkoutCode,
+        use_credit: checkoutUseCredit ? 1000000 : 0,
+      })
     });
     const d = await res.json();
     if (res.ok && d.url) {
@@ -2687,6 +3007,112 @@ async function startPayment(method) {
   } catch(e) {
     if (out) out.textContent = t('pay-error');
   }
+}
+
+// ── REFERRALS AND POINTS ──
+
+const LEDGER_REASON = {
+  referral_reward: 'ref-r-reward',
+  spend:           'ref-r-spend',
+  expiry:          'ref-r-expiry',
+  adjustment:      'ref-r-adjustment',
+};
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-GB');
+}
+
+async function loadReferral() {
+  if (!token) return;
+  const headers = {'Authorization': `Bearer ${token}`};
+
+  // Both at once: the figures and the code are one screen to the customer,
+  // and loading them in sequence makes the page assemble itself in stages.
+  let credit = null, ref = null;
+  try {
+    const [cRes, rRes] = await Promise.all([
+      fetch(`${API}/api/client/credit`, {headers}),
+      fetch(`${API}/api/client/referral`, {headers}),
+    ]);
+    if (cRes.ok) credit = await cRes.json();
+    if (rRes.ok) ref = await rRes.json();
+  } catch (e) { /* handled below */ }
+
+  const ledger = document.getElementById('ref-ledger-body');
+  const codeEl = document.getElementById('ref-code-body');
+
+  if (!credit) {
+    setText('ref-balance', '—');
+    setText('ref-pending', '—');
+    if (ledger) ledger.innerHTML = `<div style="color:var(--text-dim);font-size:13px">—</div>`;
+  } else {
+    setText('ref-balance', credit.balance);
+    setText('ref-pending', credit.pending);
+    if (ledger) {
+      ledger.innerHTML = credit.history.length
+        ? `<table class="ref-ledger">${credit.history.map(e => {
+            const plus = e.delta > 0;
+            // Which date matters depends on what the entry is doing: credit
+            // that has not vested is explained by when it will, and credit
+            // that has is explained by when it runs out.
+            const vesting = e.vests_at && new Date(e.vests_at) > new Date();
+            const when = vesting
+              ? `${t('ref-vests')} ${fmtDate(e.vests_at)}`
+              : (e.expires_at ? `${t('ref-expires')} ${fmtDate(e.expires_at)}` : fmtDate(e.created_at));
+            return `<tr>
+              <td>${t(LEDGER_REASON[e.reason] || 'ref-r-adjustment')}
+                  <div class="ref-when">${when}</div></td>
+              <td class="ref-delta ${plus ? 'plus' : 'minus'}">${plus ? '+' : ''}${e.delta}</td>
+            </tr>`;
+          }).join('')}</table>`
+        : `<div style="color:var(--text-dim);font-size:13px">${t('ref-ledger-empty')}</div>`;
+    }
+  }
+
+  if (!codeEl) return;
+  if (!ref) {
+    codeEl.innerHTML = `<div style="color:var(--text-dim);font-size:13px">—</div>`;
+  } else if (ref.code) {
+    codeEl.innerHTML = `
+      <div class="ref-code">
+        <div class="ref-code-value" id="ref-code-value">${ref.code}</div>
+        <button class="promo-btn" onclick="copyReferralCode()">${t('ref-copy')}</button>
+      </div>
+      <div class="checkout-note">
+        ${t('ref-explain').replace('{reward}', ref.reward).replace('{discount}', ref.discount_percent)}
+      </div>
+      <div class="checkout-note">${t('ref-uses')} ${ref.uses}</div>`;
+  } else if (ref.eligible) {
+    codeEl.innerHTML = `
+      <div class="checkout-note" style="margin-top:0">
+        ${t('ref-explain').replace('{reward}', ref.reward).replace('{discount}', ref.discount_percent)}
+      </div>
+      <button class="btn-primary" style="margin-top:14px" onclick="createReferralCode()">${t('ref-create')}</button>`;
+  } else {
+    // Said plainly rather than by a greyed-out button. A code is earned by
+    // being a customer, and that is the whole reason it cannot be minted by
+    // an account that has never paid.
+    codeEl.innerHTML = `<div class="checkout-note" style="margin-top:0">${t('ref-need-sub')}</div>`;
+  }
+}
+
+async function createReferralCode() {
+  if (!token) return;
+  try {
+    const res = await fetch(`${API}/api/client/referral`, {
+      method: 'POST',
+      headers: {'Authorization': `Bearer ${token}`},
+    });
+    if (res.ok) loadReferral();
+  } catch (e) { /* the panel stays as it was */ }
+}
+
+function copyReferralCode() {
+  const el = document.getElementById('ref-code-value');
+  if (!el || !navigator.clipboard) return;
+  navigator.clipboard.writeText(el.textContent.trim());
 }
 
 function toggleSidebar() {

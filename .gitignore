@@ -120,3 +120,8 @@ infrastructure/ansible/roles/outline/
 infrastructure/ansible/roles/fou-backbone/
 
 .ruff_cache/
+
+# Local scratch databases from running the app against sqlite.
+*.sqlite
+*.sqlite3
+pwa/*.db

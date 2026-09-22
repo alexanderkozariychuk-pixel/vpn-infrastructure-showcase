@@ -201,6 +201,11 @@ async def resolve_code(
     Returns (code, None) when usable, or (None, reason) when not. The reason is
     meant to reach the customer: "that code has expired" is a better checkout
     than a silent full-price order.
+
+    The reason is a short machine token, not a sentence. The portal is
+    Russian by default and the API cannot know which language a caller is
+    showing, so the wording belongs on that side; `REFUSAL_TEXT` below carries
+    an English fallback for logs and for anything reading the API directly.
     """
     if not code:
         return None, None
@@ -210,19 +215,28 @@ async def resolve_code(
     promo = result.scalars().first()
 
     if promo is None:
-        return None, "Unknown code"
+        return None, "unknown"
     if not promo.is_active:
-        return None, "This code is no longer active"
+        return None, "inactive"
     if _aware(promo.expires_at) is not None and _aware(promo.expires_at) <= now:
-        return None, "This code has expired"
+        return None, "expired"
     if promo.max_uses is not None and promo.uses >= promo.max_uses:
-        return None, "This code has been used up"
+        return None, "used_up"
     if promo.owner_user_id == buyer.id:
         # Nobody refers themselves. Cheap to check and it removes the most
         # obvious way to try.
-        return None, "You cannot use your own referral code"
+        return None, "own_code"
 
     return promo, None
+
+
+REFUSAL_TEXT = {
+    "unknown":  "Unknown code",
+    "inactive": "This code is no longer active",
+    "expired":  "This code has expired",
+    "used_up":  "This code has been used up",
+    "own_code": "You cannot use your own referral code",
+}
 
 
 # ── pricing an order ────────────────────────────────────────────────────────
@@ -272,7 +286,9 @@ async def price_order(
         "base_price": base,
         "discount": base - after_discount,
         "promo_code": promo.code if promo else None,
+        # The token is what the portal translates; the text is the fallback.
         "promo_refused": refusal,
+        "promo_refused_text": REFUSAL_TEXT.get(refusal) if refusal else None,
         "credit_available": available,
         "credit_max": max_credit_for(after_discount),
         "credit_spent": credit,
