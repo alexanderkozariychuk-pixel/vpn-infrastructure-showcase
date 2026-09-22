@@ -258,3 +258,32 @@ def test_the_referral_panel_is_wired_up():
     for needed in ("/api/client/credit", "/api/client/referral",
                    "paytab-referral", "loadReferral"):
         assert needed in html, f"referral panel is missing {needed}"
+
+
+def test_the_terms_cover_points_and_referral_codes():
+    """
+    The programme creates an obligation — points the service will honour as a
+    discount months from now — and an obligation with nothing written down is
+    one the customer cannot hold anyone to. Each figure here is also a number
+    in the code, so this is the second place either one can be caught drifting.
+    """
+    from services.credit import (
+        DEFAULT_DISCOUNT_PERCENT, MAX_CREDIT_SHARE, REFERRAL_REWARD,
+        REWARD_VESTING_DAYS,
+    )
+
+    raw = OFFER.read_text(encoding="utf-8")
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))
+
+    assert "Баллы и промокоды" in text, "the terms say nothing about points"
+    assert str(REFERRAL_REWARD) in text, f"the reward ({REFERRAL_REWARD}) is not stated"
+    assert f"{DEFAULT_DISCOUNT_PERCENT}%" in text, "the invitee discount is not stated"
+    assert f"{REWARD_VESTING_DAYS} дней" in text, "the vesting period is not stated"
+    assert int(MAX_CREDIT_SHARE * 2) == 1 and "не более половины" in text, (
+        "the cap on how much of an order points may cover is not stated"
+    )
+    # Points that look like a stored balance of money are a different kind of
+    # product with a different set of rules attached to it.
+    assert "не являются денежными средствами" in text, (
+        "the terms do not say points are not money"
+    )

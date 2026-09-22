@@ -25,7 +25,10 @@
   .meta { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; }
   .intro { color: var(--text-dim); font-size: 15px; max-width: 66ch; margin-bottom: 28px; }
   h2 { font-size: 15px; color: var(--accent); margin: 36px 0 14px; font-weight: 600; }
-  ol { list-style: none; counter-reset: t; }
+  /* One continuous counter for the whole document — see offer.html.
+     Resetting on each <ol> made every section restart at 1. */
+  .wrap { counter-reset: t; }
+  ol { list-style: none; }
   ol li { counter-increment: t; position: relative; padding-left: 38px; margin-bottom: 16px; color: var(--text-dim); font-size: 15px; max-width: 68ch; }
   ol li::before { content: counter(t) "."; position: absolute; left: 0; top: 0; width: 26px; text-align: right; color: var(--border-bright); font-variant-numeric: tabular-nums; }
   ol li b { color: var(--text); font-weight: 600; }
@@ -68,7 +71,7 @@
 </ol>
 
 <h2>Передача третьим лицам</h2>
-<ol start="12">
+<ol start="8">
   <li>Данные не продаются, не передаются и не предоставляются третьим лицам
       в маркетинговых или иных коммерческих целях.</li>
   <li>Обработка платежей выполняется платёжными системами. Им передаётся сумма
@@ -79,7 +82,7 @@
 </ol>
 
 <h2>Сроки хранения и права пользователя</h2>
-<ol start="16">
+<ol start="11">
   <li>Данные хранятся в течение срока действия учётной записи и в течение
       срока, установленного законодательством для документов об оплате.</li>
   <li>Вы вправе запросить сведения о хранящихся данных, их исправление
@@ -89,13 +92,13 @@
 </ol>
 
 <h2>Изменения</h2>
-<ol start="19">
+<ol start="14">
   <li>Условия могут изменяться. Новая редакция вступает в силу с момента
       публикации на сайте. Дата актуальной редакции указана в начале документа.</li>
 </ol>
 
 <h2>Контакты</h2>
-<ol start="20">
+<ol start="15">
   <li>Вопросы по обработке данных: <a href="mailto:sovrn.support@gmail.com">sovrn.support@gmail.com</a>
       или форма обращения в личном кабинете.</li>
 </ol>
