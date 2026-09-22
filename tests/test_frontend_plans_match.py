@@ -287,3 +287,20 @@ def test_the_terms_cover_points_and_referral_codes():
     assert "не являются денежными средствами" in text, (
         "the terms do not say points are not money"
     )
+
+
+def test_dates_follow_the_portal_language_not_the_browser():
+    """
+    `toLocaleDateString()` with no argument follows the browser's locale. The
+    portal has its own language toggle, and that is the only setting the
+    customer chose — a Russian portal was showing 9/19/2026 to anyone whose
+    browser was English. Every date goes through one formatter now.
+    """
+    html = INDEX.read_text(encoding="utf-8")
+    # A call, not the word — the comment explaining this rule says it too.
+    bare = re.findall(r"\.toLocaleDateString\(\s*\)", html)
+    assert not bare, (
+        f"{len(bare)} date(s) formatted with the browser's locale instead of "
+        f"the portal's language — route them through fmtDate()"
+    )
+    assert "function fmtDate(" in html, "the shared date formatter is gone"

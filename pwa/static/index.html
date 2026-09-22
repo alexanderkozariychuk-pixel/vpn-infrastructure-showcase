@@ -2562,6 +2562,19 @@ const translations = {
 
 let currentLang = localStorage.getItem('sov_lang') || 'ru';
 
+/**
+ * A date in the language the portal is set to.
+ *
+ * Bare toLocaleDateString() follows the *browser's* locale, not this page's
+ * language toggle, so a Russian portal showed 9/19/2026 to anyone whose
+ * browser was English. The toggle is the only setting the customer chose.
+ */
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-GB');
+}
+
 function t(key) {
   return translations[currentLang][key] || translations['en'][key] || key;
 }
@@ -2740,7 +2753,7 @@ async function loadPaymentHistory() {
       return;
     }
     const rows = list.map(p => {
-      const date = p.created_at ? new Date(p.created_at).toLocaleDateString() : '—';
+      const date = fmtDate(p.created_at) || '—';
       const stKey = PAY_STATUS_KEY[p.status] || null;
       const stTxt = stKey ? t(stKey) : (p.status || '—');
       const cls = p.status === 'paid' ? 'green' : (p.status === 'error' ? 'red' : 'yellow');
@@ -3017,12 +3030,6 @@ const LEDGER_REASON = {
   expiry:          'ref-r-expiry',
   adjustment:      'ref-r-adjustment',
 };
-
-function fmtDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return isNaN(d) ? '' : d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-GB');
-}
 
 async function loadReferral() {
   if (!token) return;
@@ -3420,7 +3427,7 @@ async function loadClientMe() {
       statEl.textContent = d.is_subscribed ? t('sub-active') : t('sub-inactive');
       statEl.className = 'metric-value ' + (d.is_subscribed ? 'green' : 'red');
     }
-    if (expEl) expEl.textContent = d.subscribed_until ? new Date(d.subscribed_until).toLocaleDateString() : '—';
+    if (expEl) expEl.textContent = fmtDate(d.subscribed_until) || '—';
   } catch(e) {}
 }
 
