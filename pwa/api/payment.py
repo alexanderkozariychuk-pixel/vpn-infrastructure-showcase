@@ -260,11 +260,27 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
         paid = 0.0
     expected = float(payment.amount)
     if paid + 0.01 < expected:
-        logger.error("FreeKassa amount mismatch on order %s: got %s, expected %s",
-                     order_id, paid, expected)
+        # The whole notification, not just the two numbers. A mismatch means a
+        # customer has paid and is getting nothing until someone intervenes,
+        # and whoever does that needs to see what actually arrived — which
+        # gateway, which method, what commission was taken — rather than
+        # deducing it from "got 329, expected 350".
+        logger.error(
+            "FreeKassa amount mismatch on order %s: got %s, expected %s; payload=%r",
+            order_id, paid, expected, params,
+        )
         payment.status = "amount_mismatch"
         await db.commit()
         return "YES"
+
+    # What the gateway kept. Not stored yet — but without it in the log there
+    # is no way to answer "what do I actually receive per sale", which is the
+    # first question once money starts arriving.
+    logger.info(
+        "FreeKassa paid: order=%s amount=%s commission=%s method=%s",
+        order_id, params.get("AMOUNT"), params.get("commission"),
+        params.get("CUR_ID") or params.get("P_ID"),
+    )
 
     result = await db.execute(select(User).where(User.id == payment.user_id))
     user = result.scalar_one_or_none()

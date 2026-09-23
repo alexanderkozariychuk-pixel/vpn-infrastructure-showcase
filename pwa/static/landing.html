@@ -3,9 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sovereign — ваша персональная расширенная локальная сеть</title>
-<meta name="description" content="Уникальный персонализированный под вас файл для расширения вашей локальной сети. 300 ₽ в месяц.">
+<title>Sovereign — персональное защищённое соединение</title>
+<meta name="description" content="Персональная конфигурация защищённого соединения. Выдаётся автоматически после оплаты, до пяти устройств. От 350 ₽ в месяц.">
 <meta name="theme-color" content="#080c0f">
+<link rel="canonical" href="https://sov3r3ign.com/">
+
+<!-- Link previews. This matters more here than search ranking does: the way
+     this service actually grows is a customer pasting their referral link
+     into a messenger, and a link with no preview reads as spam. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sovereign">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://sov3r3ign.com/">
+<meta property="og:title" content="Sovereign — персональное защищённое соединение">
+<meta property="og:description" content="Персональная конфигурация, выдаётся автоматически после оплаты. До пяти устройств. От 350 ₽ в месяц.">
+<meta property="og:image" content="https://sov3r3ign.com/static/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Sovereign — персональное защищённое соединение">
+<meta name="twitter:description" content="Персональная конфигурация, выдаётся автоматически после оплаты. До пяти устройств. От 350 ₽ в месяц.">
+<meta name="twitter:image" content="https://sov3r3ign.com/static/icons/icon-512.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -149,7 +167,7 @@
        соединения с вашей инфраструктурой. Индивидуальная конфигурация помогает
        поддерживать стабильное подключение для повседневных задач.</p>
     <div class="buy">
-      <div class="price">300 ₽ <small>в месяц</small></div>
+      <div class="price">350 ₽ <small>в месяц</small></div>
       <a class="cta" href="/app">Подключить</a>
     </div>
   </div>
@@ -183,8 +201,9 @@
     </dl>
 
     <div class="note">
-      <b>Одна конфигурация — одно устройство.</b> Нужен второй телефон или компьютер —
-      напишите в поддержку, выдадим отдельную конфигурацию.
+      <b>Одна конфигурация — одно устройство.</b> Базовый тариф — до двух конфигураций,
+      расширенный — до пяти. Добавить или удалить устройство можно в личном кабинете
+      самостоятельно, обращаться в поддержку не нужно.
     </div>
   </section>
 
@@ -194,7 +213,7 @@
       <a href="/offer">Пользовательское соглашение</a>
       <a href="/privacy">Политика конфиденциальности</a>
       <a href="/app">Личный кабинет</a>
-      <a href="mailto:alexanderkozariychuk@gmail.com">Поддержка</a>
+      <a href="mailto:sovrn.support@gmail.com">Поддержка</a>
     </nav>
     <div class="legal">
       Sovereign · sov3r3ign.com<br>
@@ -206,10 +225,11 @@
 
 <script>
   // Returning visitors with a session go straight to the app.
-  // CONFIRM the key name against how the SPA stores its JWT — if it differs,
-  // this check silently does nothing and everyone sees the landing.
+  // The key is 'sov_token' — what the portal actually writes. This read
+  // 'token' and so had never fired once; the comment that used to sit here
+  // asked for the check that would have caught it.
   try {
-    if (localStorage.getItem('token')) location.replace('/app');
+    if (localStorage.getItem('sov_token')) location.replace('/app');
   } catch (e) { /* storage blocked — stay on the landing */ }
 </script>
 

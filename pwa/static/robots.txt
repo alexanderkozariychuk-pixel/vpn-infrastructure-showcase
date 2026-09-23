@@ -1,0 +1,16 @@
+# Sovereign — sov3r3ign.com
+#
+# Public pages are open. Everything behind a login is not: the portal cannot
+# be crawled anyway, and a half-rendered app shell in a search result is worse
+# than no result at all.
+
+User-agent: *
+Allow: /$
+Allow: /about
+Allow: /offer
+Allow: /privacy
+Disallow: /app
+Disallow: /reset
+Disallow: /api/
+
+Sitemap: https://sov3r3ign.com/sitemap.xml

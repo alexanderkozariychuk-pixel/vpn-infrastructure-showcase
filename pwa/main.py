@@ -75,6 +75,19 @@ async def reset_page():
     # serves the same SPA; frontend reads ?token= and shows the reset form
     return FileResponse("static/index.html")
 
+# Both must answer from the site root — a crawler looks for /robots.txt and
+# nowhere else, and a sitemap under /static would not be trusted for URLs
+# outside that directory.
+@app.get("/robots.txt")
+async def robots():
+    return FileResponse("static/robots.txt", media_type="text/plain")
+
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    return FileResponse("static/sitemap.xml", media_type="application/xml")
+
+
 @app.get("/api")
 async def api_root():
     """
