@@ -13,4 +13,10 @@ Disallow: /app
 Disallow: /reset
 Disallow: /api/
 
+# Googlebot-Image has to reach the favicon for it to show beside the search
+# result, and the preview image for a link card. Stated rather than left to
+# the default, so a future Disallow cannot quietly take them out.
+Allow: /static/icons/
+Allow: /favicon.ico
+
 Sitemap: https://sov3r3ign.com/sitemap.xml

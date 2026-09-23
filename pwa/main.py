@@ -78,6 +78,13 @@ async def reset_page():
 # Both must answer from the site root — a crawler looks for /robots.txt and
 # nowhere else, and a sitemap under /static would not be trusted for URLs
 # outside that directory.
+# Requested by browsers and crawlers whether or not a page declares it, so a
+# 404 here is a blank icon for anyone who looks in the usual place.
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("static/icons/favicon.ico", media_type="image/x-icon")
+
+
 @app.get("/robots.txt")
 async def robots():
     return FileResponse("static/robots.txt", media_type="text/plain")

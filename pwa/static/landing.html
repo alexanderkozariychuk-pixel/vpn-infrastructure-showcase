@@ -24,8 +24,22 @@
 <meta name="twitter:title" content="Sovereign — персональное защищённое соединение">
 <meta name="twitter:description" content="Персональная конфигурация, выдаётся автоматически после оплаты. До пяти устройств. От 350 ₽ в месяц.">
 <meta name="twitter:image" content="https://sov3r3ign.com/static/icons/icon-512.png">
+<!-- Icons. Google picks the favicon up from the HOME PAGE specifically, and
+     recommends one larger than 48x48 — this page declared only 16 and 32, so
+     these point at the favicon-weight cut (see icons/make_favicon.py), which
+     is the same mark drawn heavier so it survives 16 px. /favicon.ico is
+     served from the root too, since browsers and crawlers request that path
+     whether it is declared or not. The touch icon and manifest below only
+     existed on the portal: adding the landing page to a phone home screen
+     gave a blank square. -->
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/favicon-192.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/static/icons/favicon-48.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="manifest" href="/static/icons/manifest.json">
+<meta name="apple-mobile-web-app-title" content="Sovereign">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@300;400;700&display=swap" rel="stylesheet">
 <style>

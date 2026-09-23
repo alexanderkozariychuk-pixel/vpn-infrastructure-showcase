@@ -158,3 +158,109 @@ def test_the_preview_image_exists():
     assert (STATIC.parent / match.group(1).lstrip("/")).exists(), (
         f"og:image points at {match.group(1)}, which is not in the build"
     )
+
+
+# ── the icon beside the search result ───────────────────────────────────────
+#
+# Google takes the favicon from the HOME PAGE specifically — not from the
+# portal, not from a manifest — and Googlebot-Image has to be able to fetch
+# the file. The landing declared only 16 and 32 px, below the size Google's
+# own guidance points at, and /favicon.ico answered 404.
+
+ICONS = STATIC / "icons"
+
+
+def test_the_home_page_declares_an_icon_large_enough_for_search():
+    raw = LANDING.read_text(encoding="utf-8")
+    sizes = [int(s.split("x")[0]) for s in re.findall(r'rel="icon"[^>]*sizes="(\d+x\d+)"', raw)]
+    assert sizes, "the home page declares no sized icon at all"
+    assert max(sizes) >= 48, (
+        f"largest declared icon is {max(sizes)}px; Google recommends larger "
+        f"than 48px for the favicon beside a search result"
+    )
+
+
+def test_every_declared_icon_file_exists_and_is_square():
+    from PIL import Image
+
+    raw = LANDING.read_text(encoding="utf-8")
+    hrefs = re.findall(r'rel="(?:icon|apple-touch-icon)"[^>]*href="([^"]+)"', raw)
+    assert hrefs, "the home page links no icons"
+
+    for href in hrefs:
+        # /favicon.ico is served by a route, not from the static tree.
+        path = ICONS / "favicon.ico" if href == "/favicon.ico" else STATIC.parent / href.lstrip("/")
+        assert path.exists(), f"{href} is declared but not in the build"
+        with Image.open(path) as im:
+            assert im.width == im.height, f"{href} is {im.width}x{im.height}, not square"
+
+
+def test_the_root_favicon_carries_the_sizes_a_search_result_uses():
+    from PIL import Image
+
+    ico = ICONS / "favicon.ico"
+    assert ico.exists(), "no favicon.ico — the path browsers request unprompted"
+    with Image.open(ico) as im:
+        sizes = {s[0] for s in im.info.get("sizes", [])}
+    assert 48 in sizes, f"favicon.ico has {sorted(sizes)}, no 48px frame"
+
+
+def test_nothing_blocks_the_crawler_from_the_icons():
+    robots = ROBOTS.read_text(encoding="utf-8")
+    disallowed = re.findall(r"^Disallow:\s*(\S+)", robots, re.M)
+    for blocked in disallowed:
+        assert not "/static/icons/".startswith(blocked.rstrip("*")) or blocked == "/", (
+            f"robots.txt disallows {blocked}, which covers the icons"
+        )
+    assert "Allow: /favicon.ico" in robots
+
+
+def test_the_home_page_can_be_added_to_a_home_screen():
+    """
+    The portal had the touch icon and manifest; the landing did not, so adding
+    *it* to a home screen produced a blank square.
+    """
+    raw = LANDING.read_text(encoding="utf-8")
+    assert 'rel="apple-touch-icon"' in raw
+    assert 'rel="manifest"' in raw
+
+
+def test_the_favicon_is_the_heavy_cut_not_the_app_icon():
+    """
+    The app icon is drawn for 180 px and up. At 16 px its strokes fall below a
+    pixel and the mark becomes three faint dots with nothing joining them —
+    which is the one idea it exists to carry. The favicon links must point at
+    the heavier cut, not at icon-*.png.
+    """
+    raw = LANDING.read_text(encoding="utf-8")
+    icon_hrefs = re.findall(r'rel="icon"[^>]*href="([^"]+)"', raw)
+    app_icons = [h for h in icon_hrefs if "/icon-" in h]
+    assert not app_icons, (
+        f"the home page serves the app icon as its favicon: {app_icons} — "
+        f"use the favicon-*.png cut from icons/make_favicon.py"
+    )
+
+
+def test_the_heavy_cut_actually_covers_more_ink_at_16px():
+    """
+    The property the cut exists for, measured rather than asserted: at 16 px
+    the favicon must put visibly more accent colour on screen than the app
+    icon does. A regenerated set with the wrong parameters would pass every
+    other test here and still be invisible in a search result.
+    """
+    from PIL import Image
+
+    def accent_pixels(path, size=16):
+        with Image.open(path) as im:
+            small = im.convert("RGB").resize((size, size), Image.LANCZOS)
+            # Anything clearly brighter than the near-black background.
+            pixels = list(small.convert('RGB').tobytes())
+            triples = zip(pixels[0::3], pixels[1::3], pixels[2::3])
+            return sum(1 for r, _g, b in triples if b > 90 and b > r + 40)
+
+    heavy = accent_pixels(ICONS / "favicon-16.png")
+    light = accent_pixels(ICONS / "icon-192.png")
+    assert heavy > light * 1.5, (
+        f"the favicon cut covers {heavy} px at 16x16 against the app icon's "
+        f"{light} — it is not meaningfully heavier"
+    )
