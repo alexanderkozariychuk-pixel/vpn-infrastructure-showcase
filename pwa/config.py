@@ -34,24 +34,31 @@ LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
 # a subscription paid six months up front is money now, which is worth more
 # here than the margin given up.
 #
-# `card` is why the six-month plans exist only in crypto.
+# `card` says whether a period may be bought through the fiat rail. Every
+# plan is True today, and the flag stays because the reason it existed can
+# come back.
 #
-# A six-month subscription is six months of obligation, and the card rail is
-# the part of this service that can end without warning and not by our
-# decision. Collecting half a year up front against it means holding refund
-# duties that would have to be discharged through a channel that is gone —
-# and a refund to different details than the payment is exactly what the
-# terms refuse, for good anti-fraud reasons. Crypto settles immediately, is
-# not tied to one jurisdiction, and survives a relocation.
+# It was False for the six-month plans while fiat and crypto came from
+# different providers. A six-month subscription is six months of obligation,
+# and collecting half a year up front through a rail that can end without
+# warning means holding refund duties payable through a channel that is gone.
+# Splitting the long periods onto the other rail spread that risk.
 #
-# So: card buys one or three months. Crypto buys any period.
+# That reasoning needs two independent providers to work. With fiat and
+# crypto coming from the same one, losing it takes both rails at once and the
+# split protects nothing — it only costs customers a payment method. So the
+# restriction is lifted, not because the risk went away, but because this
+# particular defence stopped answering it.
+#
+# Set one back to False if the rails are ever split again; the checkout and
+# the endpoint both already honour it.
 PLANS = {
     "basic-1m": {"tier": "basic", "configs": 2, "days": 30,  "amount": "350",  "currency": "RUB", "card": True},
     "basic-3m": {"tier": "basic", "configs": 2, "days": 90,  "amount": "900",  "currency": "RUB", "card": True},
-    "basic-6m": {"tier": "basic", "configs": 2, "days": 180, "amount": "1700", "currency": "RUB", "card": False},
+    "basic-6m": {"tier": "basic", "configs": 2, "days": 180, "amount": "1700", "currency": "RUB", "card": True},
     "ext-1m":   {"tier": "ext",   "configs": 5, "days": 30,  "amount": "650",  "currency": "RUB", "card": True},
     "ext-3m":   {"tier": "ext",   "configs": 5, "days": 90,  "amount": "1700", "currency": "RUB", "card": True},
-    "ext-6m":   {"tier": "ext",   "configs": 5, "days": 180, "amount": "3200", "currency": "RUB", "card": False},
+    "ext-6m":   {"tier": "ext",   "configs": 5, "days": 180, "amount": "3200", "currency": "RUB", "card": True},
 }
 
 # Plan names written before periods existed. Payments created under the old

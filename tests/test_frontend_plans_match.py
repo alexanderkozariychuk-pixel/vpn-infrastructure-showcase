@@ -170,11 +170,27 @@ def test_json_shape_is_what_the_endpoints_expect():
 OFFER = INDEX.parent / "offer.html"
 
 
-def test_only_the_short_periods_take_a_card():
-    by_card = {key: bool(info.get("card")) for key, info in PLANS.items()}
-    for key, allowed in by_card.items():
-        expected = PLANS[key]["days"] < 180
-        assert allowed is expected, f"{key}: card={allowed}, days={PLANS[key]['days']}"
+def test_the_card_flag_is_still_enforced_server_side():
+    """
+    Every plan takes the fiat rail today, so nothing exercises this path — and
+    a guard nothing exercises is a guard that quietly rots.
+
+    The flag used to be False for the six-month plans, while fiat and crypto
+    came from two independent providers and splitting the long periods across
+    them spread the risk of losing one. With both rails behind a single
+    provider that split protects nothing, so the restriction is lifted. The
+    mechanism stays: if the rails are ever separated again, flipping the flag
+    has to be the whole change.
+    """
+    import inspect
+
+    from api import payment
+
+    source = inspect.getsource(payment.create_payment_freekassa)
+    assert "card_allowed" in source, (
+        "the fiat endpoint no longer checks card_allowed — flipping a plan "
+        "back to card=False would then silently do nothing"
+    )
 
 
 def test_card_flag_agrees_between_server_and_portal(portal_plans):
@@ -193,28 +209,39 @@ def test_the_portal_hides_the_card_option_rather_than_failing_after_the_click():
     assert "plan.card ?" in html, "checkout does not branch on card availability"
 
 
-def test_the_terms_say_so_too():
+def test_the_terms_do_not_carry_the_retired_payment_restriction():
     """
-    The rule is a promise to the customer, not only a server-side check. If the
-    terms do not carry it, a six-month buyer has no written answer to 'why can
-    I not pay by card' — and no written answer to what happens if the channel
-    used for their payment stops existing.
+    The terms used to state that six months could be paid in crypto only. That
+    promise is gone from the product, and a document promising a restriction
+    the service no longer applies is worse than one that never mentioned it —
+    a customer reads it and expects to be refused.
+
+    Also, a payment provider reads this document during moderation. A clause
+    explaining that we route long subscriptions away from the fiat rail
+    because it might stop working reads exactly as it sounds.
     """
-    # Markup wraps lines wherever it likes, so match the rendered text rather
-    # than the source: a phrase split across two lines is still the phrase.
     raw = OFFER.read_text(encoding="utf-8")
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))
 
-    assert "только криптовалютой" in text, "terms do not state the crypto-only rule"
-    assert "иным согласованным с вами способом" in text, (
-        "terms lack the alternative-refund clause — a six-month buyer has no "
-        "written answer to what happens if the channel they paid through stops "
-        "existing"
+    assert "только криптовалютой" not in text, (
+        "the terms still restrict a period to crypto, but no plan does"
     )
     assert "300 рублей в месяц" not in text, "terms still quote the old single price"
 
 
-# ── the checkout takes its figures from the server ──────────────────────────
+def test_the_terms_still_promise_a_refund_route_that_survives():
+    """
+    This clause stays, and is the opposite of the one above: it commits the
+    service to refunding even when the original details cannot be used. It
+    protects the customer rather than the service, which is what a bank
+    reviewing consumer terms is looking for.
+    """
+    raw = OFFER.read_text(encoding="utf-8")
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))
+
+    assert "иным согласованным с вами способом" in text
+    assert "Отказать в возврате по этой причине сервис не вправе" in text
+
 
 def test_the_checkout_does_not_compute_the_discount_itself():
     """

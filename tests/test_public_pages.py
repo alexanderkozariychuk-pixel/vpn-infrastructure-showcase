@@ -325,20 +325,28 @@ def test_the_public_table_states_the_device_limits():
         )
 
 
-def test_the_crypto_only_periods_are_marked_as_such():
+def test_the_table_marks_exactly_the_crypto_only_periods():
     """
-    Otherwise a customer picks the six-month plan, reaches the checkout and
-    finds the payment method they expected is missing.
+    Both directions, on purpose. The earlier version only checked that
+    crypto-only plans carried the mark; when the restriction was lifted and
+    no plan was crypto-only any more, its loop ran zero times and it passed
+    while proving nothing. This also fails if a mark is left behind on a plan
+    that now takes the fiat rail — which is the mistake actually available
+    today.
     """
     section = LANDING.read_text(encoding="utf-8")
-    start, end = section.index('id="tariffs"'), section.index("</section>", section.index('id="tariffs"'))
-    table = section[start:end]
+    start = section.index('id="tariffs"')
+    table = section[start:section.index("</section>", start)]
 
-    crypto_only = {int(v["amount"]) for v in PLANS.values() if not v["card"]}
-    for amount in crypto_only:
+    for key, info in PLANS.items():
+        amount = int(info["amount"])
         cell = table[table.index(f"<b>{amount} ₽</b>"):]
         cell = cell[:cell.index("</td>")]
-        assert "only-crypto" in cell, f"{amount} ₽ is crypto-only but not marked"
+        marked = "only-crypto" in cell
+        assert marked is (not info["card"]), (
+            f"{key}: table marks it crypto-only={marked}, "
+            f"the server says card={info['card']}"
+        )
 
 
 def test_the_tariffs_are_reachable_from_the_footer():

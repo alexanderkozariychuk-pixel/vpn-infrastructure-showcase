@@ -2791,10 +2791,10 @@ let checkoutPlan = null;
 const PLANS = {
   'basic-1m': {tier: 'basic', configs: 2, days: 30,  amount: 350,  card: true},
   'basic-3m': {tier: 'basic', configs: 2, days: 90,  amount: 900,  card: true},
-  'basic-6m': {tier: 'basic', configs: 2, days: 180, amount: 1700, card: false},
+  'basic-6m': {tier: 'basic', configs: 2, days: 180, amount: 1700, card: true},
   'ext-1m':   {tier: 'ext',   configs: 5, days: 30,  amount: 650,  card: true},
   'ext-3m':   {tier: 'ext',   configs: 5, days: 90,  amount: 1700, card: true},
-  'ext-6m':   {tier: 'ext',   configs: 5, days: 180, amount: 3200, card: false},
+  'ext-6m':   {tier: 'ext',   configs: 5, days: 180, amount: 3200, card: true},
 };
 
 // Six months is preselected because it is the one worth buying, for the
@@ -2972,10 +2972,10 @@ function openCheckout(tier) {
   setRow('checkout-credit-row', 'checkout-credit', false);
   refreshQuote();
 
-  // Six months is crypto-only: that much obligation should not rest on the
-  // card rail, which can end without warning and not by our decision. Hide
-  // the option rather than let it fail after the click — the endpoint
-  // refuses it too, this is only so nobody meets that refusal.
+  // Every period takes the fiat rail today. The branch stays because the
+  // flag can go back to false — see the note in config.py — and when it does,
+  // the option is hidden rather than left to fail after the click. The
+  // endpoint refuses it too; this is only so nobody meets that refusal.
   const card = document.getElementById('pay-method-card');
   const note = document.getElementById('pay-card-unavailable');
   if (card) card.style.display = plan.card ? '' : 'none';
