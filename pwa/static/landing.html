@@ -145,6 +145,53 @@
   dl.facts dt:first-child { margin-top: 0; }
   dl.facts dd { color: var(--text-dim); font-size: 15px; max-width: 60ch; }
 
+  /* Tariffs. Public on purpose: the prices were only visible after logging
+     in, which meant nobody evaluating this service — a customer comparing
+     options, or a payment provider's moderator — could see what is charged
+     for what. */
+  .tariffs { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .tariffs caption {
+    caption-side: bottom; margin-top: 18px; text-align: left;
+    font-size: 14px; color: var(--text-dim); line-height: 1.6;
+  }
+  .tariffs th, .tariffs td {
+    text-align: left; padding: 16px 14px 16px 0;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  .tariffs thead th {
+    font-size: 13px; font-weight: 500; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1px; padding-bottom: 10px;
+  }
+  .tariffs tbody th {
+    font-weight: 600; color: var(--text-bright); font-size: 16px;
+    padding-right: 20px;
+  }
+  .tariffs td b {
+    display: block; font-family: var(--font-display); font-weight: 400;
+    font-size: 21px; color: var(--text-bright); letter-spacing: -0.02em;
+  }
+  .devices, .permo, .only-crypto { display: block; font-weight: 400; }
+  .devices { margin-top: 5px; font-size: 13px; color: var(--text-dim); }
+  .permo { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
+  .only-crypto { margin-top: 6px; font-size: 12px; color: var(--accent); }
+  .pay-ways { margin-top: 26px; font-size: 15px; color: var(--text-dim); }
+  .pay-ways b { color: var(--text); font-weight: 600; }
+  @media (max-width: 560px) {
+    .tariffs, .tariffs thead, .tariffs tbody, .tariffs tr, .tariffs th, .tariffs td { display: block; }
+    .tariffs thead { display: none; }
+    /* Once the table is laid out as blocks the caption stops being a table
+       caption: `caption-side` no longer applies and it shrink-wraps to a
+       column two words wide. Made an ordinary block, and moved below the
+       rows with `order` since it reads as a footnote, not a heading. */
+    .tariffs { display: flex; flex-direction: column; }
+    .tariffs caption { display: block; width: 100%; order: 2; margin-top: 20px; }
+    .tariffs tbody { order: 1; }
+    .tariffs tbody th { border-bottom: none; padding-bottom: 6px; }
+    .tariffs td { padding: 10px 0; }
+    .tariffs td::before { content: attr(data-period); display: block; font-size: 12px;
+      color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  }
+
   .note {
     margin-top: 32px; padding: 18px 20px;
     background: var(--bg-2); border-left: 2px solid var(--accent-dim);
@@ -195,6 +242,47 @@
     </ol>
   </section>
 
+  <section id="tariffs">
+    <h2>Тарифы</h2>
+
+    <table class="tariffs">
+      <caption>Цены указаны за весь оплачиваемый период. Комиссию платёжной
+        системы оплачивает сервис — вы платите ровно указанную сумму.
+        Подписка не продлевается автоматически: следующий период оплачивается
+        вручную, когда вы этого захотите.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Тариф</th>
+          <th scope="col">1 месяц</th>
+          <th scope="col">3 месяца</th>
+          <th scope="col">6 месяцев</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Базовый<span class="devices">до 2 конфигураций — 2 устройства</span></th>
+          <td data-period="1 месяц"><b>350 ₽</b><span class="permo">350 ₽ в месяц</span></td>
+          <td data-period="3 месяца"><b>900 ₽</b><span class="permo">300 ₽ в месяц</span></td>
+          <td data-period="6 месяцев"><b>1700 ₽</b><span class="permo">283 ₽ в месяц</span><span class="only-crypto">только криптовалюта</span></td>
+        </tr>
+        <tr>
+          <th scope="row">Расширенный<span class="devices">до 5 конфигураций — 5 устройств</span></th>
+          <td data-period="1 месяц"><b>650 ₽</b><span class="permo">650 ₽ в месяц</span></td>
+          <td data-period="3 месяца"><b>1700 ₽</b><span class="permo">567 ₽ в месяц</span></td>
+          <td data-period="6 месяцев"><b>3200 ₽</b><span class="permo">533 ₽ в месяц</span><span class="only-crypto">только криптовалюта</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="pay-ways">
+      <b>Оплата:</b> СБП и криптовалюта (USDT, BTC, ETH).
+      Полугодовые тарифы оплачиваются только криптовалютой — чем длиннее
+      оплаченный срок, тем важнее, чтобы канал возврата оставался доступным
+      весь этот срок.
+      Подробные условия — в <a href="/offer">пользовательском соглашении</a>.
+    </p>
+  </section>
+
   <section>
     <h2>Что входит</h2>
     <dl class="facts">
@@ -223,6 +311,7 @@
 
   <footer>
         <nav>
+      <a href="/#tariffs">Тарифы</a>
       <a href="/about">О сервисе</a>
       <a href="/offer">Пользовательское соглашение</a>
       <a href="/privacy">Политика конфиденциальности</a>

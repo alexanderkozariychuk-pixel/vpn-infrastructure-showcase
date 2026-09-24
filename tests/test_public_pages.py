@@ -50,12 +50,31 @@ def test_the_advertised_price_is_a_price_that_exists():
     )
 
 
-def test_the_landing_does_not_quote_a_retired_price():
-    """300 ₽ was the single price before periods existed."""
-    text = _text(LANDING)
-    retired = {"300 ₽"} - {f"{int(p['amount'])} ₽" for p in PLANS.values()}
-    for price in retired:
-        assert price not in text, f"the landing still quotes {price}"
+def test_the_hero_price_is_a_real_plan_price():
+    """
+    The headline figure, the one a visitor reads before anything else. It used
+    to say 300 ₽ — the single price from before periods existed.
+
+    Scoped to the hero deliberately. An earlier version of this test forbade
+    the string "300 ₽" anywhere on the page, which broke the day the tariff
+    table started showing per-month equivalents: 900 ₽ for three months really
+    is 300 ₽ a month. The number was never the problem; advertising a price
+    nobody can pay was.
+    """
+    import re as _re
+
+    html = LANDING.read_text(encoding="utf-8")
+    hero = html[html.index('class="hero"'):html.index("</section>", html.index('class="hero"'))
+                if "</section>" in html[html.index('class="hero"'):]
+                else html.index('<section')]
+    shown = _re.search(r'class="price">\s*(\d+)\s*₽', hero)
+    assert shown, "the hero shows no price at all"
+
+    real = {int(p["amount"]) for p in PLANS.values()}
+    assert int(shown.group(1)) in real, (
+        f"the hero advertises {shown.group(1)} ₽, which is not a price the "
+        f"server charges: {sorted(real)}"
+    )
 
 
 def test_the_landing_does_not_send_people_to_support_for_a_device():
@@ -264,3 +283,64 @@ def test_the_heavy_cut_actually_covers_more_ink_at_16px():
         f"the favicon cut covers {heavy} px at 16x16 against the app icon's "
         f"{light} — it is not meaningfully heavier"
     )
+
+
+# ── the public tariff table ─────────────────────────────────────────────────
+#
+# Prices used to be visible only after logging in. That is fine for a customer
+# who already bought, and useless for everyone deciding whether to: someone
+# comparing services, and a payment provider's moderator checking what is
+# charged for what. The landing showed one number — the entry price — and a
+# button leading to a login form.
+
+def test_every_plan_appears_in_the_public_table():
+    """
+    All six, not just the cheapest. A table that omits the plan someone is
+    about to buy is worse than no table.
+    """
+    text = _text(LANDING)
+    missing = [k for k, v in PLANS.items() if f"{int(v['amount'])} ₽" not in text]
+    assert not missing, f"these plans are not shown publicly: {missing}"
+
+
+def test_the_public_table_quotes_no_price_that_does_not_exist():
+    """The check that catches a price edited in one place and not the other."""
+    import re as _re
+
+    section = LANDING.read_text(encoding="utf-8")
+    start = section.index('id="tariffs"')
+    end = section.index("</section>", start)
+    quoted = {int(m) for m in _re.findall(r"<b>(\d+) ₽</b>", section[start:end])}
+    real = {int(v["amount"]) for v in PLANS.values()}
+    assert quoted == real, (
+        f"public table shows {sorted(quoted)}, the server charges {sorted(real)}"
+    )
+
+
+def test_the_public_table_states_the_device_limits():
+    text = _text(LANDING)
+    for limit in sorted({config_limit(k) for k in PLANS}):
+        assert f"до {limit} конфигураций" in text, (
+            f"the table does not state the {limit}-config limit"
+        )
+
+
+def test_the_crypto_only_periods_are_marked_as_such():
+    """
+    Otherwise a customer picks the six-month plan, reaches the checkout and
+    finds the payment method they expected is missing.
+    """
+    section = LANDING.read_text(encoding="utf-8")
+    start, end = section.index('id="tariffs"'), section.index("</section>", section.index('id="tariffs"'))
+    table = section[start:end]
+
+    crypto_only = {int(v["amount"]) for v in PLANS.values() if not v["card"]}
+    for amount in crypto_only:
+        cell = table[table.index(f"<b>{amount} ₽</b>"):]
+        cell = cell[:cell.index("</td>")]
+        assert "only-crypto" in cell, f"{amount} ₽ is crypto-only but not marked"
+
+
+def test_the_tariffs_are_reachable_from_the_footer():
+    """A moderator should not have to scroll to find them."""
+    assert 'href="/#tariffs"' in LANDING.read_text(encoding="utf-8")
