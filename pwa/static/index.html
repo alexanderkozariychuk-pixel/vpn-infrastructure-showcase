@@ -438,6 +438,22 @@
       border-top: 1px solid var(--border);
     }
 
+    /* Terms, privacy and tariffs, reachable from every page of the portal.
+       They used to be linked once, inside the checkout — so a customer who
+       had already paid, or who had not reached the payment step, could not
+       find them at all. */
+    .legal-links {
+      display: flex; flex-wrap: wrap; gap: 4px 12px;
+      padding: 0 8px 12px;
+    }
+    .legal-links a {
+      font-size: 12px; color: var(--text-dim); text-decoration: none;
+      border-bottom: 1px solid transparent; transition: color .15s, border-color .15s;
+    }
+    .legal-links a:hover, .legal-links a:focus-visible {
+      color: var(--text-bright); border-bottom-color: var(--border-bright);
+    }
+
     .user-chip {
       display: flex;
       align-items: center;
@@ -1432,6 +1448,12 @@
         </div>
       </div>
       <div class="sidebar-bottom">
+        <nav class="legal-links">
+          <a href="/#tariffs" target="_blank" rel="noopener" data-i18n="legal-tariffs">Тарифы</a>
+          <a href="/offer" target="_blank" rel="noopener" data-i18n="legal-offer">Соглашение</a>
+          <a href="/privacy" target="_blank" rel="noopener" data-i18n="legal-privacy">Конфиденциальность</a>
+          <a href="mailto:sovrn.support@gmail.com" data-i18n="legal-support">Поддержка</a>
+        </nav>
         <div class="user-chip">
           <div class="user-avatar" id="client-avatar">?</div>
           <div class="user-name" id="client-name">—</div>
@@ -2059,6 +2081,10 @@ const translations = {
     'checkout-fee': 'We cover the payment provider fee',
     'checkout-back': 'Back to plans',
     'pay-error': 'Payment error',
+    'legal-tariffs': 'Pricing',
+    'legal-offer': 'Terms',
+    'legal-privacy': 'Privacy',
+    'legal-support': 'Support',
     'checkout-savings': 'Promo code and points',
     'checkout-discount': 'Promo code discount',
     'checkout-credit': 'Points applied',
@@ -2327,6 +2353,10 @@ const translations = {
     'checkout-fee': 'Комиссию платёжной системы оплачиваем мы',
     'checkout-back': 'Назад к тарифам',
     'pay-error': 'Ошибка оплаты',
+    'legal-tariffs': 'Тарифы',
+    'legal-offer': 'Соглашение',
+    'legal-privacy': 'Конфиденциальность',
+    'legal-support': 'Поддержка',
     'checkout-savings': 'Промокод и баллы',
     'checkout-discount': 'Скидка по промокоду',
     'checkout-credit': 'Списано баллов',

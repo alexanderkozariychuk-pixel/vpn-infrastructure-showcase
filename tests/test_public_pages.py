@@ -352,3 +352,51 @@ def test_the_table_marks_exactly_the_crypto_only_periods():
 def test_the_tariffs_are_reachable_from_the_footer():
     """A moderator should not have to scroll to find them."""
     assert 'href="/#tariffs"' in LANDING.read_text(encoding="utf-8")
+
+
+# ── documents reachable from inside the portal ──────────────────────────────
+#
+# Platega's requirement is that the documents stay available to the user, and
+# their manager checked the signed-in area rather than the marketing page.
+# The portal linked the terms exactly once, inside the checkout block — so a
+# customer who had already paid, or who had not reached the payment step,
+# could not find them. The privacy policy was not linked at all.
+
+PORTAL = STATIC / "index.html"
+
+
+def test_the_portal_links_every_document_outside_the_checkout():
+    html = PORTAL.read_text(encoding="utf-8")
+
+    checkout = html[html.index('id="checkout"'):html.index("</section>", html.index('id="checkout"'))] \
+        if "</section>" in html[html.index('id="checkout"'):] else ""
+
+    for href, what in [("/offer", "terms"), ("/privacy", "privacy policy"),
+                       ("/#tariffs", "tariffs")]:
+        outside = html.replace(checkout, "") if checkout else html
+        assert f'href="{href}"' in outside, (
+            f"the portal does not link the {what} anywhere a signed-in user "
+            f"can reach without opening the checkout"
+        )
+
+
+def test_the_document_links_live_in_the_persistent_sidebar():
+    """
+    Not on one page. "Постоянно доступна" means the sidebar, which is on
+    screen whichever section the customer is looking at.
+    """
+    html = PORTAL.read_text(encoding="utf-8")
+    assert 'class="legal-links"' in html
+    block = html[html.index('class="legal-links"'):]
+    block = block[:block.index("</nav>")]
+    for href in ("/offer", "/privacy", "/#tariffs", "mailto:"):
+        assert href in block, f"{href} is missing from the persistent links"
+
+
+def test_the_document_links_are_translated():
+    html = PORTAL.read_text(encoding="utf-8")
+    start_en, start_ru = html.index("\n  en: {"), html.index("\n  ru: {")
+    en = set(re.findall(r"^\s*'([a-z0-9\-]+)':", html[start_en:start_ru], re.M))
+    ru = set(re.findall(r"^\s*'([a-z0-9\-]+)':", html[start_ru:], re.M))
+    for key in ("legal-tariffs", "legal-offer", "legal-privacy", "legal-support"):
+        assert key in en and key in ru, f"{key} is missing a translation"
