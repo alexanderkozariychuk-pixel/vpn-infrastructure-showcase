@@ -33,9 +33,17 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            // wg and wg-quick are GPL-2.0 executables used only by the root
+            // backend (AwgQuickBackend). GoBackend needs libwg-go.so alone.
+            excludes += setOf("**/libwg.so", "**/libwg-quick.so")
+        }
+    }
 }
 
 dependencies {
+    implementation(files("libs/amneziawg-tunnel-fba8e09c.aar"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
