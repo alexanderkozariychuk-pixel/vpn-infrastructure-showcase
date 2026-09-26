@@ -4,7 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeParseException
 
 /*
  * The shapes the portal API sends and accepts, as recorded in
@@ -43,14 +45,28 @@ data class Profile(
     @SerialName("is_subscribed") val isSubscribed: Boolean,
     @SerialName("subscribed_until") val subscribedUntilRaw: String? = null,
 ) {
-    /**
-     * The server stores UTC and writes it without an offset
-     * ("2026-10-12T09:26:42.848714"). Parsing it as local time would move
-     * every expiry date by three hours in Moscow.
-     */
+    /** Null when absent, and also when unreadable: a date must never crash a screen. */
     val subscribedUntil: Instant?
-        get() = subscribedUntilRaw?.let { LocalDateTime.parse(it).toInstant(ZoneOffset.UTC) }
+        get() = subscribedUntilRaw?.let { parseServerTime(it) }
 }
+
+/**
+ * The server's timestamps come in two shapes. Production (PostgreSQL) writes
+ * an offset — "2026-09-19T19:11:04.609756+00:00" — while the SQLite used to
+ * record docs/api-contract.md wrote none — "2026-10-12T09:26:42.848714". The
+ * first version read only the second and crashed on a real account. Both are
+ * UTC; one without an offset is read as UTC, not as the phone's local time.
+ */
+internal fun parseServerTime(text: String): Instant? =
+    try {
+        OffsetDateTime.parse(text).toInstant()
+    } catch (e: DateTimeParseException) {
+        try {
+            LocalDateTime.parse(text).toInstant(ZoneOffset.UTC)
+        } catch (e: DateTimeParseException) {
+            null
+        }
+    }
 
 @Serializable
 data class Device(

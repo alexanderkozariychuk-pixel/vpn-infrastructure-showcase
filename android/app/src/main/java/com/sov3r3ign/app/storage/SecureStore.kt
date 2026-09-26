@@ -39,10 +39,10 @@ class SecureStore(
     context: Context,
     private val alias: String = "sovrn-store",
     dirName: String = "secure",
-) {
+) : Secrets {
     private val dir = File(context.noBackupFilesDir, dirName)
 
-    fun put(name: String, value: String) {
+    override fun put(name: String, value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key())
         cipher.updateAAD(check(name).toByteArray(Charsets.UTF_8))
@@ -63,7 +63,7 @@ class SecureStore(
         if (!tmp.renameTo(file(name))) throw IOException("could not replace $name")
     }
 
-    fun get(name: String): String? {
+    override fun get(name: String): String? {
         val f = file(check(name))
         if (!f.exists()) return null
         return try {
@@ -81,12 +81,12 @@ class SecureStore(
         }
     }
 
-    fun remove(name: String) {
+    override fun remove(name: String) {
         file(check(name)).delete()
     }
 
     /** Sign-out: every value, and the key that could read them. */
-    fun clear() {
+    override fun clear() {
         dir.listFiles()?.forEach { it.delete() }
         keyStore().deleteEntry(alias)
     }

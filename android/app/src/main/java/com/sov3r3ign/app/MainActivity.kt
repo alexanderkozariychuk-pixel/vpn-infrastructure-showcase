@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 import org.amnezia.awg.backend.GoBackend
 import org.amnezia.awg.backend.Tunnel
 import org.amnezia.awg.config.Config
+import com.sov3r3ign.app.ui.App
 
 private const val TAG = "sovrn-spike"
 
@@ -77,7 +78,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Surface(Modifier.fillMaxSize()) { SpikeScreen() }
+                // The spike's screen stays below until step 6 removes it with the
+                // bundled config; the tunnel code it uses moves into the real
+                // screen in step 5.
+                Surface(Modifier.fillMaxSize()) { App() }
             }
         }
     }

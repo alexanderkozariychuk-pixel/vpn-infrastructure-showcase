@@ -168,6 +168,21 @@ class ApiClientTest {
     }
 
     @Test
+    fun `production writes the offset, and that is read too`() {
+        // Recorded on SQLite, the contract has no offset; PostgreSQL adds one.
+        // The first build read only the contract's shape and crashed on this.
+        val prod = profile.replace("09:26:42.848714\"", "09:26:42.848714+00:00\"")
+        val p = ok(ApiClient(Recorder(200, prod)).profile("tok"))
+        assertEquals(Instant.parse("2026-10-12T09:26:42.848714Z"), p.subscribedUntil)
+    }
+
+    @Test
+    fun `an unreadable date is null, never an exception`() {
+        val odd = profile.replace("2026-10-12T09:26:42.848714", "next Tuesday")
+        assertEquals(null, ok(ApiClient(Recorder(200, odd)).profile("tok")).subscribedUntil)
+    }
+
+    @Test
     fun `a lapsed profile has no expiry date and is not subscribed`() {
         val p = ok(ApiClient(Recorder(200, lapsedProfile)).profile("tok"))
         assertFalse(p.isSubscribed)
