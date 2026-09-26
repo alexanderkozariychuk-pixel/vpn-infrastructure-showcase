@@ -11,3 +11,9 @@ ruff==0.8.4
 # this lets the subscription and billing tests run against a real database
 # instead of a mock, with no service to stand up in CI.
 aiosqlite==0.22.1
+
+# The favicon tests open the icon files to check sizes and measure ink at
+# 16 px, as does pwa/static/icons/make_favicon.py. Missing from this file for
+# three days: the suite passed on a machine with Pillow installed system-wide
+# and failed in CI, which installs nothing it is not told to.
+Pillow==12.3.0
