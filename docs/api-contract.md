@@ -24,6 +24,19 @@ sign in again, the other says renew.
 **409 means the plan is full.** Distinct from 402 and from a server failure;
 the message names the limit.
 
+**Timestamps in production carry an offset; the ones below do not.** This
+capture ran on SQLite, which returns naive datetimes
+(`"2026-10-12T09:26:42.848714"`). Production runs PostgreSQL and returns
+`timestamptz` with the offset (`"2026-09-19T19:11:04.609756+00:00"`). Both are
+UTC. The first Android build read only the shape recorded here and crashed on
+a real account — a client must accept both.
+
+**`is_subscribed` in `/api/client/me` is the raw flag, not the gate.** Access
+is decided by `has_active_subscription`: the flag *and* `subscribed_until`
+still ahead. The flag is cleared by a periodic sweep some time after the date
+passes, so `/me` can say `true` about a period that is over. Clients must
+apply the same rule, and treat a missing date as no subscription.
+
 **The `.conf` is plain text, not JSON.** `Content-Type: text/plain`. It is
 handed to the tunnel as-is.
 
