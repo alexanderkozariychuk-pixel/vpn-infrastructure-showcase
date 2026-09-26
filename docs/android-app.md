@@ -16,6 +16,44 @@ product costs money.
 An app where the customer signs in and presses one switch removes both steps.
 That is the whole case for building it. Not "everyone has an app".
 
+## Product principles (set 2026-09-26)
+
+- **One account everywhere.** The same login works on the site, the Android
+  app and a future iPhone app, and an account can be created from any of
+  them. The API already allows it: `POST /api/client/register` is what the
+  site calls.
+- **The customer chooses the config.** The app lists the account's devices
+  and connects through the one picked; adding a new device is offered when
+  the plan has room.
+- **A family shares one login.** On the extended plan, other people are given
+  the account's login and password, sign in on their own phones and pick one
+  of the already-paid configs.
+
+That last one needs something the server does not have yet. Two phones on the
+same config send the same key from two places, the node follows whichever
+spoke last, and both connections flicker. Neither phone can see the other, so
+the app cannot prevent it alone: the server has to record which installation
+holds which config and show it in the list ("in use: Galaxy A71"). Until that
+exists, family sharing is not ready for real families.
+
+A shared password also means every holder has the owner's rights — deleting
+devices, changing the password, paying — and a password typed into five phones
+is a better target for guessing. As of this writing neither `/api/auth/token`
+nor `/api/client/register` limits attempts, and passwords have no minimum
+length. That is worth closing regardless; with shared logins it stops being
+optional.
+
+### Server work these imply
+
+Deferred until payment moderation is over, because the site is frozen until
+then. None of it blocks stage 1.
+
+| | needed for |
+|---|---|
+| Config claims: an installation marks the config it uses; the list shows it | family sharing |
+| Attempt limits on sign-in and registration; minimum password length | family sharing, and anyway |
+| A long-lived token for the app instead of the 24-hour JWT | not asking for a password daily |
+
 ## What already exists
 
 The server needs **no changes** for the first version. The portal's own API
@@ -23,6 +61,7 @@ covers everything the app does:
 
 | endpoint | what the app uses it for |
 |---|---|
+| `POST /api/client/register` | create an account (username, email, password) |
 | `POST /api/auth/token` | sign in, returns a JWT |
 | `GET /api/client/me` | subscription state, plan, expiry date |
 | `GET /api/client/configs` | the customer's devices |
@@ -126,8 +165,15 @@ library build, and two and a half on the second for the app and the tests.
 
 ### 1. The minimum real app
 
-Sign in → the app fetches the device list → picks one → fetches its `.conf`
-→ starts the tunnel. One switch, one status line, sign out.
+Sign in or register → the app fetches the device list → the customer picks
+one, or adds one if the plan has room → the app fetches its `.conf` and keeps
+it in the app's private storage → starts the tunnel. One switch, one status
+line, sign out.
+
+The token lasts 24 hours and there is no refresh. That is acceptable here:
+the token is needed to fetch configs, not to run the tunnel, so an expired
+token means asking for the password again only when the customer opens the
+device list.
 
 Done when: a person who has never seen it can install the APK, sign in with
 their portal account and be connected, without being told anything.
