@@ -1,9 +1,10 @@
 # Android client — plan
 
-Status: **stage 0 done (2026-09-26); stage 1 not started.** The plan below
+Status: **stage 1 done (2026-09-28); stage 2 not started.** The plan below
 was written before any code, so the first decisions were made deliberately
-rather than by whatever the first tutorial happens to do. What the spike
-measured is recorded under [Stage 0](#0-spike--one-weekend-before-committing-to-anything).
+rather than by whatever the first tutorial happens to do. What each stage
+measured is recorded under it: [Stage 0](#0-spike--one-weekend-before-committing-to-anything),
+[Stage 1](#1-the-minimum-real-app).
 
 ## Why
 
@@ -177,6 +178,53 @@ device list.
 
 Done when: a person who has never seen it can install the APK, sign in with
 their portal account and be connected, without being told anything.
+
+**Result (2026-09-26 → 28): met.** A person who had not seen the app installed
+the APK from a file on a Galaxy A71, signed in and connected unaided. Two
+phones on one account, each on its own device, stayed connected together.
+The interface is deliberately plain; reworking it waits until the functions
+are complete.
+
+Measured, not assumed: **one config on two phones fails as predicted** —
+both connected, each losing packets in turn, because the node answers
+whichever phone spoke last. Family sharing therefore needs the server-side
+config claims listed under [Server work](#server-work-these-imply) before real
+families get it; the note under the device list is only a stopgap.
+
+What stage 1 settled and found:
+
+- **Storage.** Token and `.conf` are AES-256-GCM encrypted with an Android
+  Keystore key, in `noBackupFilesDir`, with `allowBackup="false"`. The
+  template had backup on, which would have copied every customer's private
+  key into cloud backup. Sign-out wipes values and the key.
+- **The tunnel starts from the stored config, with no network call,** so an
+  expired token costs a password prompt only when the device list is opened.
+  Sign-out brings the tunnel down before wiping the key; choosing another
+  device while connected moves the running tunnel onto it.
+- **The recorded contract was wrong in one place that crashed the app.** It
+  was captured on SQLite, whose timestamps have no offset; production's
+  PostgreSQL adds `+00:00`, and the first build crashed on a real account.
+  `/api/client/me` also returns the raw `is_subscribed` flag, not the gate;
+  the app now applies the gate's own rule. Both recorded in
+  `docs/api-contract.md`.
+- **The APK carries no key.** Checked by key format on the built APK — a
+  search for the bare prefix `PrivateKey = ` matches the library's own
+  template string in `classes7.dex` and is useless as a check.
+- **Tests:** 52 on the JVM (API client against the contract's bodies,
+  session, texts), 9 on the phone against the real Keystore. Each suite was
+  checked to fail when the code it guards is broken.
+
+Carried into later stages:
+
+- **Installing from a file shows warnings** — "install unknown apps" for the
+  file manager, possibly Play Protect. The site's instructions must show them
+  (stage 3).
+- **The test phones run a debug-signed build.** The release will be signed
+  with a different key, and Android refuses to update one with the other:
+  the debug build has to be uninstalled first.
+- **The library's runtime dependencies** (androidx.annotation,
+  androidx.collection) still arrive through Compose, not through the AAR;
+  declare them when the library build is scripted.
 
 ### 2. What a subscriber actually needs
 
