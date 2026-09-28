@@ -3,6 +3,8 @@ package com.sov3r3ign.app.session
 import com.sov3r3ign.app.api.ApiClient
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
+import com.sov3r3ign.app.api.Device
+import com.sov3r3ign.app.api.DeviceList
 import com.sov3r3ign.app.api.Profile
 import com.sov3r3ign.app.storage.Secrets
 
@@ -39,6 +41,47 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
 
     fun profile(): ApiResult<Profile> = authorized { api.profile(it) }
 
+    fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }
+
+    fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
+
+    /**
+     * Makes [device] the one this phone uses: downloads its .conf and keeps
+     * it. The tunnel then starts from what is stored, with no network call —
+     * the token may well have expired by the time the customer presses connect.
+     *
+     * The id is written last. It is what marks a selection as complete, so an
+     * interruption part-way leaves the previous selection readable, or none.
+     */
+    fun select(device: Device): ApiResult<Unit> = authorized { token ->
+        when (val r = api.config(token, device.id)) {
+            is ApiResult.Ok -> {
+                // A 200 that is not a config — a proxy's error page, say —
+                // must not replace a working one.
+                if (!r.value.contains("[Interface]") || !r.value.contains("PrivateKey")) {
+                    ApiResult.Failed(ApiError.Malformed("not a WireGuard config"))
+                } else {
+                    secrets.put(CONF, r.value)
+                    secrets.put(DEVICE_NAME, device.name)
+                    secrets.put(DEVICE_ID, device.id)
+                    ApiResult.Ok(Unit)
+                }
+            }
+            is ApiResult.Failed -> r
+        }
+    }
+
+    /** The device this phone uses, if one was chosen here. */
+    fun selected(): Selected? {
+        val id = secrets.get(DEVICE_ID) ?: return null
+        val name = secrets.get(DEVICE_NAME) ?: return null
+        if (secrets.get(CONF) == null) return null
+        return Selected(id, name)
+    }
+
+    /** The stored .conf of the selected device; what the tunnel starts from. */
+    fun storedConfig(): String? = if (selected() != null) secrets.get(CONF) else null
+
     /** Everything stored goes, including the key that could read it. */
     fun signOut() = secrets.clear()
 
@@ -51,7 +94,12 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
         return result
     }
 
+    data class Selected(val id: String, val name: String)
+
     companion object {
         const val TOKEN = "token"
+        const val CONF = "conf"
+        const val DEVICE_ID = "device_id"
+        const val DEVICE_NAME = "device_name"
     }
 }

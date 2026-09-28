@@ -26,6 +26,14 @@ class MessagesTest {
     }
 
     @Test
+    fun `a device name is checked before the server sees it`() {
+        assertNull(validateDeviceName("phone"))
+        assertNull(validateDeviceName(" tab "))
+        assertEquals("Введите название устройства", validateDeviceName("  "))
+        assertEquals("Название — не длиннее 6 символов", validateDeviceName("Galaxy A71"))
+    }
+
+    @Test
     fun `sign-in needs both fields`() {
         assertEquals("Введите имя пользователя и пароль", validateSignIn("alex", ""))
         assertNull(validateSignIn("alex", "x"))

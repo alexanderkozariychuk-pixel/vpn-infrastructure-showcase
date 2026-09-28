@@ -1,6 +1,7 @@
 package com.sov3r3ign.app.ui
 
 import com.sov3r3ign.app.api.ApiError
+import com.sov3r3ign.app.api.MAX_DEVICE_NAME
 import com.sov3r3ign.app.api.Profile
 import java.time.Instant
 import java.time.ZoneId
@@ -35,6 +36,22 @@ fun validateRegistration(username: String, email: String, password: String, conf
         password != confirm -> "Пароли не совпадают"
         else -> null
     }
+
+fun validateDeviceName(name: String): String? = when {
+    name.isBlank() -> "Введите название устройства"
+    name.trim().length > MAX_DEVICE_NAME -> "Название — не длиннее $MAX_DEVICE_NAME символов"
+    else -> null
+}
+
+/**
+ * Said beside the list, because nothing else will warn about it: a config in
+ * use on two devices at once makes both connections drop in turn, and until
+ * the server records which installation holds which config, the app cannot
+ * see the other device.
+ */
+const val ONE_DEVICE_PER_CONFIG =
+    "Один конфиг работает на одном устройстве за раз. Если выбрать конфиг, " +
+        "который уже включён на другом телефоне, связь будет пропадать на обоих."
 
 fun describe(error: ApiError, action: Action): String = when (error) {
     ApiError.Unauthorized ->
