@@ -99,4 +99,21 @@ class MessagesTest {
         val p = Profile("paid", null, true, "next Tuesday")
         assertEquals("Подписка есть, но дату окончания не удалось прочитать", subscriptionLine(p, moscow, sept26))
     }
+
+    @Test
+    fun `connected is only said while the server answers`() {
+        val now = 1_790_418_984L
+        assertEquals("Подключение…", connectionLine(up = false, busy = true, handshakeUnixSeconds = null, nowUnixSeconds = now))
+        assertEquals("Отключено", connectionLine(false, false, null, now))
+        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
+        assertEquals("Подключено · сервер отвечал 32 с назад", connectionLine(true, false, now - 32, now))
+        assertEquals("Подключено · сервер отвечал 180 с назад", connectionLine(true, false, now - 180, now))
+        assertEquals("Сервер не отвечает уже 3 мин. Проверьте интернет или переподключитесь.",
+            connectionLine(true, false, now - 181, now))
+    }
+
+    @Test
+    fun `a phone clock behind the server does not show a negative age`() {
+        assertEquals("Подключено · сервер отвечал 0 с назад", connectionLine(true, false, 1000L, 990L))
+    }
 }

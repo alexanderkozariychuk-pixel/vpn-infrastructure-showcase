@@ -107,3 +107,22 @@ fun subscriptionLine(
         else -> "Подписка до " + DATE.withZone(zone).format(until)
     }
 }
+
+/** Beyond this the tunnel is up but the server has stopped answering. The
+ *  handshake renews every two minutes while traffic flows. */
+const val STALE_HANDSHAKE_SECONDS = 180L
+
+/**
+ * The status line under the switch. "Connected" is only said when the server
+ * has answered recently: a tunnel can be up on the phone and carry nothing,
+ * and a customer told they are connected will blame the sites, not us.
+ */
+fun connectionLine(up: Boolean, busy: Boolean, handshakeUnixSeconds: Long?, nowUnixSeconds: Long): String {
+    if (busy) return "Подключение…"
+    if (!up) return "Отключено"
+    val h = handshakeUnixSeconds
+    if (h == null || h <= 0L) return "Подключено, ждём ответа сервера"
+    val age = (nowUnixSeconds - h).coerceAtLeast(0L)
+    return if (age <= STALE_HANDSHAKE_SECONDS) "Подключено · сервер отвечал $age с назад"
+    else "Сервер не отвечает уже ${age / 60} мин. Проверьте интернет или переподключитесь."
+}

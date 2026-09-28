@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
@@ -34,18 +35,21 @@ import com.sov3r3ign.app.api.Device
 import com.sov3r3ign.app.api.DeviceList
 import com.sov3r3ign.app.api.Profile
 import com.sov3r3ign.app.session.Session
+import com.sov3r3ign.app.tunnel.VpnTunnel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.amnezia.awg.backend.Tunnel
 
 /**
  * The account, its devices, and which of them this phone uses. Choosing a
- * device downloads its config into the encrypted store; the connect switch
- * comes in step 5 and starts from that stored copy.
+ * device downloads its config into the encrypted store; the switch above the
+ * list starts the tunnel from that stored copy.
  */
 @Composable
 fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var profile by remember { mutableStateOf<Profile?>(null) }
     var devices by remember { mutableStateOf<DeviceList?>(null) }
     var selected by remember { mutableStateOf<Session.Selected?>(null) }
@@ -76,6 +80,17 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         }
     }
 
+    /**
+     * A running tunnel is on the previous device's key: move it onto the one
+     * just chosen, or the phone keeps using a config the customer left.
+     */
+    suspend fun followSelection() {
+        if (VpnTunnel.state.value != Tunnel.State.UP) return
+        withContext(Dispatchers.IO) {
+            session.storedConfig()?.let { conf -> runCatching { VpnTunnel.up(context, conf) } }
+        }
+    }
+
     fun use(device: Device) {
         busy = true
         error = null
@@ -83,7 +98,10 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
             val r = withContext(Dispatchers.IO) { session.select(device) }
             busy = false
             when (r) {
-                is ApiResult.Ok -> { selected = withContext(Dispatchers.IO) { session.selected() } }
+                is ApiResult.Ok -> {
+                    selected = withContext(Dispatchers.IO) { session.selected() }
+                    followSelection()
+                }
                 is ApiResult.Failed -> failed(r.error)
             }
         }
@@ -102,7 +120,7 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 is ApiResult.Ok -> {
                     // A device added from this phone is meant for this phone.
                     when (val s = withContext(Dispatchers.IO) { session.select(r.value) }) {
-                        is ApiResult.Ok -> {}
+                        is ApiResult.Ok -> followSelection()
                         is ApiResult.Failed -> failed(s.error)
                     }
                     busy = false
@@ -135,10 +153,9 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
 
         val here = selected
         if (here != null) {
-            Text(
-                "На этом телефоне: ${here.name}",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            HorizontalDivider()
+            Text("На этом телефоне: ${here.name}")
+            ConnectionPanel(session)
         }
 
         val list = devices
@@ -195,7 +212,12 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         HorizontalDivider()
         OutlinedButton(onClick = {
             scope.launch {
-                withContext(Dispatchers.IO) { session.signOut() }
+                withContext(Dispatchers.IO) {
+                    // Down first: wiping the key under a running tunnel would
+                    // leave the phone connected on an account it signed out of.
+                    runCatching { VpnTunnel.down(context) }
+                    session.signOut()
+                }
                 onSignedOut(null)
             }
         }) { Text("Выйти") }
