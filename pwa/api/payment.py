@@ -1,13 +1,18 @@
 """
-Payment endpoints — Heleket integration.
-Flow:
-  client selects plan
-    -> POST /api/payment/create  (auth)  -> creates Payment(pending), calls
-       Heleket create_invoice, returns {url} to redirect the user
-  user pays on Heleket
-    -> POST /api/payment/webhook (public) -> verify signature, on 'paid'/'paid_over'
-       calls activate_payment -> subscription extended, and on a first purchase
-       an AWG peer is added to the Bridge and its Config saved.
+Payment endpoints.
+
+Platega is the gateway customers use: SBP, card and crypto on one page.
+  POST /api/payment/platega/create    (auth)   -> pending Payment, redirect url
+  POST /api/payment/platega/callback  (public) -> re-asks Platega, then activates
+
+Heleket is kept on the server as a fallback and is not offered in the portal.
+  POST /api/payment/create   (auth)   -> pending Payment, Heleket invoice url
+  POST /api/payment/webhook  (public) -> signature check, then activates
+
+FreeKassa was removed on 2026-09-29, once Platega had taken a live payment.
+
+Every path ends in activate_payment: the subscription is extended, and on a
+first purchase a peer is added on the node and its Config saved.
 """
 import os
 import logging
@@ -21,10 +26,8 @@ from auth.jwt import require_auth
 from services import heleket
 from services import credit
 from services.provisioner import activate_payment
-from config import PLANS, card_allowed
-from fastapi.responses import PlainTextResponse
-from services import freekassa
-from services import platega
+from config import PLANS
+from services import net, platega
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -178,128 +181,6 @@ async def payment_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     return {"ok": True}
 
-@router.post("/api/payment/freekassa/create")
-async def create_payment_freekassa(
-    req: CreatePaymentRequest,
-    db: AsyncSession = Depends(get_db),
-    payload: dict = Depends(require_auth),
-):
-    """Create a pending payment and hand back the FreeKassa form URL."""
-    plan = req.plan
-    if plan not in PLANS:
-        raise HTTPException(status_code=400, detail="Unknown plan")
-
-    # Enforced here, not only in the interface. The portal hides the card
-    # option for these plans, but the endpoint is what a request actually
-    # reaches, and the rule it carries — six months of obligation must not
-    # rest on the rail that can disappear — is not a presentation detail.
-    if not card_allowed(plan):
-        raise HTTPException(
-            status_code=409,
-            detail="This period is available with cryptocurrency only",
-        )
-
-    user = await _current_user(db, payload)
-    info = PLANS[plan]
-    payment, quote = await _open_order(db, user, req)
-
-    url = freekassa.build_payment_url(
-        order_id=payment.id,
-        amount=str(quote["amount"]),
-        currency=info["currency"],
-        email=user.email,
-    )
-    return {"ok": True, "url": url, "payment_id": payment.id, "quote": quote}
-
-
-@router.get("/api/payment/freekassa/webhook", response_class=PlainTextResponse)
-async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    """
-    Payment notification from FreeKassa.
-
-    Method is GET, so parameters arrive in the query string. The response body
-    must be exactly "YES" as plain text — anything else, including JSON, is not
-    accepted. Note that retries are only enabled after asking their support,
-    so a dropped notification is lost by default; idempotency here guards
-    against duplicates, not against loss.
-    """
-    params = dict(request.query_params)
-
-    src_ip = freekassa.resolve_source_ip(request)
-    if not freekassa.ip_allowed(src_ip):
-        logger.warning("FreeKassa webhook from unexpected IP %s", src_ip)
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    if not freekassa.verify_notification(params):
-        logger.warning("FreeKassa webhook with bad signature, order %s",
-                       params.get("MERCHANT_ORDER_ID"))
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-    order_id = params.get("MERCHANT_ORDER_ID")
-    if not order_id:
-        return "YES"
-
-    result = await db.execute(select(Payment).where(Payment.id == order_id))
-    payment = result.scalar_one_or_none()
-    if not payment:
-        logger.warning("FreeKassa webhook for unknown order %s", order_id)
-        return "YES"
-
-    # Idempotent: a duplicate notification must not provision twice.
-    if payment.status == "paid":
-        return "YES"
-
-    # The expected amount is the one stored on this order, not the plan price.
-    #
-    # Both are server-computed and neither comes from the request, so the
-    # guarantee is unchanged — but once an order can carry a discount or spend
-    # credit, the plan price stops being what was asked for, and checking
-    # against it would reject every discounted payment as a mismatch.
-    try:
-        paid = float(params.get("AMOUNT", "0"))
-    except ValueError:
-        paid = 0.0
-    expected = float(payment.amount)
-    if paid + 0.01 < expected:
-        # The whole notification, not just the two numbers. A mismatch means a
-        # customer has paid and is getting nothing until someone intervenes,
-        # and whoever does that needs to see what actually arrived — which
-        # gateway, which method, what commission was taken — rather than
-        # deducing it from "got 329, expected 350".
-        logger.error(
-            "FreeKassa amount mismatch on order %s: got %s, expected %s; payload=%r",
-            order_id, paid, expected, params,
-        )
-        payment.status = "amount_mismatch"
-        await db.commit()
-        return "YES"
-
-    # What the gateway kept. Not stored yet — but without it in the log there
-    # is no way to answer "what do I actually receive per sale", which is the
-    # first question once money starts arriving.
-    logger.info(
-        "FreeKassa paid: order=%s amount=%s commission=%s method=%s",
-        order_id, params.get("AMOUNT"), params.get("commission"),
-        params.get("CUR_ID") or params.get("P_ID"),
-    )
-
-    result = await db.execute(select(User).where(User.id == payment.user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        logger.error("FreeKassa webhook: user missing for order %s", order_id)
-        return "YES"
-
-    # Same activation path as Heleket — blocking SSH goes to the executor
-    # inside issue_config, database work stays in this loop.
-    ok = await activate_payment(user, payment, db)
-    if not ok:
-        logger.error("Activation failed for user %s (FreeKassa order %s)",
-                     user.username, order_id)
-        # Still acknowledge — manual recovery, no retry storm.
-
-    return "YES"
-
-
 # ── Platega ───────────────────────────────────────────────────────────────
 #
 # One gateway for SBP, card and crypto: the customer picks on Platega's page
@@ -358,7 +239,7 @@ async def platega_callback(request: Request, db: AsyncSession = Depends(get_db))
     # is not proof. The real check is asking Platega, below.
     if not platega.secret_matches(request.headers.get("x-secret")):
         logger.warning("Platega callback with a bad secret from %s",
-                       freekassa.resolve_source_ip(request))
+                       net.resolve_source_ip(request))
         raise HTTPException(status_code=403, detail="Forbidden")
 
     body = await request.json()

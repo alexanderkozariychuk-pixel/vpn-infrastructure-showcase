@@ -160,47 +160,13 @@ def test_json_shape_is_what_the_endpoints_expect():
         assert re.fullmatch(r"[a-z]+-\d+m", key), f"unexpected plan key shape: {key}"
 
 
-# ── card availability ───────────────────────────────────────────────────────
+# ── payment methods ─────────────────────────────────────────────────────────
 #
-# Six months is crypto-only. That rule lives in three places — the plan table,
-# the checkout, and the terms the customer accepts — and all three have to say
-# the same thing. A page offering a card button the endpoint refuses is worse
-# than no button at all.
+# The card flag and the crypto-only six months are gone with FreeKassa: every
+# period is paid through Platega, which carries every method. What remains is
+# that the terms must not bring the restriction back.
 
 OFFER = INDEX.parent / "offer.html"
-
-
-def test_the_card_flag_is_still_enforced_server_side():
-    """
-    Every plan takes the fiat rail today, so nothing exercises this path — and
-    a guard nothing exercises is a guard that quietly rots.
-
-    The flag used to be False for the six-month plans, while fiat and crypto
-    came from two independent providers and splitting the long periods across
-    them spread the risk of losing one. With both rails behind a single
-    provider that split protects nothing, so the restriction is lifted. The
-    mechanism stays: if the rails are ever separated again, flipping the flag
-    has to be the whole change.
-    """
-    import inspect
-
-    from api import payment
-
-    source = inspect.getsource(payment.create_payment_freekassa)
-    assert "card_allowed" in source, (
-        "the fiat endpoint no longer checks card_allowed — flipping a plan "
-        "back to card=False would then silently do nothing"
-    )
-
-
-def test_card_flag_agrees_between_server_and_portal(portal_plans):
-    mismatched = {
-        key: (portal_plans[key].get("card"), PLANS[key].get("card"))
-        for key in PLANS
-        if key in portal_plans
-        and str(portal_plans[key].get("card")).lower() != str(PLANS[key].get("card")).lower()
-    }
-    assert not mismatched, f"card availability differs: {mismatched}"
 
 
 def test_checkout_goes_to_platega_and_only_platega():
@@ -210,15 +176,14 @@ def test_checkout_goes_to_platega_and_only_platega():
     portal — a button left pointing at FreeKassa or Heleket would take money
     through a gateway being retired, outside the verified-callback path.
 
-    The Platega option is not gated on `plan.card`: it carries every rail,
-    so hiding it would leave a plan with no way to pay at all.
+    Heleket stays on the server as a fallback (see test_payment_routes.py),
+    which is exactly why this matters: the portal must not offer it.
     """
     html = INDEX.read_text(encoding="utf-8")
     assert "'/api/payment/platega/create'" in html
     assert "/api/payment/freekassa/create" not in html
     assert "'/api/payment/create'" not in html
     assert html.count('onclick="startPayment()"') == 1, "exactly one pay button"
-    assert "plan.card ?" not in html, "the only method must not be hidden by the card flag"
 
     # The button sits in the order summary, under the total — not in a
     # separate "choose a method" step that has nothing left to choose.

@@ -104,8 +104,9 @@ pwa/
 │   └── support.py      support form
 ├── services/
 │   ├── provisioner.py  keygen → free address → wrapper call → DB → activate
-│   ├── freekassa.py    card/SBP gateway: signing and notification checks
-│   ├── heleket.py      crypto gateway
+│   ├── platega.py      payment gateway: SBP, card, crypto; callbacks re-verified
+│   ├── heleket.py      crypto gateway, kept as a fallback, not in the portal
+│   ├── net.py          real source address behind nginx
 │   └── mailer.py       transactional mail over an HTTPS API
 ├── db/models.py        users, configs, payments
 └── static/             landing, policy pages, single-page portal

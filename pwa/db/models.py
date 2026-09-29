@@ -51,7 +51,8 @@ class Payment(Base):
     currency: Mapped[str] = mapped_column(String(10), default="RUB")
     status: Mapped[str] = mapped_column(String(32), default="pending")
     heleket_invoice_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Which gateway this payment belongs to ('platega' | 'heleket' | 'freekassa')
+    # Which gateway this payment belongs to ('platega' | 'heleket'; rows from
+    # FreeKassa, removed 2026-09-29, carry none)
     # and that gateway's own transaction id. A callback carrying a transaction
     # id is matched to a payment by provider_ref; provider keeps two gateways'
     # ids from being confused. See migration d4f2a9c81e30.
