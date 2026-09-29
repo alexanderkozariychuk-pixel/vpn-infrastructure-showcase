@@ -4462,3 +4462,274 @@ should be rotated to something random and put in a password manager.
 Still open from before: `Payment` has no `provider` column; `pwa-add-peer`,
 `pwa-awg-show` and `pwa-logs` exist only on the nodes; `docs/troubleshooting.md`
 is still half about tooling that lives in `archive/`.
+
+## 2026-09-23
+
+### 🐛 The landing disagreed with the product in four places
+Preparing the site for payments started by reading the page a stranger lands
+on. It advertised 300 ₽ a month — a price that stopped existing when periods
+shipped, so a first customer would meet 350 ₽ at the checkout. It told people
+to write to support for a second device, three days after devices became
+self-service. Its support address was a personal one while the terms name
+sovrn.support@gmail.com. And its "returning visitor goes straight to the app"
+redirect read `localStorage.token` while the portal writes `sov_token`: it had
+never once fired.
+
+### 🛠 Crawlable, deliberately narrowly
+No robots.txt and no sitemap existed; both now answer from the root. The
+portal declared `lang="en"` while defaulting to Russian, and is now `noindex` —
+nothing behind a login belongs in a search result. Open Graph and Twitter
+tags went in because this service grows by a customer pasting a referral link
+into a messenger, and a link with no card reads as spam. The wording is left
+alone: this is hygiene and brand queries, not reach.
+
+### 🛠 A favicon that survives 16 px
+Search showed a generic globe. `/favicon.ico` answered 404 and the landing
+declared only 16 and 32 px. Both fixed — but the mark itself was the other
+half: drawn for 180 px, its fine strokes fall below a pixel at 16 and the
+three nodes stop reading as one shape. `icons/make_favicon.py` draws a
+heavier cut of the same motif, chosen by rendering candidates on a
+search-result background and looking. A test measures ink on screen at 16 px,
+so a regenerated set with the wrong parameters cannot pass silently.
+
+## 2026-09-24
+
+### 🗺 Tariffs published, for customers and for moderation
+Prices were visible only after logging in — useless to anyone deciding
+whether to buy, and to a payment provider's moderator asking what is charged
+for what. All six plans now sit on the landing with the per-month equivalent
+and the device limit per tier. The mobile layout broke in a way only a
+screenshot showed (a table caption shrink-wrapping to two words once rows are
+blocks); fixed with flex ordering.
+
+### 🗺 The crypto-only six months, lifted
+Its premise was two independent providers: long periods on a separate rail
+spread the risk of losing one. With fiat and crypto behind a single provider
+that split protects nothing, so the restriction went and the flag stayed —
+True everywhere, with a test that the endpoint still reads it. The clause
+stating the restriction left the terms; the clause promising a refund by
+another route stayed and is pinned by a test. 31 clauses renumbered, the four
+cross-references checked by reading the clauses back.
+
+### 🛠 Documents reachable from every page
+The provider's manager asked whether the documents are available once signed
+in. They were linked once, inside the checkout — available to someone in the
+act of paying and to nobody else; the privacy policy not at all. They now sit
+at the foot of the sidebar on every section.
+
+## 2026-09-25
+
+### 🗺 An Android client, planned before written
+The finding that shapes it: the server needs no changes. The portal's API
+already signs in, lists, issues and removes devices and returns the `.conf`
+with obfuscation parameters inline — so this is an HTTP client, a tunnel
+library and three screens. Three decisions were made up front as gates: the
+tunnel library's licence, native UI over a WebView, payment staying in the
+browser. iOS is out for now: Apple accepts VPN apps only from organisation
+accounts, a legal-entity question rather than a code one.
+
+`docs/api-contract.md` records the API as it actually answers, captured by
+calling it rather than reading handlers — the first guess at the device-name
+field got a 422. What the capture showed: names are capped at six characters,
+402 (renew) is a different state from 401 (sign in), 409 means the plan is
+full, and the config is plain text.
+
+### 🛠 Stage 0 toolchain
+Empty Compose project (`com.sov3r3ign.app`, minSdk 26), and the AmneziaWG
+tunnel library built from source. The AAR also carries `libwg.so` and
+`libwg-quick.so`, GPL-2.0 tools for the root backend; the app uses
+`GoBackend`, excludes both, and the built APK was checked to hold
+`libwg-go.so` alone.
+
+The upstream build shipped without its sleep fix: `go.mod` wants Go 1.25, the
+Makefile fetched 1.24.2, and `GOTOOLCHAIN=auto` quietly downloaded 1.25 — so
+the patch was applied to a toolchain nothing was compiled with. Found by
+reading the version string out of the built `.so`. Fixed on `sovrn-build`
+with `GOTOOLCHAIN=local`.
+
+## 2026-09-26
+
+### ✅ Stage 0 met: a tunnel from a phone
+Galaxy A71, Android 13: handshake 65 ms after initiation, public address the
+exit node's, and after 25 minutes locked and unplugged the tunnel was alive
+on unlock with pages loading. `INTERNET` has to be declared by the app — the
+library's manifest does not, and without it the tunnel comes up and carries
+nothing, with no error.
+
+### 🐛 A word the site must not use, on the tariff cards
+The HTML carried a neutral default; the portal's translation table replaced
+it on load, so the pages reviewed by eye looked clean and the rendered portal
+did not. Six dead keys from retired plans sat beside it, readable in the
+source. The wording line — describe what the service does — had no test
+behind it; `test_public_wording.py` now reads every served page, script
+included, and failed on the old portal with five findings.
+
+### 🐛 CI red since the favicon commit
+Three tests open icons with Pillow, which `requirements-dev.txt` never
+listed; they passed locally because Pillow was installed system-wide.
+
+### 🛠 Stage 1 foundations
+Product principles written down: one account on the site and both apps, the
+customer picks which config to connect through, and a family shares one login
+on the extended plan. The API client maps failures the way screens need them
+(401, 402, 409, no network). The token and `.conf` are AES-256-GCM encrypted
+under an Android Keystore key, in `noBackupFilesDir`, with backup off — the
+template had `allowBackup="true"`, which would have copied every customer's
+private key into cloud backup.
+
+### 🐛 The recorded contract crashed the app
+It was captured on SQLite, whose timestamps have no offset. Production's
+PostgreSQL writes `+00:00`, and the first build crashed on a real account.
+Both shapes are read now, and `/me`'s `is_subscribed` is treated as the raw
+flag it is — the gate is the flag *and* a future end date.
+
+## 2026-09-27
+
+### 🛠 Two configs issued by hand
+Two people needed access before the payment rail was live, and nobody is put
+on the product through a checkout that cannot take money. Issued with
+`pwa-add-peer` on the entry node, no accounts: `manual200` and `manual201`.
+They are not billed and do not expire. Removal is by public key
+(`pwa-del-peer`); the `.pub` files are kept for that.
+
+## 2026-09-28
+
+### ✅ Stage 1 met: someone else, unaided
+A person who had not seen the app installed the APK from a file, signed in
+and connected. Two phones on one account, each on its own device, held
+together. The account screen lists devices against the plan's limit, "add
+this phone" appears only while there is room, the tunnel starts from the
+stored config with no network call, and sign-out brings the tunnel down
+before wiping the key. The APK was checked for keys by format — a search for
+the bare `PrivateKey = ` prefix matches the library's own template string and
+proves nothing.
+
+Measured, not assumed: **one config on two phones fails as predicted** — both
+connected, each losing packets in turn, because the node follows whichever
+spoke last. Family sharing needs the server to record which installation
+holds which config before real families get it.
+
+### 🗺 Platega replaces FreeKassa, and Heleket if it can
+The provider was approved. The decision: all ruble payments move to Platega,
+and since it takes crypto as well, Heleket leaves the scheme too. The
+customer picks the method on Platega's own page — one methodless transaction
+per order. The shop keys live in `.env` on the app server only.
+
+A throwaway smoke test settled the two things the documentation left open,
+before any route existed: the credentials are accepted, and the amount is
+whole rubles (100 sent, 100 ₽ shown). The callback URL was deliberately left
+empty in the provider's dashboard until an endpoint existed to receive it.
+
+### 🛠 Payments know their gateway
+`d4f2a9c81e30` adds `provider` and `provider_ref`, backfilled from
+`heleket_invoice_id`, which stays until nothing reads it. This closes the
+"`Payment` has no `provider` column" item carried since the 22nd.
+
+## 2026-09-29
+
+### 🗺 The callback is a nudge, not the truth
+Platega's callback carries a shared secret in a header and no signature over
+the body: anyone holding the secret can forge a CONFIRMED. So the handler
+checks the secret, then asks Platega for the transaction's real state over
+its own authenticated request, and acts only on that answer. The amount is
+compared with the recorded order — a mismatch is logged for a human, not
+activated. A repeat notification changes nothing; a gateway we cannot reach
+is a 502, so Platega retries. The load-bearing test is a forged CONFIRMED
+against a gateway saying PENDING: nothing granted. Both protections were
+mutation-checked.
+
+### 🐛 A green suite that was only green alone
+The Platega tests passed file by file and failed together. `platega.py` reads
+its credentials at import time, so whichever test module imported it first
+fixed them for the run — as an empty secret, turning every callback into a
+403. Credentials are now pinned on the module per test, the pattern the
+FreeKassa tests already used and `conftest.py` already warned about.
+
+### 🗺 No user data to the payment system
+Platega confirmed `metadata` is optional for our shop. The privacy policy
+tells customers the payment system receives the amount and the order id. We
+were also about to send the user id, login and the payer's IP — the last of
+which the policy does not list as collected at all. None of it is sent; the
+order id already links a transaction to the user. A test pins the exact set
+of body keys, so adding one has to go through the policy first.
+
+### 🛠 One checkout, and a return that does not overclaim
+With one gateway there is nothing to choose, so checkout is the order summary
+ending in "Оплатить". The button locks for the request (a double click would
+open two orders and two transactions) and unlocks when the page returns from
+the gateway through the back-forward cache. Coming back with `?paid=1` opens
+the order history with a note that the subscription turns on once the payment
+is confirmed — landing back is not confirmation.
+
+Found on the way and live in production: on a phone the checkout column was
+`1fr`, which cannot shrink below the promo input's natural width, so it
+measured 396 px on a 390 px screen and clipped the total. `minmax(0, 1fr)`.
+
+### 🛠 Every paid device on screen
+My Config showed one device — it read the endpoint that returns only the
+newest config — so a customer on a two-device plan who came through the site
+had no way to reach the second. It now shows every slot the plan pays for:
+issued devices, renamable, and an "add a device" tile for each free one.
+`PATCH /api/client/configs/{id}` is new and renames only the label. Names stay
+at six characters and, on the page, Latin letters, digits, `-` and `_`,
+because the name becomes the download's filename. A test ties the page's
+limit to the server's models.
+
+Found while driving it in a browser: the add request holds a busy flag while
+it reloads the list, and the device selector turned that reload away as if it
+were a second click. The new device lit up over the previous device's file,
+and Download would have handed that file out under the new name.
+
+Also: a second `copyConfig` had been shadowing the first and copied the
+block's text, "Copy" label included, into the top of the customer's config.
+
+### 🛠 Connect, and a support page without wallets
+A Connect section: Android and iOS, both marked as apps in development,
+showing only the chosen platform's steps for AmneziaWG today and the
+one-file-per-device rule measured on the 28th. Support lost the FAQ that
+taught buying ETH, installing a wallet and guarding a seed phrase — none of
+it applies once payment goes through Platega.
+
+### 🐛 Every customer's plan read "no subscription"
+Found on the live portal right after deploying. The Payment page read `plan`
+from `/api/client/me`, which never returned it; its status line trusted the
+raw flag, so a period that had just ended still read "Active". `/me` now
+returns `plan` and `active`, the latter being the server's own gate. The
+Android client parses with `ignoreUnknownKeys`, so the new fields do not
+disturb it.
+
+### ✅ A real payment, end to end
+Deployed as one batch from `main` after a database dump. Migration
+`c3e8a1f70b42 -> d4f2a9c81e30`, both columns present, the container seeing
+both keys, the callback answering 403 to a wrong secret. The callback URL was
+set only after that.
+
+Then a real payment from an account that had never paid, basic plan for a
+month with a one-use, one-day test code at 60% — 140 ₽ by SBP:
+
+```
+12:29:29  POST /v2/transaction/process            200
+12:30:37  GET  /transaction/5b79048f-…            200   (the handler asking)
+          POST /api/payment/platega/callback      200
+12:30:38  payment paid, basic-1m, until 2026-10-29 12:30:38
+```
+
+`provider_ref` matches the gateway's receipt; no amount mismatch and no
+failed status check in the logs. The first device was issued on activation,
+and a second added from the new slot. 268 tests.
+
+### 📋 Next
+- Cut FreeKassa and Heleket out of the server: routes, modules, tests, the
+  card flag. They are gone from the interface already.
+- Abandoned orders stay "Pending" forever and clutter the history; the history
+  prints plan keys instead of names; its table overflows on a phone.
+- The first device is auto-named `device-1` — longer than the six characters
+  the page now allows for names.
+- The landing lists specific coins; check them against what the gateway
+  actually offers.
+- A chargeback has a test but has not been seen live.
+- Android stage 2, and the server work it needs: config claims for shared
+  logins, attempt limits and a minimum password length, a longer-lived token.
+- `manual200` and `manual201` remain outside billing.
+- From the 22nd, not re-checked here: the admin password rotation, and the
+  monitoring stack.
