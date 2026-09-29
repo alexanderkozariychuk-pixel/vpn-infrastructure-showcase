@@ -108,20 +108,17 @@ def test_support_is_the_service_address_not_a_personal_one():
     assert "alexanderkozariychuk@gmail.com" not in raw
 
 
-def test_the_landing_redirect_reads_the_key_the_portal_writes():
+def test_the_landing_does_not_send_visitors_away():
     """
-    It read `token` while the portal writes `sov_token`, so the "returning
-    visitor goes straight to the app" path had never once fired.
+    Every visitor lands on the home page — from search, from a shared link,
+    or signed in — and reaches the account through its button. The old
+    "signed-in visitors go straight to the app" redirect is gone on purpose;
+    the test that guarded its storage key would now pass while checking
+    nothing, so it is replaced by this one.
     """
     landing = LANDING.read_text(encoding="utf-8")
-    portal = (STATIC / "index.html").read_text(encoding="utf-8")
-
-    written = set(re.findall(r"localStorage\.setItem\('([a-z_]+)'", portal))
-    read = set(re.findall(r"localStorage\.getItem\('([a-z_]+)'\)", landing))
-    assert read <= written, (
-        f"the landing reads {sorted(read - written)}, which the portal never "
-        f"writes (it writes {sorted(written)})"
-    )
+    assert "location.replace(" not in landing
+    assert "location.href =" not in landing and "location.href=" not in landing
 
 
 # ── crawler-facing files ────────────────────────────────────────────────────

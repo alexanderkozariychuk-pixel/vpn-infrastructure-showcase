@@ -40,6 +40,17 @@
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <link rel="manifest" href="/static/icons/manifest.json">
 <meta name="apple-mobile-web-app-title" content="Sovereign">
+<script>
+  // Intro: once per browser session, never for reduced motion. Setting the
+  // class here, before first paint, is what keeps the page from flashing
+  // underneath it; without JS the class is never set and there is no intro.
+  try {
+    if (!sessionStorage.getItem('sov_intro') &&
+        !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('intro');
+    }
+  } catch (e) { /* storage blocked: skip the intro, show the page */ }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@300;400;700&display=swap" rel="stylesheet">
 <style>
@@ -70,52 +81,199 @@
   }
   .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
 
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 24px 0; border-bottom: 1px solid var(--border);
+  /* ── INTRO ─────────────────────────────────────────────────────────────
+     The mark assembles itself the way a connection does: a packet leaves the
+     first node, reaches the second, then the third, and the route closes.
+     Shown once per browser session, never for reduced motion, and never
+     without JS: the overlay exists only when the head script has set
+     html.intro, so crawlers, moderators and no-JS visitors get the page at
+     once. It also hides itself by CSS alone at 1.8 s, whether or not any
+     later script runs. */
+  #intro { display: none; }
+  html.intro #intro {
+    display: grid; place-items: center;
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    animation: intro-out .45s ease 1.35s forwards;
   }
+  .intro-box { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .intro-mark { width: 150px; height: 150px; overflow: visible; }
+  .intro-mark .edge {
+    stroke: var(--accent-dim); stroke-width: 9; stroke-linecap: round; fill: none;
+    stroke-dasharray: 1; stroke-dashoffset: 1;
+  }
+  .intro-mark .e1 { animation: draw .32s ease-in-out .28s forwards; }
+  .intro-mark .e2 { animation: draw .32s ease-in-out .62s forwards; }
+  .intro-mark .e3 { animation: draw .30s ease-in-out .95s forwards; }
+  .intro-mark .node { opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .intro-mark .n1 { animation: pop .3s cubic-bezier(.2,1.4,.4,1) .05s forwards; }
+  .intro-mark .n2 { animation: pop .3s cubic-bezier(.2,1.4,.4,1) .58s forwards; }
+  .intro-mark .n3 { animation: pop .34s cubic-bezier(.2,1.4,.4,1) .92s forwards; }
+  /* Filled with the background, as in the app icon, so the route's lines
+     end at the ring instead of showing through it. */
+  .intro-mark .ring { fill: var(--bg); stroke: var(--accent); stroke-width: 12; }
+  .intro-mark .dot { fill: var(--accent); }
+  .intro-mark .glow { filter: drop-shadow(0 0 10px rgba(0, 212, 255, .55)); }
+  .intro-word {
+    font-family: var(--font-display); font-weight: 700; font-size: 22px;
+    letter-spacing: -0.02em; color: var(--text-bright);
+    opacity: 0; animation: rise .4s ease .9s forwards;
+  }
+  .intro-word span { color: var(--accent); }
+  .intro-bar {
+    width: 150px; height: 2px; border-radius: 2px; background: var(--border); overflow: hidden;
+  }
+  .intro-bar i {
+    display: block; height: 100%; width: 100%; transform-origin: left; transform: scaleX(0);
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    animation: fill 1.25s cubic-bezier(.4,0,.2,1) .05s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes fill { to { transform: scaleX(1); } }
+  @keyframes intro-out { to { opacity: 0; visibility: hidden; transform: scale(1.03); } }
+
+  /* ── HERO ──────────────────────────────────────────────────────────────── */
+  .hero-wrap {
+    position: relative; min-height: 100vh; min-height: 100svh;
+    display: flex; flex-direction: column; overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+  .net {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .net-drift { animation: drift 38s ease-in-out infinite alternate; }
+  .net .lk { stroke: var(--border-bright); stroke-width: 1; opacity: .55; }
+  .net .nd { fill: var(--accent-dim); }
+  .net .nd.tw { animation: twinkle 5s ease-in-out infinite; }
+  .net .route { stroke: var(--accent); stroke-width: 1.4; opacity: .35; fill: none; }
+  .net .pkt { fill: var(--accent); filter: drop-shadow(0 0 6px rgba(0, 212, 255, .9)); }
+  @keyframes drift { from { transform: translate(-18px, -10px); } to { transform: translate(18px, 12px); } }
+  @keyframes twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+  /* Legibility: the text side of the hero sits over a darker field, and the
+     bottom fades into the page so the network does not end in a hard edge. */
+  .hero-shade {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 60% at 22% 55%, rgba(8,12,15,.92), rgba(8,12,15,.55) 55%, rgba(8,12,15,0) 100%),
+      radial-gradient(ellipse 45% 40% at 78% 40%, rgba(0,212,255,.07), rgba(0,212,255,0) 70%),
+      linear-gradient(180deg, rgba(8,12,15,0) 60%, var(--bg) 100%);
+  }
+
+  .topbar {
+    position: relative; z-index: 2;
+    width: 100%; max-width: 1120px; margin: 0 auto; padding: 22px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand svg { width: 28px; height: 28px; }
   .mark {
     font-family: var(--font-display); font-weight: 700;
     font-size: 18px; letter-spacing: -0.02em; color: var(--text-bright);
   }
   .mark span { color: var(--accent); }
+  .topnav { display: flex; align-items: center; gap: 26px; }
+  .topnav a.lnk { color: var(--text-dim); text-decoration: none; font-size: 15px; transition: color .15s; }
+  .topnav a.lnk:hover, .topnav a.lnk:focus-visible { color: var(--text-bright); }
   .signin {
-    font-size: 14px; color: var(--text-dim); text-decoration: none;
-    padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px;
-    transition: border-color .15s, color .15s;
+    font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: none;
+    padding: 9px 16px; border: 1px solid var(--accent-dim); border-radius: 7px;
+    background: rgba(0, 212, 255, .04);
+    transition: border-color .15s, color .15s, background .15s, box-shadow .2s;
   }
-  .signin:hover, .signin:focus-visible { color: var(--text-bright); border-color: var(--border-bright); }
+  .signin:hover, .signin:focus-visible {
+    color: var(--text-bright); border-color: var(--accent); background: var(--accent-glow);
+    box-shadow: 0 0 22px 0 var(--accent-glow);
+  }
 
-  .hero { padding: 88px 0 72px; }
-  .hero h1 {
-    font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(30px, 6vw, 46px); line-height: 1.15;
-    letter-spacing: -0.03em; color: var(--text-bright);
-    max-width: 15ch;
+  .hero {
+    position: relative; z-index: 2; flex: 1;
+    width: 100%; max-width: 1120px; margin: 0 auto; padding: 40px 24px 96px;
+    display: flex; flex-direction: column; justify-content: center;
   }
-  .hero p {
-    margin-top: 24px; max-width: 54ch;
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px; align-self: flex-start;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); padding: 7px 12px; border: 1px solid var(--accent-dim); border-radius: 999px;
+    background: rgba(0, 212, 255, .05);
+  }
+  .eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .hero h1 {
+    margin-top: 26px;
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(34px, 6.2vw, 68px); line-height: 1.08;
+    letter-spacing: -0.035em; color: var(--text-bright);
+    max-width: 13ch;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p.lead {
+    margin-top: 24px; max-width: 52ch;
     font-size: 17px; color: var(--text-dim);
   }
-
   .buy {
-    margin-top: 40px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    margin-top: 38px; display: flex; align-items: center; gap: 16px 22px; flex-wrap: wrap;
   }
-  .price {
-    font-family: var(--font-display); font-weight: 400;
-    font-size: 34px; color: var(--text-bright); letter-spacing: -0.02em;
-  }
-  .price small { font-family: var(--font-body); font-size: 15px; color: var(--text-dim); font-weight: 400; }
   .cta {
-    display: inline-block; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
     background: var(--accent); color: #04191f;
     font-weight: 600; font-size: 16px;
-    padding: 14px 30px; border-radius: 7px;
+    padding: 15px 28px; border-radius: 8px;
     box-shadow: 0 0 0 0 var(--accent-glow);
-    transition: box-shadow .2s, transform .1s;
+    transition: box-shadow .2s, transform .1s, background .15s;
   }
-  .cta:hover, .cta:focus-visible { box-shadow: 0 0 28px 0 var(--accent-glow); }
+  .cta:hover, .cta:focus-visible { box-shadow: 0 0 34px 2px rgba(0, 212, 255, .35); background: #3fe0ff; }
   .cta:active { transform: translateY(1px); }
+  .ghost {
+    display: inline-flex; align-items: center; text-decoration: none;
+    color: var(--text); font-size: 15px; padding: 14px 20px; border-radius: 8px;
+    border: 1px solid var(--border-bright); transition: border-color .15s, color .15s;
+  }
+  .ghost:hover, .ghost:focus-visible { border-color: var(--accent-dim); color: var(--text-bright); }
+  .price-line { display: flex; align-items: baseline; gap: 8px; color: var(--text-dim); font-size: 14px; }
+  .price {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: 26px; color: var(--text-bright); letter-spacing: -0.02em;
+  }
+  .price small { font-family: var(--font-body); font-size: 14px; color: var(--text-dim); font-weight: 400; }
+  .perks {
+    margin-top: 44px; display: flex; flex-wrap: wrap; gap: 10px;
+    list-style: none;
+  }
+  .perks li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px;
+    background: rgba(13, 19, 24, .72); backdrop-filter: blur(4px);
+    font-size: 14px; color: var(--text);
+  }
+  .perks svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent); }
+  .scroll-cue {
+    position: absolute; left: 50%; bottom: 22px; z-index: 2; transform: translateX(-50%);
+    width: 22px; height: 34px; border: 1px solid var(--border-bright); border-radius: 12px;
+  }
+  .scroll-cue::after {
+    content: ""; position: absolute; left: 50%; top: 7px; width: 3px; height: 7px; margin-left: -1.5px;
+    border-radius: 2px; background: var(--accent); animation: cue 1.8s ease-in-out infinite;
+  }
+  @keyframes cue { 0% { opacity: 0; transform: translateY(0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(11px); } }
+
+  /* The hero's contents rise in once the intro has gone (or straight away
+     when there was none). */
+  .rise { opacity: 0; animation: rise .6s ease forwards; animation-delay: calc(var(--d, 0) * 90ms + 80ms); }
+  html.intro .rise { animation-delay: calc(var(--d, 0) * 90ms + 1500ms); }
+
+  @media (max-width: 720px) {
+    .topnav a.lnk { display: none; }
+    .eyebrow { font-size: 10.5px; letter-spacing: 1.2px; padding: 6px 11px; }
+    .hero { padding-top: 24px; padding-bottom: 84px; }
+    .hero p.lead { font-size: 16px; }
+    .hero-shade {
+      background:
+        linear-gradient(180deg, rgba(8,12,15,.55), rgba(8,12,15,.88) 45%, rgba(8,12,15,.95) 80%, var(--bg));
+    }
+    .cta, .ghost { flex: 1 1 auto; justify-content: center; }
+  }
 
   section { padding: 56px 0; border-top: 1px solid var(--border); }
   h2 {
@@ -209,30 +367,75 @@
   .legal { font-family: var(--font-mono); font-size: 12px; color: #4d6b7d; line-height: 1.8; }
 
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+    .rise { opacity: 1 !important; animation: none !important; }
+    .net-drift, .net .nd.tw, .scroll-cue::after { animation: none !important; }
+  }
 </style>
 </head>
 <body>
 
-<div class="wrap">
+<div id="intro" aria-hidden="true">
+  <div class="intro-box">
+    <svg class="intro-mark" viewBox="100 100 312 312">
+      <path class="edge e1" d="M150 180 L360 150" pathLength="1"/>
+      <path class="edge e2" d="M360 150 L256 360" pathLength="1"/>
+      <path class="edge e3" d="M256 360 L150 180" pathLength="1"/>
+      <circle class="node n1 ring" cx="150" cy="180" r="32"/>
+      <circle class="node n2 ring" cx="360" cy="150" r="32"/>
+      <circle class="node n3 dot glow" cx="256" cy="360" r="38"/>
+    </svg>
+    <div class="intro-word">Sover<span>ei</span>gn</div>
+    <div class="intro-bar"><i></i></div>
+  </div>
+</div>
 
-  <header>
-    <div class="mark">Sovereign</div>
-    <a class="signin" href="/app">Войти</a>
+<div class="hero-wrap">
+  <svg class="net" id="net" aria-hidden="true" preserveAspectRatio="xMidYMid slice"></svg>
+  <div class="hero-shade"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Sovereign — на главную">
+      <svg viewBox="100 100 312 312" aria-hidden="true">
+        <path d="M150 180 L360 150 L256 360 Z" fill="none" stroke="#006a80" stroke-width="16" stroke-linejoin="round"/>
+        <circle cx="150" cy="180" r="32" fill="#080c0f" stroke="#00d4ff" stroke-width="16"/>
+        <circle cx="360" cy="150" r="32" fill="#080c0f" stroke="#00d4ff" stroke-width="16"/>
+        <circle cx="256" cy="360" r="40" fill="#00d4ff"/>
+      </svg>
+      <span class="mark">Sover<span>ei</span>gn</span>
+    </a>
+    <nav class="topnav">
+      <a class="lnk" href="#how">Как это работает</a>
+      <a class="lnk" href="#tariffs">Тарифы</a>
+      <a class="lnk" href="/about">О сервисе</a>
+      <a class="signin" href="/app">Личный кабинет</a>
+    </nav>
   </header>
 
   <div class="hero">
-    <h1>Ваша персональная расширенная локальная сеть</h1>
-    <p>Sovereign — персональный сервис для создания дополнительного защищённого
+    <div class="eyebrow rise" style="--d:0"><i></i>Персональное защищённое соединение</div>
+    <h1 class="rise" style="--d:1">Подключение, собранное <em>лично под вас</em></h1>
+    <p class="lead rise" style="--d:2">Sovereign — персональный сервис для создания дополнительного защищённого
        соединения с вашей инфраструктурой. Индивидуальная конфигурация помогает
        поддерживать стабильное подключение для повседневных задач.</p>
-    <div class="buy">
-      <div class="price">350 ₽ <small>в месяц</small></div>
-      <a class="cta" href="/app">Подключить</a>
+    <div class="buy rise" style="--d:3">
+      <a class="cta" href="/app">Личный кабинет <span aria-hidden="true">→</span></a>
+      <a class="ghost" href="#tariffs">Тарифы</a>
+      <div class="price-line">от <div class="price">350 ₽ <small>в месяц</small></div></div>
     </div>
+    <ul class="perks rise" style="--d:4">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>Свой ключ для каждого устройства</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="18" r="2.2"/><circle cx="12" cy="6" r="2.2"/><circle cx="19" cy="16" r="2.2"/><path d="M6.3 16.2L10.8 7.9M13.6 7.6l4.3 6.6"/></svg>Маршрут через несколько узлов</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="12" height="9" rx="1.5"/><path d="M7 17h4"/><rect x="16" y="8" width="5" height="12" rx="1.2"/></svg>До 5 устройств на одном тарифе</li>
+    </ul>
   </div>
+  <a class="scroll-cue" href="#how" aria-label="Листать вниз"></a>
+</div>
 
-  <section>
+<div class="wrap">
+
+  <section id="how">
     <h2>Как это работает</h2>
     <ol class="steps">
       <li><b>Регистрация и оплата</b><span>Почта, пароль, оплата через СБП или криптовалютой.</span></li>
@@ -324,13 +527,113 @@
 </div>
 
 <script>
-  // Returning visitors with a session go straight to the app.
-  // The key is 'sov_token' — what the portal actually writes. This read
-  // 'token' and so had never fired once; the comment that used to sit here
-  // asked for the check that would have caught it.
-  try {
-    if (localStorage.getItem('sov_token')) location.replace('/app');
-  } catch (e) { /* storage blocked — stay on the landing */ }
+  // ── Background network ────────────────────────────────────────────────
+  // Generated rather than shipped as an image: a few KB instead of hundreds,
+  // sharp at any size, and the packets travelling a three-hop route are the
+  // service's own idea rather than a stock picture. Seeded, so every visitor
+  // sees the same composition.
+  (function () {
+    var svg = document.getElementById('net');
+    if (!svg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+    var W = 1600, H = 900;
+    var still = false;
+    try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+    var seed = 20260929;
+    function rnd() {            // mulberry32
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+    function el(tag, attrs, parent) {
+      var n = document.createElementNS(NS, tag);
+      for (var k in attrs) n.setAttribute(k, attrs[k]);
+      (parent || svg).appendChild(n);
+      return n;
+    }
+
+    var cols = 12, rows = 7, pts = [];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        pts.push({
+          x: (c + 0.5) * W / cols + (rnd() - 0.5) * W / cols * 0.8,
+          y: (r + 0.5) * H / rows + (rnd() - 0.5) * H / rows * 0.8,
+          n: []
+        });
+      }
+    }
+    // Each point to its two or three nearest: a mesh, not a hairball.
+    var links = {};
+    pts.forEach(function (p, i) {
+      var d = pts.map(function (q, j) { return [j, (p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y)]; })
+                 .filter(function (a) { return a[0] !== i; })
+                 .sort(function (a, b) { return a[1] - b[1]; });
+      var k = 2 + (rnd() < 0.4 ? 1 : 0);
+      for (var m = 0; m < k; m++) {
+        var j = d[m][0], key = Math.min(i, j) + '-' + Math.max(i, j);
+        if (!links[key]) { links[key] = [i, j]; p.n.push(j); pts[j].n.push(i); }
+      }
+    });
+
+    var g = el('g', { 'class': 'net-drift' });
+    Object.keys(links).forEach(function (key) {
+      var a = pts[links[key][0]], b = pts[links[key][1]];
+      el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, 'class': 'lk' }, g);
+    });
+
+    // Three-hop routes, kept to the right of the headline, each with a
+    // packet running it — entry, bridge, exit.
+    var routes = 0, tries = 0, used = {};
+    while (routes < 4 && tries < 200) {
+      tries++;
+      var start = Math.floor(rnd() * pts.length);
+      if (pts[start].x < W * 0.52 || used[start]) continue;
+      var path = [start], cur = start;
+      for (var h = 0; h < 3; h++) {
+        var opts = pts[cur].n.filter(function (j) { return path.indexOf(j) < 0; });
+        if (!opts.length) break;
+        cur = opts[Math.floor(rnd() * opts.length)];
+        path.push(cur);
+      }
+      if (path.length < 4) continue;
+      used[start] = 1;
+      var d = 'M' + path.map(function (i) { return pts[i].x.toFixed(1) + ' ' + pts[i].y.toFixed(1); }).join(' L');
+      var id = 'rt' + routes;
+      el('path', { id: id, d: d, 'class': 'route' }, g);
+      if (!still) {
+        var pk = el('circle', { r: 3.2, 'class': 'pkt' }, g);
+        var am = el('animateMotion', {
+          dur: (5 + rnd() * 3).toFixed(1) + 's', repeatCount: 'indefinite',
+          begin: (routes * 1.3).toFixed(1) + 's', rotate: 'auto'
+        }, pk);
+        el('mpath', { href: '#' + id }, am);
+      }
+      routes++;
+    }
+
+    pts.forEach(function (p, i) {
+      var tw = !still && rnd() < 0.35;
+      var dot = el('circle', { cx: p.x, cy: p.y, r: (1.6 + rnd() * 1.8).toFixed(1), 'class': 'nd' + (tw ? ' tw' : '') }, g);
+      if (tw) dot.style.animationDelay = (rnd() * 5).toFixed(2) + 's';
+    });
+  })();
+
+  // ── Intro bookkeeping ─────────────────────────────────────────────────
+  // CSS already hides the overlay on its own; this only records that it was
+  // seen this session and takes it out of the page once it is gone.
+  (function () {
+    var root = document.documentElement;
+    if (!root.classList.contains('intro')) return;
+    try { sessionStorage.setItem('sov_intro', '1'); } catch (e) {}
+    setTimeout(function () {
+      root.classList.add('intro-done');
+      var o = document.getElementById('intro');
+      if (o) o.remove();
+    }, 1850);
+  })();
 </script>
 
 </body>

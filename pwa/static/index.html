@@ -94,154 +94,6 @@
     .view { display: none; min-height: 100vh; }
     .view.active { display: flex; flex-direction: column; }
 
-    /* ── LANDING ─────────────────────────────────────── */
-    #view-landing {
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .landing-grid {
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 60px 60px;
-      opacity: 0.3;
-      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
-    }
-
-    .landing-content {
-      position: relative;
-      text-align: center;
-      padding: 40px 20px;
-      max-width: 600px;
-    }
-
-    .landing-badge {
-      display: inline-block;
-      font-size: 13px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: var(--accent);
-      border: 1px solid var(--accent-dim);
-      padding: 4px 12px;
-      margin-bottom: 32px;
-      animation: pulse-border 3s infinite;
-    }
-
-    @keyframes pulse-border {
-      0%, 100% { border-color: var(--accent-dim); }
-      50% { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
-    }
-
-    .landing-title {
-      font-family: var(--font-display);
-      font-size: clamp(36px, 8vw, 72px);
-      font-weight: 700;
-      color: var(--text-bright);
-      line-height: 1;
-      margin-bottom: 8px;
-      letter-spacing: -2px;
-    }
-
-    .landing-title span {
-      color: var(--accent);
-      text-shadow: 0 0 40px var(--accent-glow);
-    }
-
-    .landing-sub {
-      font-family: var(--font-body);
-      font-size: 11px;
-      letter-spacing: 4px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      margin-bottom: 40px;
-      font-weight: 500;
-    }
-
-    .landing-desc {
-      font-size: 16px;
-      line-height: 1.8;
-      color: var(--text-dim);
-      margin-bottom: 48px;
-      max-width: 420px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .landing-actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-      padding: 12px 28px;
-      font-family: var(--font-body);
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-primary:hover {
-      background: var(--text-bright);
-      box-shadow: 0 0 24px var(--accent-glow);
-    }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--text-dim);
-      border: 1px solid var(--border);
-      padding: 12px 28px;
-      font-family: var(--font-body);
-      font-size: 15px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-ghost:hover {
-      border-color: var(--accent-dim);
-      color: var(--accent);
-    }
-
-    .landing-status {
-      position: absolute;
-      bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      color: var(--text-dim);
-    }
-
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 8px var(--green);
-      animation: blink 2s infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
     /* ── LOGIN ───────────────────────────────────────── */
     #view-login {
       align-items: center;
@@ -279,6 +131,7 @@
     }
 
     .login-title span { color: var(--accent); }
+    .login-title span.plain { color: inherit; }
 
     .field {
       margin-bottom: 16px;
@@ -322,6 +175,13 @@
       transition: color 0.2s;
     }
     .login-forgot:hover { color: var(--accent); }
+    .login-switch {
+      margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border);
+      text-align: center; font-size: 14px; color: var(--text-dim);
+    }
+    .login-switch-link { color: var(--accent); cursor: pointer; margin-left: 6px; }
+    .login-switch-link:hover { text-decoration: underline; }
+    a.login-back { text-decoration: none; display: inline-block; }
     .login-ok {
       color: var(--green);
       font-size: 13px;
@@ -776,14 +636,6 @@
       --yellow: #a06000;
       --red: #c02020;
     }
-
-    body.light .landing-grid {
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    }
-
-    body.light .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
     /* THEME TOGGLE */
     .theme-toggle {
@@ -1432,51 +1284,30 @@
 <div class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">◐</div>
 
 <!-- ═══════════════════════════════════════════
-     LANDING
-════════════════════════════════════════════ -->
-<div id="view-landing" class="view active">
-<div class="landing-grid"></div>
-  <div class="landing-content">
-    <div class="landing-badge" data-i18n="badge">Encrypted Access Network</div>
-    <h1 class="landing-title">Sover<span>ei</span>gn</h1>
-    <p class="landing-sub" data-i18n="landing-sub" style="font-size:11px;letter-spacing:2px">Private · Secure · Resilient</p>
-    <p class="landing-desc" id="landing-tagline"
-      onmouseenter="this.textContent='Путь всегда существует.'"
-      onmouseleave="this.textContent='Path always exists.'" 
-      style="cursor:default;transition:opacity 0.3s">Path always exists.</p>
-    <div class="landing-actions">
-      <button class="btn-primary" onclick="showView('login', 'client')" data-i18n="btn-signin">Sign In</button>
-      <button class="btn-ghost" onclick="showView('register')" data-i18n="btn-create">Create Account</button>
-    </div>
-  </div>
-  <div style="position:absolute;bottom:12px;right:20px;font-size: 12px;color:var(--border);cursor:pointer;letter-spacing:2px" onclick="showView('login', 'admin')">admin</div>
-  <div class="landing-status">
-    <div class="status-dot"></div>
-    All systems operational
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
      LOGIN
 ════════════════════════════════════════════ -->
-<div id="view-login" class="view">
+<div id="view-login" class="view active">
   <div class="login-box">
     <div class="login-header">
-      <div class="login-back" onclick="showView('landing')" data-i18n="login-back">← Back</div>
-      <div class="login-title">Sign<span> in</span></div>
+      <a class="login-back" href="/" data-i18n="login-home">← Home</a>
+      <div class="login-title"><span class="plain" data-i18n="login-title-1">Sign</span><span data-i18n="login-title-2"> in</span></div>
     </div>
     <div class="field">
-      <label>Username</label>
+      <label data-i18n="label-username">Username</label>
       <input type="text" id="inp-user" placeholder="username" autocomplete="username">
     </div>
     <div class="field">
-      <label>Password</label>
+      <label data-i18n="label-password">Password</label>
       <input type="password" id="inp-pass" placeholder="••••••••" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="btn-full" id="login-btn" onclick="doLogin()" data-i18n="btn-auth">Authenticate</button>
     <div class="login-forgot" onclick="showForgotPrompt()" data-i18n="login-forgot">Forgot password?</div>
+    <div class="login-switch">
+      <span data-i18n="login-no-account">No account?</span>
+      <span class="login-switch-link" onclick="showView('register')" data-i18n="btn-create">Create Account</span>
+    </div>
   </div>
 </div>
 
@@ -1511,31 +1342,31 @@
 <div id="view-register" class="view">
   <div class="login-box">
     <div class="login-header">
-      <div class="login-back" onclick="showView('landing')" data-i18n="login-back">← Back</div>
-      <div class="login-title">Create<span> account</span></div>
+      <div class="login-back" onclick="showView('login','client')" data-i18n="login-back">← Back</div>
+      <div class="login-title"><span class="plain" data-i18n="reg-title-1">Create</span><span data-i18n="reg-title-2"> account</span></div>
     </div>
     <div class="field">
-      <label>Username</label>
+      <label data-i18n="label-username">Username</label>
       <input type="text" id="reg-user" placeholder="username" autocomplete="username">
     </div>
     <div class="field">
-      <label>Email</label>
+      <label data-i18n="label-email">Email</label>
       <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
     </div>
     <div class="field">
-      <label>Password</label>
+      <label data-i18n="label-password">Password</label>
       <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password">
     </div>
     <div class="field">
-      <label>Confirm Password</label>
+      <label data-i18n="label-confirm">Confirm Password</label>
       <input type="password" id="reg-pass2" placeholder="••••••••" autocomplete="new-password"
         onkeydown="if(event.key==='Enter')doRegister()">
     </div>
     <div class="login-error" id="reg-error"></div>
     <div id="reg-success" style="font-size: 14px;color:var(--green);margin-bottom:16px;min-height:16px"></div>
-    <button class="btn-full" id="reg-btn" onclick="doRegister()">Create Account</button>
+    <button class="btn-full" id="reg-btn" onclick="doRegister()" data-i18n="btn-reg">Create Account</button>
     <div style="margin-top:16px;font-size: 14px;color:var(--text-dim);text-align:center">
-      Already have an account? <span style="color:var(--accent);cursor:pointer" onclick="showView('login','client')">Sign in</span>
+      <span data-i18n="reg-have-account">Already have an account?</span> <span style="color:var(--accent);cursor:pointer" onclick="showView('login','client')" data-i18n="reg-signin">Sign in</span>
     </div>
   </div>
 </div>
@@ -2308,14 +2139,13 @@ const translations = {
     'node-chisinau': 'Chisinau',
     'node-stockholm': 'Exit node',
     // Landing
-    'badge': 'Encrypted Access Network',
-    'landing-sub': 'Private · Secure · Resilient',
     'btn-signin': 'Sign In',
     'btn-create': 'Create Account',
     'btn-admin': 'Admin',
-    'status-ok': 'All systems operational',
     // Login
     'login-back': '← Back',
+    'login-home': '← Home',
+    'login-no-account': 'No account?',
     'login-title-1': 'Sign',
     'login-title-2': ' in',
     'label-username': 'Username',
@@ -2592,14 +2422,13 @@ const translations = {
     'node-chisinau': 'Кишинёв',
     'node-stockholm': 'Выходной узел',
     // Landing
-    'badge': 'Зашифрованный доступ',
-    'landing-sub': 'Приватно · Надёжно · Устойчиво',
     'btn-signin': 'Войти',
     'btn-create': 'Создать аккаунт',
     'btn-admin': 'Админ',
-    'status-ok': 'Все системы работают',
     // Login
     'login-back': '← Назад',
+    'login-home': '← На главную',
+    'login-no-account': 'Нет аккаунта?',
     'login-title-1': 'Вход',
     'login-title-2': '',
     'label-username': 'Имя пользователя',
@@ -2709,7 +2538,13 @@ function fmtDate(iso) {
 }
 
 function t(key) {
-  return translations[currentLang][key] || translations['en'][key] || key;
+  // A key that is present is the translation, even when it is empty: the
+  // Russian titles are one word ("Вход") and set their second half to ''.
+  // Treating '' as missing fell through to English and read "Вход in".
+  const cur = translations[currentLang];
+  if (cur && Object.prototype.hasOwnProperty.call(cur, key)) return cur[key];
+  const en = translations['en'];
+  return (en && Object.prototype.hasOwnProperty.call(en, key)) ? en[key] : key;
 }
 
 function applyTranslations() {
@@ -3481,7 +3316,7 @@ function doLogout() {
   localStorage.removeItem('sov_user');
   token = null;
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-  showView('landing');
+  showView('login', 'client');
 }
 
 function hdrs() { return {'Authorization': `Bearer ${token}`}; }
