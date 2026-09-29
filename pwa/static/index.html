@@ -989,7 +989,6 @@
     .subtab:hover { color: var(--text); }
     .subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
     .paytab-panel { display: none; }
-    .setup-panel { display: none; }
 
     /* Support form */
     .sup-field { margin-bottom: 20px; }
@@ -1035,7 +1034,6 @@
     .chip:hover { border-color: var(--accent); color: var(--text); }
     .chip.selected { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
 
-    .setup-panel.active { display: block; }
     .paytab-panel.active { display: block; }
 
 
@@ -1227,6 +1225,93 @@
       font-family: inherit;
     }
     .checkout-back:hover { color: var(--text-bright); border-color: var(--border-bright); }
+
+    /* ── DEVICES (My Config) ── */
+    .dev-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .dev-count { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; font-family: var(--font-mono); }
+    .dev-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .dev-chip {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      min-width: 128px; padding: 10px 14px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); cursor: pointer; font-family: var(--font-body); text-align: left;
+      transition: border-color .15s, background .15s, transform .15s;
+    }
+    .dev-chip:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+    .dev-chip.selected { border-color: var(--accent); background: var(--accent-glow); }
+    .dev-chip-name { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+    .dev-chip-ip { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
+    .dev-hint { margin-top: 14px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+    /* ── CONNECT ── */
+    .plat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .plat-tile {
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 26px 14px 20px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      color: var(--text-dim); cursor: pointer; font-family: var(--font-body);
+      transition: transform .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+    .plat-tile:hover { transform: translateY(-3px); border-color: var(--border-bright); color: var(--text); }
+    .plat-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .plat-tile.selected {
+      border-color: var(--accent); color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 8px 28px var(--accent-glow);
+    }
+    .plat-glow {
+      position: absolute; inset: -40% -20% auto; height: 120%;
+      background: radial-gradient(closest-side, var(--accent-glow), transparent);
+      opacity: 0; transition: opacity .3s ease; pointer-events: none;
+    }
+    .plat-tile.selected .plat-glow { opacity: 1; }
+    .plat-icon { width: 52px; height: 52px; transition: transform .25s ease; }
+    .plat-tile:hover .plat-icon, .plat-tile.selected .plat-icon { transform: scale(1.08); }
+    .plat-name { font-size: 16px; font-weight: 600; color: var(--text-bright); position: relative; }
+    .plat-tag {
+      font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text-dim); position: relative;
+    }
+    .conn-empty { margin-top: 18px; font-size: 13px; color: var(--text-dim); text-align: center; }
+    .conn-panel { margin-top: 20px; animation: conn-in .35s ease both; }
+    .conn-panel[hidden] { display: none; }
+    .conn-status {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--bg-3);
+    }
+    .conn-pulse {
+      width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+      background: var(--yellow); box-shadow: 0 0 0 0 var(--yellow);
+      animation: conn-pulse 1.8s ease-out infinite;
+    }
+    .conn-status-title { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+    .conn-status-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
+    .conn-steps { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .conn-step {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; color: var(--text); line-height: 1.45;
+      animation: conn-in .4s ease both; animation-delay: calc(var(--i) * 70ms + 80ms);
+    }
+    .conn-step-n {
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      display: grid; place-items: center;
+      background: var(--accent-glow); color: var(--accent);
+      font-size: 12px; font-weight: 700; font-family: var(--font-mono);
+    }
+    .conn-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    @keyframes conn-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes conn-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(255, 208, 77, .55); }
+      70%  { box-shadow: 0 0 0 9px rgba(255, 208, 77, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 208, 77, 0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .plat-tile, .plat-icon, .dev-chip, .plat-glow { transition: none; }
+      .plat-tile:hover, .dev-chip:hover { transform: none; }
+      .conn-panel, .conn-step, .conn-pulse { animation: none; }
+    }
 
     /* ── PROMO CODE AND CREDIT ── */
     .promo-row { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -1430,13 +1515,16 @@
       </div>
       <div class="nav-section">
         <div class="nav-label">Menu</div>
-        <div class="nav-item active" onclick="showPage('client', 'config')">
+        <div class="nav-item active" data-page="config" onclick="showPage('client', 'config')">
           <span class="nav-icon">⌗</span> <span data-i18n="nav-config">My Config</span>
         </div>
-        <div class="nav-item" onclick="showPage('client', 'payment')">
+        <div class="nav-item" data-page="connect" onclick="showPage('client', 'connect')">
+          <span class="nav-icon">⇄</span> <span data-i18n="nav-connect">Connect</span>
+        </div>
+        <div class="nav-item" data-page="payment" onclick="showPage('client', 'payment')">
           <span class="nav-icon">◎</span> <span data-i18n="nav-payment">Payment</span>
         </div>
-        <div class="nav-item" onclick="showPage('client', 'support')">
+        <div class="nav-item" data-page="support" onclick="showPage('client', 'support')">
           <span class="nav-icon">✆</span> <span data-i18n="nav-support">Support</span>
         </div>
       </div>
@@ -1481,6 +1569,14 @@
         <!-- has subscription -->
         <div id="config-has-sub" style="display:none">
           <div class="card">
+            <div class="dev-head">
+              <div class="card-title" data-i18n="card-devices">Devices</div>
+              <div class="dev-count" id="cl-dev-count"></div>
+            </div>
+            <div class="dev-list" id="cl-devices"></div>
+            <div class="dev-hint" data-i18n="dev-one-file">One file is for one device. The same file on two devices at once makes them knock each other off.</div>
+          </div>
+          <div class="card">
             <div class="card-title" data-i18n="card-conn">Connection Details</div>
             <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
               <div class="qr-placeholder" id="cl-qr">QR CODE<br>COMING SOON</div>
@@ -1491,42 +1587,89 @@
                 </div>
                 <div class="actions">
                   <button class="btn-sm" onclick="downloadConfig()" data-i18n="btn-download">↓ Download .conf</button>
+                  <button class="btn-sm" onclick="showPage('client','connect')" data-i18n="btn-how-connect">How to connect →</button>
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title" data-i18n="card-setup">Setup Instructions</div>
-            <div class="subtabs" style="margin-bottom:16px">
-              <div class="subtab active" data-setuptab="ios" onclick="showSetupTab('ios')" data-i18n="setup-tab-ios">iOS</div>
-              <div class="subtab" data-setuptab="android" onclick="showSetupTab('android')" data-i18n="setup-tab-android">Android</div>
-              <div class="subtab" data-setuptab="windows" onclick="showSetupTab('windows')" data-i18n="setup-tab-windows">Windows</div>
-            </div>
-            <div class="setup-panel active" id="setup-ios">
-              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="ios-step-1">Open App Store, find AmneziaWG, install</span></div>
-              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="ios-step-2">Open AmneziaWG → tap + → Add from file</span></div>
-              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="ios-step-3">Download your .conf file above and select it</span></div>
-              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="ios-step-4">Allow VPN configuration when prompted</span></div>
-              <div class="metric"><span class="metric-label">5</span><span class="metric-value" data-i18n="ios-step-5">Toggle the connection — done</span></div>
-              <div class="metric" style="margin-top:4px"><span class="metric-label" data-i18n="setup-note">Note</span><span class="metric-value" style="color:var(--text-dim)" data-i18n="ios-note">If toggle turns off immediately — check VPN permissions in iOS Settings</span></div>
-            </div>
-            <div class="setup-panel" id="setup-android">
-              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="and-step-1">Open Google Play or RuStore, find AmneziaWG, install</span></div>
-              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="and-step-2">Open AmneziaWG → tap + → Import from file</span></div>
-              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="and-step-3">Download your .conf file above and select it</span></div>
-              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="and-step-4">Allow VPN configuration when prompted</span></div>
-              <div class="metric"><span class="metric-label">5</span><span class="metric-value" data-i18n="and-step-5">Toggle the connection — done</span></div>
-            </div>
-            <div class="setup-panel" id="setup-windows">
-              <div class="metric"><span class="metric-label">1</span><span class="metric-value" data-i18n="win-step-1">Download AmneziaWG from amnezia.org</span></div>
-              <div class="metric"><span class="metric-label">2</span><span class="metric-value" data-i18n="win-step-2">Install and open the application</span></div>
-              <div class="metric"><span class="metric-label">3</span><span class="metric-value" data-i18n="win-step-3">Click Add tunnel → select your .conf file</span></div>
-              <div class="metric"><span class="metric-label">4</span><span class="metric-value" data-i18n="win-step-4">Click Activate — done</span></div>
             </div>
           </div>
         </div>
       </div>
 
+
+      <!-- CONNECT -->
+      <div class="page" id="client-page-connect">
+        <div class="page-header">
+          <div class="page-title" data-i18n="page-connect">Connect</div>
+          <div class="page-sub" data-i18n="page-connect-sub">Choose your device</div>
+        </div>
+        <div class="card">
+          <div class="plat-grid" role="tablist">
+            <button class="plat-tile" role="tab" aria-selected="false" data-plat="android" onclick="choosePlatform('android')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
+                  <rect x="12" y="4" width="24" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                  <line x1="12" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.6"/>
+                  <line x1="12" y1="37" x2="36" y2="37" stroke="currentColor" stroke-width="1.6"/>
+                  <circle cx="18" cy="40.5" r="1.1" fill="currentColor"/><circle cx="24" cy="40.5" r="1.1" fill="currentColor"/><circle cx="30" cy="40.5" r="1.1" fill="currentColor"/>
+                </svg>
+              <span class="plat-name">Android</span>
+              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
+            </button>
+            <button class="plat-tile" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
+                  <rect x="12" y="4" width="24" height="40" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                  <rect x="20" y="7.5" width="8" height="2.6" rx="1.3" fill="currentColor"/>
+                  <line x1="20" y1="40.5" x2="28" y2="40.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              <span class="plat-name">iOS</span>
+              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
+            </button>
+          </div>
+          <div class="conn-empty" id="conn-empty" data-i18n="conn-pick">Pick your device to see how to connect it.</div>
+            <div class="conn-panel" id="conn-panel-android" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-android-app"></div>
+                  <div class="conn-status-sub" data-i18n="conn-via-awg"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-android-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-android-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-android-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-android-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-android-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-ios" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-ios-app"></div>
+                  <div class="conn-status-sub" data-i18n="conn-via-awg"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-ios-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-ios-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-ios-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-ios-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-ios-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="conn-ios-note"></div>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+        </div>
+      </div>
 
       <!-- PAYMENT -->
       <div class="page" id="client-page-payment">
@@ -1713,84 +1856,6 @@
           <div class="page-title" data-i18n="nav-support">Support</div>
           <div class="page-sub" data-i18n="support-sub">We're here to help</div>
         </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-title" style="margin-bottom:16px">Частые вопросы об оплате</div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500">У меня нет криптовалюты. Как оплатить?</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                Купите ETH (Ethereum) через любой проверенный обменник — деньги переводятся по СБП или картой,
-                крипта зачисляется на ваш кошелёк за несколько минут, регистрация на бирже не нужна.
-                Ищите обменник через агрегаторы вроде bestchange, где собраны курсы и отзывы — так безопаснее,
-                чем доверять первому попавшемуся сайту.<br><br>
-                Мы рекомендуем покупать именно ETH, а не стейблкоин — для отправки стейблкоина всё равно
-                нужен отдельный токен на комиссию сети, получаются два разных актива вместо одного. При
-                оплате напрямую в ETH комиссия списывается из того же баланса.<br><br>
-                Минимальная покупка через большинство обменников — около 1000 ₽, этой суммы хватит на
-                несколько месяцев подписки. Курс ETH колеблется, поэтому остаток в рублёвом эквиваленте
-                может немного плавать — если суммы не хватит на следующий счёт, докупите ETH на разницу.
-              </div>
-            </details>
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500">У меня нет крипто-кошелька. Что установить?</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                Подойдёт MetaMask — бесплатное расширение для браузера или приложение для телефона.
-                Установите его с официального сайта metamask.io, следуя шагам создания нового кошелька.
-              </div>
-            </details>
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500;color:var(--yellow)">⚠ Что такое seed-фраза и как её хранить?</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                Seed-фраза — это 12-24 слова, которые при создании кошелька MetaMask покажет вам один раз.
-                Это единственный способ восстановить доступ к вашим деньгам, и одновременно — единственное,
-                что нужно злоумышленнику, чтобы их украсть.<br><br>
-                <b style="color:var(--text-bright)">Никогда никому не сообщайте seed-фразу</b> — ни в переписке,
-                ни по телефону, ни в форме на сайте. Наша поддержка никогда не попросит её у вас, и ни один
-                легитимный сервис не запросит её вообще.<br><br>
-                Запишите фразу на бумаге и храните офлайн — не в заметках телефона, не в фото, не в облаке.
-                Ещё раз: <b style="color:var(--text-bright)">никому и никогда</b>, включая тех, кто представляется поддержкой.
-              </div>
-            </details>
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500">Какую валюту и сеть выбрать при оплате?</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                На странице оплаты выберите <b style="color:var(--text-bright)">ETH</b>, сеть —
-                <b style="color:var(--text-bright)">ETH (ERC-20)</b>. Это основная сеть Ethereum, MetaMask
-                работает с ней сразу после установки, без дополнительной настройки.<br><br>
-                <b style="color:var(--yellow)">Важно:</b> комиссия сети оплачивается отдельно из вашего
-                баланса ETH, сверх суммы платежа. В часы высокой загрузки сети комиссия может быть заметно
-                выше обычного — MetaMask показывает её точный размер на экране подтверждения транзакции,
-                проверьте перед отправкой.
-              </div>
-            </details>
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500">Как отправить платёж?</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                1. На странице оплаты выберите ETH и сеть ETH (ERC-20)<br>
-                2. Скопируйте адрес или отсканируйте QR-код<br>
-                3. В MetaMask откройте отправку, вставьте адрес и укажите сумму в ETH<br>
-                4. Проверьте размер комиссии на экране подтверждения и отправьте<br><br>
-                Перед подтверждением проверьте адрес получателя ещё раз — крипто-транзакции необратимы.
-              </div>
-            </details>
-
-            <details style="border:1px solid var(--border);border-radius:8px;padding:12px 16px">
-              <summary style="cursor:pointer;font-weight:500">Я отправил платёж, но статус не обновился</summary>
-              <div style="margin-top:10px;font-size:14px;color:var(--text-dim);line-height:1.6">
-                Подтверждение в блокчейне может занять несколько минут в зависимости от загруженности сети.
-                Если статус не обновился дольше 30 минут — напишите в поддержку и приложите хэш транзакции
-                (его можно скопировать из MetaMask, раздел «Активность»).
-              </div>
-            </details>
-
-          </div>
-        </div>
-
         <!-- Form state -->
         <div id="support-form-wrap">
           <div class="card">
@@ -2019,6 +2084,33 @@ function updateMapImage() {
 // ── i18n ──────────────────────────────────────────
 const translations = {
   en: {
+    'nav-connect': 'Connect',
+    'page-connect': 'Connect',
+    'page-connect-sub': 'Choose your device',
+    'conn-tag-dev': 'App in development',
+    'conn-pick': 'Pick your device to see how to connect it.',
+    'conn-android-app': 'The Sovereign app for Android is in development',
+    'conn-ios-app': 'The Sovereign app for iOS is in development',
+    'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of taps.',
+    'conn-android-1': 'Install AmneziaWG from Google Play or RuStore',
+    'conn-android-2': 'In My Config, pick a device and download its .conf file',
+    'conn-android-3': 'Open AmneziaWG → tap + → Import from file, and choose the file',
+    'conn-android-4': 'Allow the VPN connection when asked',
+    'conn-android-5': 'Turn the switch on — done',
+    'conn-ios-1': 'Install AmneziaWG from the App Store',
+    'conn-ios-2': 'In My Config, pick a device and download its .conf file',
+    'conn-ios-3': 'Open AmneziaWG → tap + → Add from file, and choose the file',
+    'conn-ios-4': 'Allow adding the VPN configuration when asked',
+    'conn-ios-5': 'Turn the switch on — done',
+    'conn-ios-note': 'If the switch turns itself off right away, check that VPN is allowed in iOS Settings.',
+    'conn-to-config': 'Open My Config →',
+    'card-devices': 'Devices',
+    'dev-used': '{used} of {limit} in use',
+    'dev-one-file': 'One file is for one device. The same file on two devices at once makes them knock each other off.',
+    'btn-how-connect': 'How to connect →',
+    'btn-copied': 'Copied',
+    'config-preparing': 'Config is being prepared',
+    'config-preparing-sub': 'Your config will be available shortly. Contact support if it takes too long.',
     'nav-support': 'Support',
     'support-sub': "We're here to help",
     'support-card-title': 'Contact us',
@@ -2128,25 +2220,6 @@ const translations = {
     'sup-ok-body': 'Мы получили ваш запрос и разберёмся в ближайшее время.\nОтвет придёт на вашу почту — обычно в течение нескольких часов.',
     'sup-ok-new': 'Отправить ещё одну заявку',
 
-    'setup-tab-ios': 'iOS',
-    'setup-tab-android': 'Android',
-    'setup-tab-windows': 'Windows',
-    'setup-note': 'Note',
-    'ios-step-1': 'Open App Store, find AmneziaWG, install',
-    'ios-step-2': 'Open AmneziaWG → tap + → Add from file or archive',
-    'ios-step-3': 'Download your .conf file above and select it',
-    'ios-step-4': 'Allow VPN configuration when prompted',
-    'ios-step-5': 'Toggle the connection — done',
-    'ios-note': 'If the toggle turns off immediately — check that VPN is allowed in iOS Settings',
-    'and-step-1': 'Open Google Play or RuStore, find AmneziaWG, install',
-    'and-step-2': 'Open AmneziaWG → tap + → Import from file',
-    'and-step-3': 'Download your .conf file above and select it',
-    'and-step-4': 'Allow VPN configuration when prompted',
-    'and-step-5': 'Toggle the connection — done',
-    'win-step-1': 'Download AmneziaWG from amnezia.org',
-    'win-step-2': 'Install and open the application',
-    'win-step-3': 'Click Add tunnel → select your .conf file',
-    'win-step-4': 'Click Activate — done',
     'config-no-sub-title': 'No active subscription',
     'config-no-sub-sub': 'Subscribe to get your personal config',
     'btn-go-plans': 'Choose a plan →',
@@ -2234,7 +2307,6 @@ const translations = {
     'card-conn': 'Connection Details',
     'qr-soon': 'QR CODE\nCOMING SOON',
     'btn-download': '↓ Download .conf',
-    'card-setup': 'Setup Instructions',
     'setup-1-label': '1. Download',
     'setup-1-val': 'AmneziaWG app (iOS / Android / Windows)',
     'setup-2-label': '2. Import',
@@ -2285,6 +2357,33 @@ const translations = {
     'analyze-desc': 'Collects metrics from all nodes and generates an SRE report.',
   },
   ru: {
+    'nav-connect': 'Подключение',
+    'page-connect': 'Подключение',
+    'page-connect-sub': 'Выберите ваше устройство',
+    'conn-tag-dev': 'Приложение в разработке',
+    'conn-pick': 'Выберите устройство — покажем, как его подключить.',
+    'conn-android-app': 'Приложение Sovereign для Android в разработке',
+    'conn-ios-app': 'Приложение Sovereign для iOS в разработке',
+    'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
+    'conn-android-1': 'Установите AmneziaWG из Google Play или RuStore',
+    'conn-android-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-android-3': 'Откройте AmneziaWG → нажмите + → Импорт из файла и выберите файл',
+    'conn-android-4': 'Разрешите VPN-подключение, когда приложение спросит',
+    'conn-android-5': 'Включите переключатель — готово',
+    'conn-ios-1': 'Установите AmneziaWG из App Store',
+    'conn-ios-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-ios-3': 'Откройте AmneziaWG → нажмите + → Добавить из файла и выберите файл',
+    'conn-ios-4': 'Разрешите добавить конфигурацию VPN, когда iOS спросит',
+    'conn-ios-5': 'Включите переключатель — готово',
+    'conn-ios-note': 'Если переключатель сразу выключается — проверьте, что VPN разрешён в Настройках iOS.',
+    'conn-to-config': 'Открыть «Мой конфиг» →',
+    'card-devices': 'Устройства',
+    'dev-used': 'Используется {used} из {limit}',
+    'dev-one-file': 'Один файл — для одного устройства. Если открыть один и тот же файл на двух устройствах одновременно, они будут выбивать друг друга.',
+    'btn-how-connect': 'Как подключить →',
+    'btn-copied': 'Скопировано',
+    'config-preparing': 'Конфиг готовится',
+    'config-preparing-sub': 'Ваш конфиг будет доступен в ближайшее время. Если ждёте долго — напишите в поддержку.',
     'nav-support': 'Техподдержка',
     'support-sub': 'Мы на связи',
     'support-card-title': 'Связаться с нами',
@@ -2394,25 +2493,6 @@ const translations = {
     'sup-ok-body': 'Мы получили ваш запрос и разберёмся в ближайшее время.\nОтвет придёт на вашу почту — обычно в течение нескольких часов.',
     'sup-ok-new': 'Отправить ещё одну заявку',
 
-    'setup-tab-ios': 'iOS',
-    'setup-tab-android': 'Android',
-    'setup-tab-windows': 'Windows',
-    'setup-note': 'Важно',
-    'ios-step-1': 'Откройте App Store, найдите AmneziaWG, установите',
-    'ios-step-2': 'Откройте AmneziaWG → нажмите + → Добавить из файла',
-    'ios-step-3': 'Скачайте ваш .conf файл выше и выберите его',
-    'ios-step-4': 'Разрешите настройку VPN при запросе',
-    'ios-step-5': 'Включите переключатель — готово',
-    'ios-note': 'Если переключатель сразу отключается — проверьте настройки VPN в iOS Настройках',
-    'and-step-1': 'Откройте Google Play или RuStore, найдите AmneziaWG, установите',
-    'and-step-2': 'Откройте AmneziaWG → нажмите + → Импорт из файла',
-    'and-step-3': 'Скачайте ваш .conf файл выше и выберите его',
-    'and-step-4': 'Разрешите настройку VPN при запросе',
-    'and-step-5': 'Включите переключатель — готово',
-    'win-step-1': 'Скачайте AmneziaWG с сайта amnezia.org',
-    'win-step-2': 'Установите и откройте приложение',
-    'win-step-3': 'Нажмите Добавить туннель → выберите ваш .conf файл',
-    'win-step-4': 'Нажмите Активировать — готово',
     'config-no-sub-title': 'Нет активной подписки',
     'config-no-sub-sub': 'Оформите подписку чтобы получить конфиг',
     'btn-go-plans': 'Выбрать тариф →',
@@ -2500,7 +2580,6 @@ const translations = {
     'card-conn': 'Данные подключения',
     'qr-soon': 'QR КОД\nСКОРО',
     'btn-download': '↓ Скачать .conf',
-    'card-setup': 'Инструкция по подключению',
     'setup-1-label': '1. Скачать',
     'setup-1-val': 'Приложение AmneziaWG (iOS / Android / Windows)',
     'setup-2-label': '2. Импорт',
@@ -2708,13 +2787,30 @@ function resetSupportForm() {
   _supChips = {};
 }
 
-function showSetupTab(tab) {
-  document.querySelectorAll('.setup-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('[data-setuptab]').forEach(s => s.classList.remove('active'));
-  const panel = document.getElementById('setup-' + tab);
-  if (panel) panel.classList.add('active');
-  const tabEl = document.querySelector(`[data-setuptab="${tab}"]`);
-  if (tabEl) tabEl.classList.add('active');
+// ── CONNECT ──
+// One platform at a time: the customer sees the steps for the device they
+// picked and nothing else. The pick is remembered on this browser only.
+function choosePlatform(plat) {
+  document.querySelectorAll('.plat-tile').forEach(el => {
+    const on = el.dataset.plat === plat;
+    el.classList.toggle('selected', on);
+    el.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.conn-panel').forEach(el => {
+    const on = el.id === 'conn-panel-' + plat;
+    // Re-showing restarts the entry animation, so switching feels alive.
+    el.hidden = !on;
+    if (on) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+  });
+  const empty = document.getElementById('conn-empty');
+  if (empty) empty.style.display = 'none';
+  try { localStorage.setItem('sov_platform', plat); } catch (e) { /* private mode */ }
+}
+
+function initConnectPage() {
+  let saved = null;
+  try { saved = localStorage.getItem('sov_platform'); } catch (e) { /* private mode */ }
+  if (saved === 'android' || saved === 'ios') choosePlatform(saved);
 }
 
 function showPayTab(tab) {
@@ -3216,13 +3312,20 @@ function showPage(panel, page) {
     loadClientMe();
   }
   if (panel === 'client' && page === 'support') { /* static page */ }
+  if (panel === 'client' && page === 'connect') initConnectPage();
   const prefix = panel === 'admin' ? 'admin' : 'client';
   document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .page`)
     .forEach(p => p.classList.remove('active'));
   document.querySelectorAll(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .nav-item`)
     .forEach(n => n.classList.remove('active'));
   document.getElementById(`${prefix}-page-${page}`)?.classList.add('active');
-  event?.currentTarget?.classList.add('active');
+  const cur = (typeof event !== 'undefined') ? event?.currentTarget : null;
+  if (cur && cur.classList && cur.classList.contains('nav-item')) {
+    cur.classList.add('active');
+  } else {
+    document.querySelector(`#view-${panel === 'admin' ? 'admin' : 'dashboard'} .nav-item[data-page="${page}"]`)
+      ?.classList.add('active');
+  }
 }
 
 // ── AUTH ─────────────────────────────────────────
@@ -3348,13 +3451,30 @@ async function runSpeedTest() {
 
 let _configText = '';
 
+// ── MY CONFIG: devices ──
+// A plan buys several devices; each has its own .conf. The list comes from
+// /api/client/configs, and the file for the picked one from its own /raw —
+// the old single-config endpoint only ever showed the newest device.
+let _configs = [];
+let _configId = null;
+let _configName = null;
+
+function _configPreparing(noSub, hasSub) {
+  noSub.style.display = 'block';
+  hasSub.style.display = 'none';
+  const title = noSub.querySelector('[data-i18n="config-no-sub-title"], .wip-title');
+  const sub = noSub.querySelector('[data-i18n="config-no-sub-sub"], .wip-sub');
+  if (title) { title.removeAttribute('data-i18n'); title.textContent = t('config-preparing'); }
+  if (sub) { sub.removeAttribute('data-i18n'); sub.textContent = t('config-preparing-sub'); }
+}
+
 async function loadClientConfigPage() {
   const noSub = document.getElementById('config-no-sub');
   const hasSub = document.getElementById('config-has-sub');
   const block = document.getElementById('cl-config-block');
   if (!noSub || !hasSub) return;
   try {
-    const res = await fetch(`${API}/api/client/config`, {headers: hdrs()});
+    const res = await fetch(`${API}/api/client/configs`, {headers: hdrs()});
     if (res.status === 401) { doLogout(); return; }
     if (res.status === 402) {
       noSub.style.display = 'block';
@@ -3362,48 +3482,83 @@ async function loadClientConfigPage() {
       applyTranslations();
       return;
     }
-    if (res.status === 404) {
-      noSub.style.display = 'block';
-      hasSub.style.display = 'none';
-      // show "config being prepared" message
-      const title = noSub.querySelector('[data-i18n="config-no-sub-title"]');
-      const sub = noSub.querySelector('[data-i18n="config-no-sub-sub"]');
-      if (title) { title.removeAttribute('data-i18n'); title.textContent = currentLang === 'ru' ? 'Конфиг готовится' : 'Config is being prepared'; }
-      if (sub) { sub.removeAttribute('data-i18n'); sub.textContent = currentLang === 'ru' ? 'Ваш конфиг будет доступен в ближайшее время. Обратитесь в поддержку если ожидаете долго.' : 'Your config will be available shortly. Contact support if you wait too long.'; }
-      return;
-    }
+    if (!res.ok) throw new Error('configs ' + res.status);
     const d = await res.json();
-    if (d.ok && d.config) {
-      noSub.style.display = 'none';
-      hasSub.style.display = 'block';
-      _configText = d.config;
-      // render config with syntax highlighting
-      const lines = d.config.split('\n').map(line => {
-        if (line.startsWith('[')) return `<span class="config-key">${line}</span>`;
-        if (line.includes(' = ')) {
-          const [k, ...v] = line.split(' = ');
-          return `<span class="config-key">${k}</span> = <span class="config-val">${v.join(' = ')}</span>`;
-        }
-        return `<span style="color:var(--text-dim)">${line}</span>`;
-      });
-      block.innerHTML = `<button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">${t('btn-copy')}</button>` + lines.join('<br>');
-    }
+    _configs = (d && d.configs) || [];
+    if (!_configs.length) { _configPreparing(noSub, hasSub); return; }
+
+    noSub.style.display = 'none';
+    hasSub.style.display = 'block';
+    setText('cl-dev-count', t('dev-used').replace('{used}', d.used).replace('{limit}', d.limit));
+    renderDevices();
+    const keep = _configs.some(c => c.id === _configId) ? _configId : _configs[0].id;
+    await selectDevice(keep);
   } catch(e) {
     if (block) block.innerHTML = '<span style="color:var(--red)">—</span>';
   }
 }
 
+function renderDevices() {
+  const list = document.getElementById('cl-devices');
+  if (!list) return;
+  list.innerHTML = _configs.map(c => `
+    <button class="dev-chip${c.id === _configId ? ' selected' : ''}" data-id="${escHtml(String(c.id))}"
+            onclick="selectDevice(this.dataset.id)">
+      <span class="dev-chip-name">${escHtml(String(c.name || '—'))}</span>
+      <span class="dev-chip-ip">${escHtml(String(c.peer_ip || ''))}</span>
+    </button>`).join('');
+}
+
+async function selectDevice(id) {
+  const block = document.getElementById('cl-config-block');
+  const cfg = _configs.find(c => c.id === id);
+  if (!cfg || !block) return;
+  _configId = id;
+  _configName = cfg.name;
+  _configText = null;
+  document.querySelectorAll('.dev-chip').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+  block.innerHTML = `<span class="loading">${t('hist-loading')}</span>`;
+  try {
+    const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}/raw`, {headers: hdrs()});
+    if (res.status === 401) { doLogout(); return; }
+    if (!res.ok) throw new Error('raw ' + res.status);
+    const text = await res.text();
+    if (_configId !== id) return;   // a later click won the race — drop this answer
+    _configText = text;
+    const lines = text.split('\n').map(raw => {
+      const line = escHtml(raw);
+      if (line.startsWith('[')) return `<span class="config-key">${line}</span>`;
+      if (line.includes(' = ')) {
+        const [k, ...v] = line.split(' = ');
+        return `<span class="config-key">${k}</span> = <span class="config-val">${v.join(' = ')}</span>`;
+      }
+      return `<span style="color:var(--text-dim)">${line}</span>`;
+    });
+    block.innerHTML = `<button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">${t('btn-copy')}</button>` + lines.join('<br>');
+  } catch(e) {
+    if (_configId === id) block.innerHTML = '<span style="color:var(--red)">—</span>';
+  }
+}
+
 function copyConfig() {
-  if (_configText) navigator.clipboard.writeText(_configText);
+  if (!_configText) return;
+  navigator.clipboard.writeText(_configText).then(() => {
+    const btn = document.querySelector('#cl-config-block .copy-btn');
+    if (!btn) return;
+    btn.textContent = t('btn-copied');
+    setTimeout(() => { btn.textContent = t('btn-copy'); }, 1500);
+  }).catch(() => {});
 }
 
 function downloadConfig() {
   if (!_configText) return;
-  const user = localStorage.getItem('sov_user') || 'sovereign';
+  // The device's own short name: AmneziaWG on Android refuses long .conf
+  // filenames, and two devices must not download under the same name.
+  const safe = String(_configName || 'sovrn').replace(/[^A-Za-z0-9_-]/g, '') || 'sovrn';
   const blob = new Blob([_configText], {type: 'text/plain'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `sovereign-${user}.conf`;
+  a.download = `${safe}.conf`;
   a.click();
 }
 
@@ -3444,10 +3599,6 @@ async function loadClientOverview() {
   await loadClientConfigPage();
 }
 
-function copyConfig() {
-  const text = document.getElementById('cl-config-block').innerText;
-  navigator.clipboard.writeText(text);
-}
 
 
 
