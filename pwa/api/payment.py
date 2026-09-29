@@ -24,6 +24,7 @@ from services.provisioner import activate_payment
 from config import PLANS, card_allowed
 from fastapi.responses import PlainTextResponse
 from services import freekassa
+from services import platega
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -297,3 +298,135 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
         # Still acknowledge — manual recovery, no retry storm.
 
     return "YES"
+
+
+# ── Platega ───────────────────────────────────────────────────────────────
+#
+# One gateway for SBP, card and crypto: the customer picks on Platega's page
+# (methodless /v2/transaction/process). The callback carries no signature over
+# its body — only the shared X-Secret in a header — so it is treated as a
+# nudge, and the real status is read back from Platega before anything is
+# granted. A forged CONFIRMED callback then changes nothing.
+
+
+@router.post("/api/payment/platega/create")
+async def create_payment_platega(
+    request: Request,
+    req: CreatePaymentRequest,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    if req.plan not in PLANS:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+
+    user = await _current_user(db, payload)
+    payment, quote = await _open_order(db, user, req)
+    payment.provider = "platega"
+    await db.commit()
+
+    # The payer's own address, for Platega's antifraud metadata.
+    client_ip = freekassa.resolve_source_ip(request) or None
+
+    try:
+        created = await platega.create_transaction(
+            amount=quote["amount"],                 # whole rubles; 100 -> 100 ₽, verified live
+            currency=PLANS[req.plan]["currency"],
+            description=f"Sovereign — {req.plan}",
+            return_url=f"{SITE_URL}/app?paid=1",
+            failed_url=f"{SITE_URL}/app?paid=0",
+            order_id=payment.id,
+            user_id=user.id,
+            user_name=user.username,
+            client_ip=client_ip,
+        )
+    except Exception as e:
+        payment.status = "error"
+        await db.commit()
+        logger.error("Platega create failed for %s on order %s: %s", user.username, payment.id, e)
+        raise HTTPException(status_code=502, detail="Payment gateway error")
+
+    txn = created.get("transactionId")
+    url = created.get("url")
+    if not txn or not url:
+        payment.status = "error"
+        await db.commit()
+        logger.error("Platega create returned no txn/url for order %s: %s", payment.id, created)
+        raise HTTPException(status_code=502, detail="Payment gateway error")
+
+    payment.provider_ref = txn
+    await db.commit()
+    return {"ok": True, "url": url, "payment_id": payment.id, "quote": quote}
+
+
+@router.post("/api/payment/platega/callback")
+async def platega_callback(request: Request, db: AsyncSession = Depends(get_db)):
+    # First gate: the shared secret Platega echoes in the header. Cheap, and it
+    # turns away the internet at large — but the body has no signature, so it
+    # is not proof. The real check is asking Platega, below.
+    if not platega.secret_matches(request.headers.get("x-secret")):
+        logger.warning("Platega callback with a bad secret from %s",
+                       freekassa.resolve_source_ip(request))
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    body = await request.json()
+    txn = str(body.get("id") or "")
+    if not txn:
+        return {"ok": True}
+
+    result = await db.execute(
+        select(Payment).where(Payment.provider_ref == txn, Payment.provider == "platega")
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        logger.warning("Platega callback for unknown transaction %s", txn)
+        return {"ok": True}
+
+    if payment.status == "paid":
+        return {"ok": True}  # idempotent — a repeat notification changes nothing
+
+    # The callback is only a nudge. Ask Platega for the real state over our own
+    # authenticated request; a forged CONFIRMED body dies here.
+    try:
+        status = await platega.fetch_status(txn)
+    except Exception as e:
+        # Could not reach Platega — do not ack, let it retry.
+        logger.error("Platega status check failed for %s: %s", txn, e)
+        raise HTTPException(status_code=502, detail="Could not verify")
+
+    if status is None:
+        raise HTTPException(status_code=502, detail="Could not verify")
+
+    real = status.get("status")
+
+    if real == platega.CONFIRMED:
+        paid = status.get("paymentDetails") or {}
+        paid_amount = paid.get("amount")
+        if paid_amount is None or int(paid_amount) != int(payment.amount):
+            # Confirmed, but not for the amount we recorded. This needs a
+            # human, not an activation and not a retry.
+            logger.error("Platega amount mismatch on %s: gateway %r, order %s",
+                         txn, paid_amount, payment.amount)
+            return {"ok": True}
+        result = await db.execute(select(User).where(User.id == payment.user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            ok = await activate_payment(user, payment, db)
+            if not ok:
+                logger.error("Platega activation failed for %s on %s", user.username, txn)
+        return {"ok": True}
+
+    if real == platega.CHARGEBACKED:
+        # Money clawed back after the fact. Record it; revoking access is a
+        # separate, deliberate decision, not a webhook's to make.
+        logger.warning("Platega CHARGEBACKED on %s (order %s, user %s)",
+                       txn, payment.id, payment.user_id)
+        payment.status = "chargebacked"
+        await db.commit()
+        return {"ok": True}
+
+    if real == platega.CANCELED:
+        payment.status = "canceled"
+        await db.commit()
+    # PENDING and anything else: nothing to grant. A later CONFIRMED arrives
+    # as its own callback.
+    return {"ok": True}

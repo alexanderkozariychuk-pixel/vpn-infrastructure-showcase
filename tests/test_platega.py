@@ -25,6 +25,19 @@ os.environ.setdefault("PLATEGA_BASE_URL", "https://app.platega.io")
 from services import platega  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _platega_creds(monkeypatch):
+    """
+    platega.py reads MERCHANT_ID / SECRET at import time, so whichever test
+    module imports the module first fixes their values for the whole run — and
+    the two Platega test files use different secrets. Pin this file's values on
+    the module object per-test (monkeypatch reverts them), so the suite is
+    order-independent rather than relying on which import won the race.
+    """
+    monkeypatch.setattr(platega, "MERCHANT_ID", "MID-123")
+    monkeypatch.setattr(platega, "SECRET", "sekret-abc")
+
+
 def _run(handler, coro_factory):
     """Drive `coro_factory(client)` with a MockTransport client on one loop."""
     async def _go():
