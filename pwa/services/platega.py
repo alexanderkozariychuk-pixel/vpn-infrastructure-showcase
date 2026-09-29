@@ -52,9 +52,6 @@ async def create_transaction(
     return_url: str,
     failed_url: str,
     order_id: str | None = None,
-    user_id: str | None = None,
-    user_name: str | None = None,
-    client_ip: str | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> dict:
     """
@@ -63,6 +60,12 @@ async def create_transaction(
     `amount` goes in as a JSON number. Returns the raw response dict,
     {transactionId, status, url, expiresIn, rate}; the caller stores
     transactionId as the payment's provider_ref and redirects to `url`.
+
+    No `metadata` is sent — no user id, login or IP. Platega confirmed it is
+    optional for our gateway, and the privacy policy (item 9) promises the
+    payment system receives the amount and the order id and nothing more. The
+    order id already ties a transaction to our Payment row, and through it to
+    the user, which is all a dispute needs.
 
     `client` is for tests; production passes none and one is opened here.
     """
@@ -74,14 +77,6 @@ async def create_transaction(
     }
     if order_id:
         payload["orderId"] = order_id
-    # Antifraud metadata, sent whenever we have a user. Harmless when the shop
-    # does not require it; the shop is disabled if it does and we omit it, so
-    # the safe default is to always send it.
-    if user_id:
-        meta = {"userId": str(user_id), "userName": user_name or str(user_id)}
-        if client_ip:
-            meta["clientIp"] = client_ip
-        payload["metadata"] = meta
 
     return await _post_json("/v2/transaction/process", payload, client)
 

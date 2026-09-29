@@ -67,8 +67,7 @@ def test_create_transaction_sends_the_methodless_shape():
         amount=100, currency="RUB", description="Sovereign — basic-1m",
         return_url="https://sov3r3ign.com/app?paid=1",
         failed_url="https://sov3r3ign.com/app?paid=0",
-        order_id="order-42", user_id="user-7", user_name="test1",
-        client_ip="203.0.113.9", client=c,
+        order_id="order-42", client=c,
     ))
 
     assert out["transactionId"] == "3fa85f64-5717-4562-b3fc-2c963f66afa6"
@@ -85,21 +84,27 @@ def test_create_transaction_sends_the_methodless_shape():
     assert body["orderId"] == "order-42"
     assert body["return"] == "https://sov3r3ign.com/app?paid=1"
     assert body["failedUrl"] == "https://sov3r3ign.com/app?paid=0"
-    assert body["metadata"] == {
-        "userId": "user-7", "userName": "test1", "clientIp": "203.0.113.9",
-    }
 
 
-def test_create_without_a_user_omits_metadata_but_still_works():
+def test_platega_receives_the_amount_and_the_order_id_and_nothing_about_the_user():
+    """
+    The privacy policy, item 9: the payment system is given the amount and the
+    order id. So the body carries exactly these keys — no `metadata`, no user
+    id, login or IP. A new key here is a change to what we hand a third party
+    and has to go through the policy first; this test is where that surfaces.
+    """
+    seen = {}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        assert "metadata" not in json.loads(request.content)
+        seen["body"] = json.loads(request.content)
         return httpx.Response(200, json={"transactionId": "t", "status": "PENDING", "url": "u"})
 
-    out = _run(handler, lambda c: platega.create_transaction(
-        amount=350, currency="RUB", description="d",
-        return_url="r", failed_url="f", client=c,
+    _run(handler, lambda c: platega.create_transaction(
+        amount=350, currency="RUB", description="Sovereign — basic-1m",
+        return_url="r", failed_url="f", order_id="order-42", client=c,
     ))
-    assert out["transactionId"] == "t"
+    assert set(seen["body"]) == {"paymentDetails", "description", "return", "failedUrl", "orderId"}
+    assert set(seen["body"]["paymentDetails"]) == {"amount", "currency"}
 
 
 def test_fetch_status_returns_the_gateways_own_answer():

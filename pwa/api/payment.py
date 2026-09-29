@@ -311,7 +311,6 @@ async def freekassa_webhook(request: Request, db: AsyncSession = Depends(get_db)
 
 @router.post("/api/payment/platega/create")
 async def create_payment_platega(
-    request: Request,
     req: CreatePaymentRequest,
     db: AsyncSession = Depends(get_db),
     payload: dict = Depends(require_auth),
@@ -324,9 +323,6 @@ async def create_payment_platega(
     payment.provider = "platega"
     await db.commit()
 
-    # The payer's own address, for Platega's antifraud metadata.
-    client_ip = freekassa.resolve_source_ip(request) or None
-
     try:
         created = await platega.create_transaction(
             amount=quote["amount"],                 # whole rubles; 100 -> 100 ₽, verified live
@@ -335,9 +331,6 @@ async def create_payment_platega(
             return_url=f"{SITE_URL}/app?paid=1",
             failed_url=f"{SITE_URL}/app?paid=0",
             order_id=payment.id,
-            user_id=user.id,
-            user_name=user.username,
-            client_ip=client_ip,
         )
     except Exception as e:
         payment.status = "error"

@@ -217,8 +217,16 @@ def test_checkout_goes_to_platega_and_only_platega():
     assert "'/api/payment/platega/create'" in html
     assert "/api/payment/freekassa/create" not in html
     assert "'/api/payment/create'" not in html
-    assert html.count('class="pay-method"') == 1, "exactly one payment method"
+    assert html.count('onclick="startPayment()"') == 1, "exactly one pay button"
     assert "plan.card ?" not in html, "the only method must not be hidden by the card flag"
+
+    # The button sits in the order summary, under the total — not in a
+    # separate "choose a method" step that has nothing left to choose.
+    side = html[html.index('<div class="checkout-side">'):]
+    side = side[:side.index('id="checkout-back"') if 'id="checkout-back"' in side else side.index('checkout-back')]
+    assert 'id="checkout-pay"' in side
+    assert side.index('id="checkout-total"') < side.index('id="checkout-pay"')
+    assert "checkout-method" not in html, "the method-selection step is gone"
 
 
 def test_the_return_from_the_gateway_does_not_claim_the_payment_is_confirmed():
