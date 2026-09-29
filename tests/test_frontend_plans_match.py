@@ -203,10 +203,34 @@ def test_card_flag_agrees_between_server_and_portal(portal_plans):
     assert not mismatched, f"card availability differs: {mismatched}"
 
 
-def test_the_portal_hides_the_card_option_rather_than_failing_after_the_click():
+def test_checkout_goes_to_platega_and_only_platega():
+    """
+    Checkout has one method: Platega, where the customer picks SBP or crypto
+    on the gateway's own page. The old per-rail buttons are gone from the
+    portal — a button left pointing at FreeKassa or Heleket would take money
+    through a gateway being retired, outside the verified-callback path.
+
+    The Platega option is not gated on `plan.card`: it carries every rail,
+    so hiding it would leave a plan with no way to pay at all.
+    """
     html = INDEX.read_text(encoding="utf-8")
-    assert "pay-method-card" in html, "the card method needs an id to be hidden"
-    assert "plan.card ?" in html, "checkout does not branch on card availability"
+    assert "'/api/payment/platega/create'" in html
+    assert "/api/payment/freekassa/create" not in html
+    assert "'/api/payment/create'" not in html
+    assert html.count('class="pay-method"') == 1, "exactly one payment method"
+    assert "plan.card ?" not in html, "the only method must not be hidden by the card flag"
+
+
+def test_the_return_from_the_gateway_does_not_claim_the_payment_is_confirmed():
+    """
+    ?paid=1 means the customer finished on Platega's page, not that the money
+    arrived — the subscription turns on only when the verified callback lands.
+    The message must say it is pending confirmation, in both languages.
+    """
+    html = INDEX.read_text(encoding="utf-8")
+    assert "function handlePaymentReturn" in html
+    assert "подтвердит" in html
+    assert "confirms it" in html
 
 
 def test_the_terms_do_not_carry_the_retired_payment_restriction():
