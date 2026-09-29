@@ -125,3 +125,4 @@ infrastructure/ansible/roles/fou-backbone/
 *.sqlite
 *.sqlite3
 pwa/*.db
+.venv/
