@@ -34,8 +34,11 @@ a real account — a client must accept both.
 **`is_subscribed` in `/api/client/me` is the raw flag, not the gate.** Access
 is decided by `has_active_subscription`: the flag *and* `subscribed_until`
 still ahead. The flag is cleared by a periodic sweep some time after the date
-passes, so `/me` can say `true` about a period that is over. Clients must
-apply the same rule, and treat a missing date as no subscription.
+passes, so `/me` can say `true` about a period that is over. Since 2026-09-29
+`/me` also returns `active` — the gate's own answer — and `plan`; read
+`active` where present. A client talking to an older server, which lacks the
+field, must apply the same rule itself and treat a missing date as no
+subscription.
 
 **The `.conf` is plain text, not JSON.** `Content-Type: text/plain`. It is
 handed to the tunnel as-is.
@@ -118,6 +121,8 @@ GET /api/client/me
   "username": "paid",
   "email": "paid@example.test",
   "is_subscribed": true,
+  "plan": "basic-1m",
+  "active": true,
   "peer_ip": null,
   "subscribed_until": "2026-10-12T09:26:42.848714"
 }

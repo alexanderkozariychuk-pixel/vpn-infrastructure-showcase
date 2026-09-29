@@ -9,6 +9,7 @@ from db.base import get_db
 from db.models import User, Payment
 from auth.jwt import hash_password, require_auth, require_admin
 from services.mailer import send_email, welcome_email
+from services.subscriptions import has_active_subscription
 import logging
 
 logger = logging.getLogger(__name__)
@@ -137,6 +138,13 @@ async def get_me(
         "username": user.username,
         "email": user.email,
         "is_subscribed": user.is_subscribed,
+        # The plan key ("basic-1m"). The portal read it all along and never
+        # got it, so every customer's plan showed as "no subscription".
+        "plan": user.plan,
+        # The gate's own answer — flag *and* a paid period still ahead — so a
+        # client does not have to re-derive it from the raw flag, which the
+        # expiry sweep only clears some time after the date has passed.
+        "active": has_active_subscription(user),
         "peer_ip": user.peer_ip,
         "subscribed_until": user.subscribed_until,
     }

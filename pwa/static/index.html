@@ -2733,6 +2733,8 @@ function toggleLang() {
   applyTranslations();
   // The per-month line is built in JS, so applyTranslations cannot reach it.
   if (typeof renderPlans === 'function') renderPlans();
+  // Nor the current-plan block, which is filled from /me.
+  if (_lastMe) renderMe(_lastMe);
 }
 
 (function initLang() {
@@ -3743,20 +3745,38 @@ function downloadConfig() {
   a.click();
 }
 
+// "basic-1m" -> "Базовый · 1 месяц". A key this page does not know (a
+// retired plan still on an old account) is shown as it is rather than hidden.
+function planLabel(key) {
+  const m = /^(basic|ext)-(\d+m)$/.exec(key || '');
+  if (!m) return key || '—';
+  return `${t(m[1] === 'ext' ? 'plan-ext-name' : 'plan-basic-name')} · ${t('period-' + m[2])}`;
+}
+
+let _lastMe = null;
+
+function renderMe(d) {
+  // `active` is the server's own gate (flag and a paid period still ahead).
+  // The raw is_subscribed flag stays set until the expiry sweep runs, so on
+  // its own it can call an ended period active. Older servers lack `active`.
+  const active = (typeof d.active === 'boolean') ? d.active : !!d.is_subscribed;
+  const planEl = document.getElementById('cur-plan');
+  const statEl = document.getElementById('cur-status');
+  const expEl = document.getElementById('cur-expires');
+  if (planEl) planEl.textContent = active ? planLabel(d.plan) : t('sub-none');
+  if (statEl) {
+    statEl.textContent = active ? t('sub-active') : t('sub-inactive');
+    statEl.className = 'metric-value ' + (active ? 'green' : 'red');
+  }
+  if (expEl) expEl.textContent = fmtDate(d.subscribed_until) || '—';
+}
+
 async function loadClientMe() {
   try {
     const res = await fetch(`${API}/api/client/me`, {headers: hdrs()});
     if (!res.ok) return;
-    const d = await res.json();
-    const planEl = document.getElementById('cur-plan');
-    const statEl = document.getElementById('cur-status');
-    const expEl = document.getElementById('cur-expires');
-    if (planEl) planEl.textContent = d.plan || t('sub-none');
-    if (statEl) {
-      statEl.textContent = d.is_subscribed ? t('sub-active') : t('sub-inactive');
-      statEl.className = 'metric-value ' + (d.is_subscribed ? 'green' : 'red');
-    }
-    if (expEl) expEl.textContent = fmtDate(d.subscribed_until) || '—';
+    _lastMe = await res.json();
+    renderMe(_lastMe);
   } catch(e) {}
 }
 
