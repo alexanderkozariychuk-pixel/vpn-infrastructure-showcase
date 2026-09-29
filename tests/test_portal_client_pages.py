@@ -126,3 +126,59 @@ def test_support_no_longer_teaches_crypto_wallets():
     for word in ("MetaMask", "seed", "ERC-20", "bestchange", "хэш транзакции"):
         assert word not in page, f"support still mentions {word!r}"
     assert 'id="support-form-wrap"' in page, "the request form must stay"
+
+
+def test_every_slot_the_plan_pays_for_is_on_screen():
+    """
+    Filled slots are the devices; each free one is an "add" tile. A customer
+    who bought two devices sees two places, not one config and no way to get
+    the second.
+    """
+    html = _html()
+    body = html[html.index("function renderDevices("):]
+    body = body[:body.index("\n}\n")]
+    assert "_devLimit - _configs.length" in body
+    assert 'class="dev-slot"' in body
+    assert "startDeviceEdit(" in body, "a device cannot be renamed"
+
+
+def test_adding_and_renaming_go_to_the_servers_device_endpoints():
+    html = _html()
+    add = html[html.index("function startDeviceAdd("):]
+    add = add[:add.index("\n}\n")]
+    assert "`${API}/api/client/configs`" in add and "method: 'POST'" in add
+    edit = html[html.index("function startDeviceEdit("):]
+    edit = edit[:edit.index("\n}\n")]
+    assert "/api/client/configs/${encodeURIComponent(id)}" in edit and "method: 'PATCH'" in edit
+
+
+def test_the_page_accepts_exactly_the_names_the_server_does():
+    """
+    The page's name rule and the server's must agree on length, or the page
+    offers names the server then refuses (or blocks ones it would take).
+    """
+    from api import config as config_api
+
+    html = _html()
+    m = re.search(r"const DEV_NAME_RE = /\^\[A-Za-z0-9_-\]\{1,(\d+)\}\$/;", html)
+    assert m, "DEV_NAME_RE not found in its expected shape"
+    page_max = int(m.group(1))
+    for model in (config_api.NewConfigRequest, config_api.RenameConfigRequest):
+        meta = {type(x).__name__: x for x in model.model_fields["name"].metadata}
+        assert meta["MaxLen"].max_length == page_max, f"{model.__name__} disagrees with the page"
+    assert f'maxlength="{page_max}"' in html
+
+
+def test_the_reload_after_adding_is_not_blocked_by_the_add_in_flight():
+    """
+    Found in the browser: the add request holds the busy flag while it
+    reloads the list, and selectDevice turned the reload away as if it were
+    a second click — the new device's chip lit up over the previous device's
+    file, and Download would have handed that file out under the new name.
+    """
+    html = _html()
+    load = html[html.index("async function loadClientConfigPage("):]
+    load = load[:load.index("\n}\n")]
+    assert "selectDevice(keep, true)" in load
+    sel = html[html.index("async function selectDevice("):]
+    assert sel.index("if (_devBusy && !fromCode) return;") < sel.index("\n}\n")

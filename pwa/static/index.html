@@ -1241,7 +1241,45 @@
     .dev-chip.selected { border-color: var(--accent); background: var(--accent-glow); }
     .dev-chip-name { font-size: 14px; font-weight: 600; color: var(--text-bright); }
     .dev-chip-ip { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
-    .dev-hint { margin-top: 14px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .dev-hint { margin-top: 10px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .dev-chip { position: relative; padding-right: 36px; }
+    .dev-chip:focus-visible, .dev-slot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .dev-edit {
+      position: absolute; top: 6px; right: 6px;
+      width: 24px; height: 24px; border-radius: 6px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text-dim); cursor: pointer; font-size: 13px; line-height: 1;
+    }
+    .dev-edit:hover { border-color: var(--border-bright); color: var(--accent); }
+    .dev-slot {
+      display: flex; align-items: center; gap: 8px;
+      min-width: 128px; min-height: 58px; padding: 10px 14px;
+      background: transparent; border: 1px dashed var(--border-bright); border-radius: 8px;
+      color: var(--text-dim); cursor: pointer; font-family: var(--font-body); font-size: 13px;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .dev-slot:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .dev-slot-plus { font-size: 18px; line-height: 1; }
+    .dev-form {
+      display: flex; align-items: center; gap: 6px;
+      min-height: 58px; padding: 8px 10px;
+      border: 1px solid var(--accent); border-radius: 8px; background: var(--bg);
+      animation: conn-in .2s ease both;
+    }
+    .dev-input {
+      width: 92px; background: var(--bg-3); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-bright); padding: 8px 10px; font-family: var(--font-mono); font-size: 14px;
+    }
+    .dev-input:focus { outline: none; border-color: var(--accent); }
+    .dev-ok, .dev-cancel {
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 7px 10px; cursor: pointer; font-family: var(--font-body); font-size: 13px;
+    }
+    .dev-ok { border-color: var(--accent); color: var(--accent); }
+    .dev-ok:disabled, .dev-cancel:disabled, .dev-input:disabled { opacity: .6; cursor: progress; }
+    .dev-msg { margin-top: 10px; font-size: 13px; color: var(--text-dim); min-height: 0; }
+    .dev-msg:empty { display: none; }
+    .dev-msg.bad { color: var(--red); }
 
     /* ── CONNECT ── */
     .plat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -1310,7 +1348,7 @@
     @media (prefers-reduced-motion: reduce) {
       .plat-tile, .plat-icon, .dev-chip, .plat-glow { transition: none; }
       .plat-tile:hover, .dev-chip:hover { transform: none; }
-      .conn-panel, .conn-step, .conn-pulse { animation: none; }
+      .conn-panel, .conn-step, .conn-pulse, .dev-form { animation: none; }
     }
 
     /* ── PROMO CODE AND CREDIT ── */
@@ -1574,6 +1612,8 @@
               <div class="dev-count" id="cl-dev-count"></div>
             </div>
             <div class="dev-list" id="cl-devices"></div>
+            <div class="dev-msg" id="dev-msg" role="status"></div>
+            <div class="dev-hint" data-i18n="dev-name-rule">A device name is up to 6 characters: Latin letters, digits, - and _. The connection file downloads under this name.</div>
             <div class="dev-hint" data-i18n="dev-one-file">One file is for one device. The same file on two devices at once makes them knock each other off.</div>
           </div>
           <div class="card">
@@ -2109,8 +2149,19 @@ const translations = {
     'dev-one-file': 'One file is for one device. The same file on two devices at once makes them knock each other off.',
     'btn-how-connect': 'How to connect →',
     'btn-copied': 'Copied',
-    'config-preparing': 'Config is being prepared',
-    'config-preparing-sub': 'Your config will be available shortly. Contact support if it takes too long.',
+    'dev-add': 'Add a device',
+    'dev-add-first': 'Add a device to get its connection file.',
+    'dev-create': 'Create',
+    'dev-rename': 'Rename',
+    'dev-cancel': 'Cancel',
+    'dev-name-label': 'Device name',
+    'dev-name-rule': 'A device name is up to 6 characters: Latin letters, digits, - and _. The connection file downloads under this name.',
+    'dev-saving': 'Saving…',
+    'dev-created': 'Device added. Its file is below.',
+    'dev-err-name': 'Up to 6 characters: Latin letters, digits, - and _.',
+    'dev-err-limit': 'Your plan has no free device slots left.',
+    'dev-err-provision': 'Could not create the device right now. Try again in a minute, or write to support.',
+    'dev-err-generic': 'Something went wrong. Try again.',
     'nav-support': 'Support',
     'support-sub': "We're here to help",
     'support-card-title': 'Contact us',
@@ -2382,8 +2433,19 @@ const translations = {
     'dev-one-file': 'Один файл — для одного устройства. Если открыть один и тот же файл на двух устройствах одновременно, они будут выбивать друг друга.',
     'btn-how-connect': 'Как подключить →',
     'btn-copied': 'Скопировано',
-    'config-preparing': 'Конфиг готовится',
-    'config-preparing-sub': 'Ваш конфиг будет доступен в ближайшее время. Если ждёте долго — напишите в поддержку.',
+    'dev-add': 'Добавить устройство',
+    'dev-add-first': 'Добавьте устройство, чтобы получить его файл подключения.',
+    'dev-create': 'Создать',
+    'dev-rename': 'Переименовать',
+    'dev-cancel': 'Отмена',
+    'dev-name-label': 'Имя устройства',
+    'dev-name-rule': 'Имя устройства — до 6 символов: латиница, цифры, «-» и «_». Под этим именем скачивается файл подключения.',
+    'dev-saving': 'Сохраняем…',
+    'dev-created': 'Устройство добавлено. Его файл — ниже.',
+    'dev-err-name': 'До 6 символов: латиница, цифры, «-» и «_».',
+    'dev-err-limit': 'Свободных мест для устройств в тарифе не осталось.',
+    'dev-err-provision': 'Не получилось создать устройство. Попробуйте через минуту или напишите в поддержку.',
+    'dev-err-generic': 'Что-то пошло не так. Попробуйте ещё раз.',
     'nav-support': 'Техподдержка',
     'support-sub': 'Мы на связи',
     'support-card-title': 'Связаться с нами',
@@ -3459,16 +3521,14 @@ let _configs = [];
 let _configId = null;
 let _configName = null;
 
-function _configPreparing(noSub, hasSub) {
-  noSub.style.display = 'block';
-  hasSub.style.display = 'none';
-  const title = noSub.querySelector('[data-i18n="config-no-sub-title"], .wip-title');
-  const sub = noSub.querySelector('[data-i18n="config-no-sub-sub"], .wip-sub');
-  if (title) { title.removeAttribute('data-i18n'); title.textContent = t('config-preparing'); }
-  if (sub) { sub.removeAttribute('data-i18n'); sub.textContent = t('config-preparing-sub'); }
-}
+let _devLimit = 0;
+let _devBusy = false;
+// Must match what the server accepts (1–6 chars) and what survives as a
+// filename: downloadConfig keeps only these characters, so a name outside
+// them would download as a generic file and two devices could collide.
+const DEV_NAME_RE = /^[A-Za-z0-9_-]{1,6}$/;
 
-async function loadClientConfigPage() {
+async function loadClientConfigPage(selectId) {
   const noSub = document.getElementById('config-no-sub');
   const hasSub = document.getElementById('config-has-sub');
   const block = document.getElementById('cl-config-block');
@@ -3485,31 +3545,152 @@ async function loadClientConfigPage() {
     if (!res.ok) throw new Error('configs ' + res.status);
     const d = await res.json();
     _configs = (d && d.configs) || [];
-    if (!_configs.length) { _configPreparing(noSub, hasSub); return; }
+    _devLimit = Math.max(Number(d.limit) || 0, _configs.length);
 
     noSub.style.display = 'none';
     hasSub.style.display = 'block';
-    setText('cl-dev-count', t('dev-used').replace('{used}', d.used).replace('{limit}', d.limit));
+    setText('cl-dev-count', t('dev-used').replace('{used}', _configs.length).replace('{limit}', _devLimit));
+
+    if (!_configs.length) {
+      // Subscribed with no device yet (all removed from the app, say):
+      // the empty slots are the way forward, not a "being prepared" notice.
+      _configId = null; _configName = null; _configText = null;
+      renderDevices();
+      if (block) block.innerHTML = `<span style="color:var(--text-dim)">${t('dev-add-first')}</span>`;
+      return;
+    }
+    const want = selectId || _configId;
+    const keep = _configs.some(c => c.id === want) ? want : _configs[0].id;
+    _configId = keep;
     renderDevices();
-    const keep = _configs.some(c => c.id === _configId) ? _configId : _configs[0].id;
-    await selectDevice(keep);
+    await selectDevice(keep, true);
   } catch(e) {
     if (block) block.innerHTML = '<span style="color:var(--red)">—</span>';
   }
 }
 
+// Every slot the plan pays for is on screen: devices already issued, and an
+// empty "add" tile for each one still free — so a customer sees at once what
+// they bought, names each device themselves, and gets its own file.
 function renderDevices() {
   const list = document.getElementById('cl-devices');
   if (!list) return;
-  list.innerHTML = _configs.map(c => `
-    <button class="dev-chip${c.id === _configId ? ' selected' : ''}" data-id="${escHtml(String(c.id))}"
-            onclick="selectDevice(this.dataset.id)">
+  const filled = _configs.map(c => `
+    <div class="dev-chip${c.id === _configId ? ' selected' : ''}" data-id="${escHtml(String(c.id))}"
+         role="button" tabindex="0"
+         onclick="selectDevice(this.dataset.id)"
+         onkeydown="if(event.key==='Enter'){selectDevice(this.dataset.id)}">
       <span class="dev-chip-name">${escHtml(String(c.name || '—'))}</span>
       <span class="dev-chip-ip">${escHtml(String(c.peer_ip || ''))}</span>
-    </button>`).join('');
+      <button class="dev-edit" title="${t('dev-rename')}" aria-label="${t('dev-rename')}"
+              onclick="event.stopPropagation(); startDeviceEdit(this.parentElement.dataset.id)">✎</button>
+    </div>`);
+  const free = Math.max(0, _devLimit - _configs.length);
+  const empty = Array.from({length: free}, () => `
+    <button class="dev-slot" onclick="startDeviceAdd(this)">
+      <span class="dev-slot-plus">+</span>
+      <span>${t('dev-add')}</span>
+    </button>`);
+  list.innerHTML = filled.join('') + empty.join('');
 }
 
-async function selectDevice(id) {
+function _devMsg(text, bad) {
+  const el = document.getElementById('dev-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'dev-msg' + (bad ? ' bad' : '');
+}
+
+// One inline form, used for both naming a new device and renaming one.
+function _devForm(value, submitLabel, onSubmit) {
+  const form = document.createElement('form');
+  form.className = 'dev-form';
+  form.innerHTML = `
+    <input class="dev-input" maxlength="6" autocomplete="off" spellcheck="false"
+           placeholder="phone" aria-label="${t('dev-name-label')}">
+    <button type="submit" class="dev-ok">${submitLabel}</button>
+    <button type="button" class="dev-cancel" aria-label="${t('dev-cancel')}">✕</button>`;
+  const input = form.querySelector('input');
+  input.value = value || '';
+  form.addEventListener('click', e => e.stopPropagation());
+  form.querySelector('.dev-cancel').addEventListener('click', () => { _devMsg(''); renderDevices(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') { _devMsg(''); renderDevices(); } });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = input.value.trim();
+    if (!DEV_NAME_RE.test(name)) { _devMsg(t('dev-err-name'), true); input.focus(); return; }
+    if (_devBusy) return;
+    _devBusy = true;
+    form.querySelectorAll('button, input').forEach(el => el.disabled = true);
+    _devMsg(t('dev-saving'));
+    try { await onSubmit(name); }
+    finally { _devBusy = false; }
+  });
+  setTimeout(() => input.focus(), 0);
+  return form;
+}
+
+function _devError(status) {
+  if (status === 409) return t('dev-err-limit');
+  if (status === 422) return t('dev-err-name');
+  if (status === 503) return t('dev-err-provision');
+  return t('dev-err-generic');
+}
+
+function startDeviceAdd(slot) {
+  if (_devBusy) return;
+  renderDevices();   // one form at a time
+  const target = document.querySelectorAll('#cl-devices .dev-slot')[0];
+  if (!target) return;
+  _devMsg('');
+  const form = _devForm('', t('dev-create'), async name => {
+    try {
+      const res = await fetch(`${API}/api/client/configs`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', ...hdrs()},
+        body: JSON.stringify({name}),
+      });
+      if (res.status === 401) { doLogout(); return; }
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { _devMsg(_devError(res.status), true); renderDevices(); return; }
+      _devMsg(t('dev-created'));
+      await loadClientConfigPage(d.config && d.config.id);
+    } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
+  });
+  form.classList.add('dev-form-slot');
+  target.replaceWith(form);
+}
+
+function startDeviceEdit(id) {
+  if (_devBusy) return;
+  renderDevices();
+  const chip = document.querySelector(`#cl-devices .dev-chip[data-id="${CSS.escape(id)}"]`);
+  const cfg = _configs.find(c => c.id === id);
+  if (!chip || !cfg) return;
+  _devMsg('');
+  const form = _devForm(cfg.name, '✓', async name => {
+    try {
+      const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json', ...hdrs()},
+        body: JSON.stringify({name}),
+      });
+      if (res.status === 401) { doLogout(); return; }
+      if (!res.ok) { _devMsg(_devError(res.status), true); renderDevices(); return; }
+      cfg.name = name;
+      if (_configId === id) _configName = name;
+      _devMsg('');
+      renderDevices();
+    } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
+  });
+  chip.replaceWith(form);
+}
+
+// `fromCode` is the page's own reload after adding a device — that runs while
+// the add is still marked busy, and must not be turned away like a click
+// would be, or the new device's chip lights up over the previous one's file.
+async function selectDevice(id, fromCode) {
+  if (_devBusy && !fromCode) return;
   const block = document.getElementById('cl-config-block');
   const cfg = _configs.find(c => c.id === id);
   if (!cfg || !block) return;
