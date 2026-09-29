@@ -6,6 +6,7 @@ GET    /api/client/config/raw        — the same, as a downloadable file
 GET    /api/client/configs           — every device on the account
 POST   /api/client/configs           — add a device, up to the plan's limit
 GET    /api/client/configs/{id}/raw  — one device's .conf as a file
+PATCH  /api/client/configs/{id}      — rename a device
 DELETE /api/client/configs/{id}      — remove a device and free the slot
 """
 import asyncio
@@ -98,6 +99,11 @@ class NewConfigRequest(BaseModel):
     name: str = Field(default="device", min_length=1, max_length=6)
 
 
+class RenameConfigRequest(BaseModel):
+    # Same bound as a new device's name: it is the download's filename.
+    name: str = Field(min_length=1, max_length=6)
+
+
 def _describe(config: Config) -> dict:
     return {
         "id": config.id,
@@ -184,6 +190,42 @@ async def config_raw(
         content=render_config(config),
         headers={"Content-Disposition": f"attachment; filename={config.name}.conf"},
     )
+
+
+@router.patch("/api/client/configs/{config_id}")
+async def rename_config(
+    config_id: str,
+    req: RenameConfigRequest,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    """
+    Rename a device. Only the label changes — keys, address and the peer on
+    the node are untouched, so a working tunnel keeps working.
+
+    The first device is issued automatically when a plan is bought, before the
+    customer has had a chance to name it; this is how they do.
+    """
+    user = await _current_user(db, payload)
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name is empty")
+
+    # Scoped like the download: someone else's id reads as missing.
+    result = await db.execute(
+        select(Config).where(
+            Config.id == config_id,
+            Config.user_id == user.id,
+            Config.is_active.is_(True),
+        )
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Config not found")
+
+    config.name = name
+    await db.commit()
+    return {"ok": True, "config": _describe(config)}
 
 
 @router.delete("/api/client/configs/{config_id}")

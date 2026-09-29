@@ -51,6 +51,12 @@ class Payment(Base):
     currency: Mapped[str] = mapped_column(String(10), default="RUB")
     status: Mapped[str] = mapped_column(String(32), default="pending")
     heleket_invoice_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Which gateway this payment belongs to ('platega' | 'heleket' | 'freekassa')
+    # and that gateway's own transaction id. A callback carrying a transaction
+    # id is matched to a payment by provider_ref; provider keeps two gateways'
+    # ids from being confused. See migration d4f2a9c81e30.
+    provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    provider_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # The promo code used, and how much credit the order intends to consume.
     # The credit is held here rather than deducted up front: an order that is
     # never paid must not spend anything, and a ledger entry written at
