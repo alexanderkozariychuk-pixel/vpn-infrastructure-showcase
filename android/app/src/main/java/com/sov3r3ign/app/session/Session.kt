@@ -46,6 +46,19 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
 
     /**
+     * Renames a device on the account. When it is the one this phone uses,
+     * the stored name follows; the stored config does not change, since the
+     * server changes only the label.
+     */
+    fun renameDevice(deviceId: String, name: String): ApiResult<Device> = authorized { token ->
+        val r = api.renameDevice(token, deviceId, name)
+        if (r is ApiResult.Ok && secrets.get(DEVICE_ID) == deviceId) {
+            secrets.put(DEVICE_NAME, r.value.name)
+        }
+        r
+    }
+
+    /**
      * Makes [device] the one this phone uses: downloads its .conf and keeps
      * it. The tunnel then starts from what is stored, with no network call —
      * the token may well have expired by the time the customer presses connect.

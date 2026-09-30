@@ -119,3 +119,6 @@ data class DeviceList(
 
 @Serializable
 data class AddedDevice(val config: Device, val used: Int, val limit: Int)
+
+@Serializable
+data class RenamedDevice(val config: Device)

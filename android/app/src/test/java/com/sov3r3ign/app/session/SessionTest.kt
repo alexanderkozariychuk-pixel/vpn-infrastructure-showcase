@@ -173,4 +173,39 @@ class SessionTest {
         Session(ApiClient(Script()), secrets).signOut()
         assertTrue(secrets.map.isEmpty())
     }
+
+    // --- rename ---------------------------------------------------------------
+
+    private fun renamedTo(name: String) = HttpReply(200,
+        """{"ok":true,"config":{"id":"${phone.id}","name":"$name","peer_ip":"10.88.88.50","created_at":"2026-09-25T09:26:43"}}""")
+
+    private fun chosePhone() = MapSecrets().apply {
+        put("token", "T1"); put("conf", "[Interface]\nPrivateKey = k"); put("device_name", "phone"); put("device_id", phone.id)
+    }
+
+    @Test
+    fun `renaming the device this phone uses renames it here, config untouched`() {
+        val secrets = chosePhone()
+        val s = Session(ApiClient(Script(renamedTo("A71"))), secrets)
+        assertTrue(s.renameDevice(phone.id, "A71") is ApiResult.Ok)
+        assertEquals(Session.Selected(phone.id, "A71"), s.selected())
+        assertEquals("[Interface]\nPrivateKey = k", s.storedConfig())
+    }
+
+    @Test
+    fun `renaming another device leaves this phone's choice as it was`() {
+        val secrets = chosePhone()
+        val other = "bddb174e-f00a-4d37-89a3-7a9d7b5dd227"
+        val reply = HttpReply(200, """{"ok":true,"config":{"id":"$other","name":"lap2","peer_ip":"10.88.88.51","created_at":"2026-09-25T09:26:43"}}""")
+        assertTrue(Session(ApiClient(Script(reply)), secrets).renameDevice(other, "lap2") is ApiResult.Ok)
+        assertEquals("phone", secrets.map["device_name"])
+    }
+
+    @Test
+    fun `a failed rename keeps the name stored here`() {
+        val secrets = chosePhone()
+        val s = Session(ApiClient(Script(HttpReply(404, """{"detail":"Config not found"}"""))), secrets)
+        assertEquals(ApiResult.Failed(ApiError.NotFound), s.renameDevice(phone.id, "A71"))
+        assertEquals("phone", secrets.map["device_name"])
+    }
 }

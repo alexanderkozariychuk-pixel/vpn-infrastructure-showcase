@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +60,9 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var newName by rememberSaveable { mutableStateOf("phone") }
     var reload by remember { mutableIntStateOf(0) }
+    var renaming by remember { mutableStateOf<Device?>(null) }
+    var renameText by rememberSaveable { mutableStateOf("") }
+    var renameError by remember { mutableStateOf<String?>(null) }
 
     /** Every call can find the token expired; that always ends at sign-in. */
     fun failed(e: ApiError) {
@@ -66,6 +70,8 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
             onSignedOut("Сессия истекла — войдите снова")
         } else {
             error = describe(e, Action.LOAD)
+            // The device is gone from the account: the list on screen is stale.
+            if (e == ApiError.NotFound) reload++
         }
     }
 
@@ -103,6 +109,29 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 is ApiResult.Ok -> {
                     selected = withContext(Dispatchers.IO) { session.selected() }
                     followSelection()
+                }
+                is ApiResult.Failed -> failed(r.error)
+            }
+        }
+    }
+
+    fun rename() {
+        val device = renaming ?: return
+        val problem = validateDeviceName(renameText)
+        if (problem != null) {
+            renameError = problem
+            return
+        }
+        busy = true
+        error = null
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { session.renameDevice(device.id, renameText) }
+            busy = false
+            renaming = null
+            when (r) {
+                is ApiResult.Ok -> {
+                    selected = withContext(Dispatchers.IO) { session.selected() }
+                    reload++
                 }
                 is ApiResult.Failed -> failed(r.error)
             }
@@ -185,11 +214,21 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(d.name, style = MaterialTheme.typography.bodyLarge)
-                    if (here?.id == d.id) {
-                        Text("выбрано", color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        TextButton(onClick = { use(d) }, enabled = !busy) {
-                            Text("Использовать здесь")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                renaming = d
+                                renameText = d.name
+                                renameError = null
+                            },
+                            enabled = !busy,
+                        ) { Text("Переименовать") }
+                        if (here?.id == d.id) {
+                            Text("выбрано", color = MaterialTheme.colorScheme.primary)
+                        } else {
+                            TextButton(onClick = { use(d) }, enabled = !busy) {
+                                Text("Использовать здесь")
+                            }
                         }
                     }
                 }
@@ -217,6 +256,35 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = { reload++ }, enabled = !busy) { Text("Повторить") }
+        }
+
+        renaming?.let { d ->
+            AlertDialog(
+                onDismissRequest = { if (!busy) renaming = null },
+                title = { Text("Переименовать «${d.name}»") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = renameText,
+                            onValueChange = { renameText = it; renameError = null },
+                            label = { Text("До 6 символов, латиница и цифры") },
+                            singleLine = true,
+                            enabled = !busy,
+                        )
+                        renameError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        Text(
+                            "Меняется только название. Подключение и ключ остаются прежними.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { rename() }, enabled = !busy) { Text("Сохранить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { renaming = null }, enabled = !busy) { Text("Отмена") }
+                },
+            )
         }
 
         HorizontalDivider()

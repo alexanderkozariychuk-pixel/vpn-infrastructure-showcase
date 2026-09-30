@@ -69,6 +69,12 @@ class MessagesTest {
     }
 
     @Test
+    fun `a device that is gone says so, not that the server is down`() {
+        assertEquals("Устройство не найдено — возможно, его удалили на сайте. Список обновлён.",
+            describe(ApiError.NotFound, Action.LOAD))
+    }
+
+    @Test
     fun `a lapsed subscription points to renewal, not to sign-in`() {
         assertEquals("Подписка закончилась. Продлить её можно на сайте.",
             describe(ApiError.SubscriptionLapsed, Action.LOAD))

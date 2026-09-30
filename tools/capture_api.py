@@ -113,6 +113,14 @@ rec("Список устройств", "То, что рисует экран.", 
 cid = first.get("id") or first.get("config", {}).get("id")
 rec("Файл конфигурации", "Текст .conf — его получает туннель.", "GET",
     f"/api/client/configs/{cid}/raw", headers=H)
+rec("Переименовать устройство", "Меняется только подпись; ключи и туннель не трогаются.", "PATCH",
+    f"/api/client/configs/{cid}", headers=H, json_body={"name": "A71"})
+rec("Переименовать — пустое имя", "Имя из одних пробелов.", "PATCH",
+    f"/api/client/configs/{cid}", headers=H, json_body={"name": "   "})
+rec("Переименовать — длинное имя", "Больше 6 символов.", "PATCH",
+    f"/api/client/configs/{cid}", headers=H, json_body={"name": "Galaxy A71"})
+rec("Переименовать чужое или удалённое", "Чужой id и несуществующий неразличимы.", "PATCH",
+    f"/api/client/configs/{uuid.uuid4()}", headers=H, json_body={"name": "x"})
 rec("Удалить устройство", "Освобождает место в тарифе.", "DELETE",
     f"/api/client/configs/{cid}", headers=H)
 
@@ -121,5 +129,5 @@ H2 = {"Authorization": f"Bearer {tok2}"}
 rec("Профиль без подписки", "Что видит приложение, когда платить перестали.", "GET", "/api/client/me", headers=H2)
 rec("Конфиг без подписки", "Поведение при истёкшей подписке.", "GET", "/api/client/configs", headers=H2)
 
-json.dump(out, open("/tmp/claude-0/-home-claude/516589b3-43e8-5816-a92b-6b9d3617912b/scratchpad/api_capture.json", "w"), ensure_ascii=False, indent=2)
+json.dump(out, open(os.environ.get("CAPTURE_OUT", "api_capture.json"), "w"), ensure_ascii=False, indent=2)
 print(f"записано {len(out)} вызовов")

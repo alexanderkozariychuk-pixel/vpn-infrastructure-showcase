@@ -24,6 +24,17 @@ sign in again, the other says renew.
 **409 means the plan is full.** Distinct from 402 and from a server failure;
 the message names the limit.
 
+**404 means no such device on this account.** Renaming, fetching or deleting
+someone else's id answers exactly as for one that never existed or was
+removed on the site. Renaming does not check the subscription: it changes
+only the label.
+
+**The portal accepts fewer names than the server.** The server takes any 1
+to 6 characters; the portal lets through only Latin letters, digits, `-` and
+`_`, because the name becomes the downloaded file's name. The app follows
+the portal. Names the server made itself (`device-1`, eight characters) can
+exist on an account and have to be displayed.
+
 **Timestamps in production carry an offset; the ones below do not.** This
 capture ran on SQLite, which returns naive datetimes
 (`"2026-10-12T09:26:42.848714"`). Production runs PostgreSQL and returns
@@ -274,6 +285,85 @@ PersistentKeepalive = 25
 
 ```
 
+## Переименовать устройство
+
+Меняется только подпись; ключи и туннель не трогаются.
+
+```
+PATCH /api/client/configs/50ad16ee-a71d-40e1-9ee7-e1036389a1cb
+→ 200  application/json
+```
+
+```
+{
+  "ok": true,
+  "config": {
+    "id": "50ad16ee-a71d-40e1-9ee7-e1036389a1cb",
+    "name": "A71",
+    "peer_ip": "10.88.88.50",
+    "created_at": "2026-09-25T09:26:43"
+  }
+}
+```
+
+## Переименовать — пустое имя
+
+Имя из одних пробелов.
+
+```
+PATCH /api/client/configs/50ad16ee-a71d-40e1-9ee7-e1036389a1cb
+→ 422  application/json
+```
+
+```
+{
+  "detail": "Name is empty"
+}
+```
+
+## Переименовать — длинное имя
+
+Больше 6 символов.
+
+```
+PATCH /api/client/configs/50ad16ee-a71d-40e1-9ee7-e1036389a1cb
+→ 422  application/json
+```
+
+```
+{
+  "detail": [
+    {
+      "type": "string_too_long",
+      "loc": [
+        "body",
+        "name"
+      ],
+      "msg": "String should have at most 6 characters",
+      "input": "Galaxy A71",
+      "ctx": {
+        "max_length": 6
+      }
+    }
+  ]
+}
+```
+
+## Переименовать чужое или удалённое
+
+Чужой id и несуществующий неразличимы.
+
+```
+PATCH /api/client/configs/<unknown id>
+→ 404  application/json
+```
+
+```
+{
+  "detail": "Config not found"
+}
+```
+
 ## Удалить устройство
 
 Освобождает место в тарифе.
@@ -305,6 +395,8 @@ GET /api/client/me
   "username": "lapsed",
   "email": "lapsed@example.test",
   "is_subscribed": false,
+  "plan": null,
+  "active": false,
   "peer_ip": null,
   "subscribed_until": null
 }

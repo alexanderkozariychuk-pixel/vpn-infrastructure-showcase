@@ -63,6 +63,8 @@ fun describe(error: ApiError, action: Action): String = when (error) {
 
     ApiError.SubscriptionLapsed -> "Подписка закончилась. Продлить её можно на сайте."
 
+    ApiError.NotFound -> "Устройство не найдено — возможно, его удалили на сайте. Список обновлён."
+
     // The server's reasons are in English and name the field; the app says
     // it in Russian rather than showing them raw.
     is ApiError.Conflict -> when {

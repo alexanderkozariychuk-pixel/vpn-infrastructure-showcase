@@ -67,6 +67,8 @@ class ApiClientTest {
           "username": "lapsed",
           "email": "lapsed@example.test",
           "is_subscribed": false,
+          "plan": null,
+          "active": false,
           "peer_ip": null,
           "subscribed_until": null
         }
@@ -192,9 +194,18 @@ class ApiClientTest {
     }
 
     @Test
-    fun `a server that predates plan and active leaves both unknown`() {
-        // «Профиль без подписки» was recorded without them, as an older server answers.
+    fun `without a subscription the server says so itself`() {
         val p = ok(ApiClient(Recorder(200, lapsedProfile)).profile("tok"))
+        assertEquals(null, p.plan)
+        assertEquals(false, p.active)
+    }
+
+    @Test
+    fun `a server that predates plan and active leaves both unknown`() {
+        // As the server answered before 2026-09-29.
+        val old = profile.replace("\"plan\": \"basic-1m\",\n  \"active\": true,\n  ", "")
+        assertFalse(old.contains("active"))
+        val p = ok(ApiClient(Recorder(200, old)).profile("tok"))
         assertEquals(null, p.plan)
         assertEquals(null, p.active)
     }
@@ -318,5 +329,54 @@ class ApiClientTest {
     fun `fields the server adds later do not break the app`() {
         val extended = profile.replace("\"ok\": true,", "\"ok\": true, \"new_field\": 1,")
         assertEquals("paid", ok(ApiClient(Recorder(200, extended)).profile("tok")).username)
+    }
+
+    // --- rename ---------------------------------------------------------------
+
+    private val id = "50ad16ee-a71d-40e1-9ee7-e1036389a1cb"
+
+    // «Переименовать устройство»
+    private val renamed = """
+        {
+          "ok": true,
+          "config": {
+            "id": "50ad16ee-a71d-40e1-9ee7-e1036389a1cb",
+            "name": "A71",
+            "peer_ip": "10.88.88.50",
+            "created_at": "2026-09-25T09:26:43"
+          }
+        }
+    """.trimIndent()
+
+    @Test
+    fun `a rename is a PATCH on the device and returns it renamed`() {
+        val t = Recorder(200, renamed)
+        val d = ok(ApiClient(t).renameDevice("tok", id, " A71 "))
+        assertEquals("A71", d.name)
+        assertEquals(listOf("PATCH /api/client/configs/$id tok"), t.calls)
+        assertEquals("""{"name":"A71"}""", t.lastBody)
+    }
+
+    @Test
+    fun `a rename to a name the portal would not take is refused before any request`() {
+        val never = Transport { _, _, _, _ -> fail("must not reach the network"); HttpReply(0, "") }
+        assertTrue(error(ApiClient(never).renameDevice("tok", id, "Galaxy A71")) is ApiError.Rejected)
+        assertTrue(error(ApiClient(never).renameDevice("tok", id, "тел")) is ApiError.Rejected)
+        assertTrue(error(ApiClient(never).renameDevice("tok", id, "  ")) is ApiError.Rejected)
+        assertTrue(error(ApiClient(never).renameDevice("tok", "x/../../me", "ok")) is ApiError.Rejected)
+    }
+
+    @Test
+    fun `a device someone else owns, or that is gone, is NotFound`() {
+        // «Переименовать чужое или удалённое»
+        val r = ApiClient(Recorder(404, """{"detail": "Config not found"}""")).renameDevice("tok", id, "x")
+        assertEquals(ApiError.NotFound, error(r))
+    }
+
+    @Test
+    fun `the server's own refusal of a name still reads as Rejected`() {
+        // «Переименовать — пустое имя»: the app never sends this, a stale build might.
+        val r = ApiClient(Recorder(422, """{"detail": "Name is empty"}""")).renameDevice("tok", id, "x")
+        assertEquals(ApiError.Rejected("Name is empty"), error(r))
     }
 }

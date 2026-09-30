@@ -32,6 +32,12 @@ sealed interface ApiError {
     /** 402 — the paid period is over. */
     data object SubscriptionLapsed : ApiError
 
+    /**
+     * 404 — no such device on this account. The server does not tell someone
+     * else's id from one that never existed or was removed on the site.
+     */
+    data object NotFound : ApiError
+
     /** 409 — the plan is full, or the username or email is taken. */
     data class Conflict(val message: String) : ApiError
 
@@ -107,6 +113,23 @@ class ApiClient(private val transport: Transport) {
         }
     }
 
+    /** Only the label changes; the key, the address and a running tunnel stay as they are. */
+    fun renameDevice(token: String, deviceId: String, name: String): ApiResult<Device> {
+        if (!DEVICE_ID.matches(deviceId)) {
+            return ApiResult.Failed(ApiError.Rejected("Not a device id"))
+        }
+        val trimmed = name.trim()
+        if (!DEVICE_NAME.matches(trimmed)) {
+            return ApiResult.Failed(
+                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME Latin letters, digits, - or _")
+            )
+        }
+        val body = json.encodeToString(NewDeviceRequest.serializer(), NewDeviceRequest(trimmed))
+        return call("PATCH", "/api/client/configs/$deviceId", token, body) {
+            json.decodeFromString(RenamedDevice.serializer(), it).config
+        }
+    }
+
     /** The .conf text, handed to the tunnel as it is. */
     fun config(token: String, deviceId: String): ApiResult<String> {
         // Ids come from our own server and are UUIDs. Checked anyway: an id
@@ -138,6 +161,7 @@ class ApiClient(private val transport: Transport) {
             }
             401 -> ApiResult.Failed(ApiError.Unauthorized)
             402 -> ApiResult.Failed(ApiError.SubscriptionLapsed)
+            404 -> ApiResult.Failed(ApiError.NotFound)
             409 -> ApiResult.Failed(ApiError.Conflict(detail(reply.body)))
             400, 422 -> ApiResult.Failed(ApiError.Rejected(detail(reply.body)))
             else -> ApiResult.Failed(ApiError.Server(reply.code))
