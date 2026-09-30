@@ -83,7 +83,11 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
             is ApiResult.Failed -> { failed(p.error); return@LaunchedEffect }
         }
         when (val d = withContext(Dispatchers.IO) { session.devices() }) {
-            is ApiResult.Ok -> { devices = d.value }
+            is ApiResult.Ok -> {
+                devices = d.value
+                // The list may carry a new name for this phone's device.
+                selected = withContext(Dispatchers.IO) { session.selected() }
+            }
             is ApiResult.Failed -> { devices = null; failed(d.error) }
         }
     }

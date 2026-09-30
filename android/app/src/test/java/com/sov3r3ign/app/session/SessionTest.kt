@@ -208,4 +208,23 @@ class SessionTest {
         assertEquals(ApiResult.Failed(ApiError.NotFound), s.renameDevice(phone.id, "A71"))
         assertEquals("phone", secrets.map["device_name"])
     }
+
+    @Test
+    fun `a rename made on the site reaches this phone with the device list`() {
+        val secrets = chosePhone().apply { put("device_name", "old") }
+        val s = Session(ApiClient(Script(devices)), secrets)
+        assertTrue(s.devices() is ApiResult.Ok)
+        assertEquals(Session.Selected(phone.id, "phone"), s.selected())
+        assertEquals("[Interface]\nPrivateKey = k", s.storedConfig())
+    }
+
+    @Test
+    fun `a list without this phone's device leaves the choice for now`() {
+        // What to do when the device is gone is decided with deletion, not here.
+        val secrets = chosePhone().apply { put("device_name", "old") }
+        val empty = HttpReply(200, """{"ok":true,"plan":"basic-1m","limit":2,"used":0,"configs":[]}""")
+        assertTrue(Session(ApiClient(Script(empty)), secrets).devices() is ApiResult.Ok)
+        assertEquals("old", secrets.map["device_name"])
+        assertEquals(phone.id, secrets.map["device_id"])
+    }
 }

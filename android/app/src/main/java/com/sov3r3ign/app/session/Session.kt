@@ -41,7 +41,21 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
 
     fun profile(): ApiResult<Profile> = authorized { api.profile(it) }
 
-    fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }
+    /**
+     * The account's devices. The list is also where the name shown for this
+     * phone's device is kept current: a rename on the site, or on another
+     * phone, reaches this phone only this way. The config is not touched —
+     * a rename changes only the label.
+     */
+    fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }.also { r ->
+        if (r is ApiResult.Ok) {
+            val id = secrets.get(DEVICE_ID)
+            val current = r.value.configs.firstOrNull { it.id == id }
+            if (current != null && secrets.get(DEVICE_NAME) != current.name) {
+                secrets.put(DEVICE_NAME, current.name)
+            }
+        }
+    }
 
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
 
