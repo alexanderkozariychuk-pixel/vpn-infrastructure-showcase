@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The window behind the app while it starts: the site's --bg, so launch is never a white flash. -->
+    <!-- The window behind the app while it starts: the site's background colour, so launch is never a white flash. -->
     <color name="sov_bg">#FF080C0F</color>
 </resources>
