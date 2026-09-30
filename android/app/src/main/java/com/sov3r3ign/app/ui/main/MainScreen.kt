@@ -323,7 +323,7 @@ private fun Hero(
 
         PowerButton(
             centre = at(Mark.BUTTON_X, Mark.BUTTON_Y),
-            size = unit * Mark.BUTTON_SIZE,
+            diameter = unit * Mark.BUTTON_SIZE,
             link = link,
             action = action,
             onPress = onPress,
@@ -379,7 +379,7 @@ private fun NodeLabel(text: String, anchor: Offset, glow: Color?, flash: () -> F
 }
 
 @Composable
-private fun PowerButton(centre: Offset, size: Dp, link: Link, action: String, onPress: () -> Unit) {
+private fun PowerButton(centre: Offset, diameter: Dp, link: Link, action: String, onPress: () -> Unit) {
     val on = link == Link.ON
     val fill = if (on) Sov.Accent else Sov.Bg2
     val edge = when (link) {
@@ -400,7 +400,7 @@ private fun PowerButton(centre: Offset, size: Dp, link: Link, action: String, on
                     p.place((centre.x - p.width / 2f).toInt(), (centre.y - p.height / 2f).toInt())
                 }
             }
-            .size(size)
+            .size(diameter)
             .clip(CircleShape)
             .background(fill)
             .border(2.dp, edge, CircleShape)
