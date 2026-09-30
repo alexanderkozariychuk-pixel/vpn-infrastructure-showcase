@@ -53,6 +53,8 @@ class ApiClientTest {
           "username": "paid",
           "email": "paid@example.test",
           "is_subscribed": true,
+          "plan": "basic-1m",
+          "active": true,
           "peer_ip": null,
           "subscribed_until": "2026-10-12T09:26:42.848714"
         }
@@ -180,6 +182,21 @@ class ApiClientTest {
     fun `an unreadable date is null, never an exception`() {
         val odd = profile.replace("2026-10-12T09:26:42.848714", "next Tuesday")
         assertEquals(null, ok(ApiClient(Recorder(200, odd)).profile("tok")).subscribedUntil)
+    }
+
+    @Test
+    fun `the plan and the server's own answer are read`() {
+        val p = ok(ApiClient(Recorder(200, profile)).profile("tok"))
+        assertEquals("basic-1m", p.plan)
+        assertEquals(true, p.active)
+    }
+
+    @Test
+    fun `a server that predates plan and active leaves both unknown`() {
+        // «Профиль без подписки» was recorded without them, as an older server answers.
+        val p = ok(ApiClient(Recorder(200, lapsedProfile)).profile("tok"))
+        assertEquals(null, p.plan)
+        assertEquals(null, p.active)
     }
 
     @Test

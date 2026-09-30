@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
@@ -50,6 +51,7 @@ import org.amnezia.awg.backend.Tunnel
 fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var profile by remember { mutableStateOf<Profile?>(null) }
     var devices by remember { mutableStateOf<DeviceList?>(null) }
     var selected by remember { mutableStateOf<Session.Selected?>(null) }
@@ -146,7 +148,15 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         val p = profile
         if (p != null) {
             Text("Вы вошли как ${p.username}")
+            planLine(p)?.let { Text(it) }
             Text(subscriptionLine(p))
+            expiryWarning(p)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (needsPayment(p)) {
+                // No browser on the phone is rare, but it must not crash the screen.
+                OutlinedButton(onClick = { runCatching { uriHandler.openUri(PAYMENT_URL) } }) {
+                    Text("Оплатить на сайте")
+                }
+            }
         } else if (error == null) {
             CircularProgressIndicator()
         }

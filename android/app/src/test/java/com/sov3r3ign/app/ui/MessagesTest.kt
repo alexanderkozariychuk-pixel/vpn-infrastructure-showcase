@@ -3,7 +3,9 @@ package com.sov3r3ign.app.ui
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.Profile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
@@ -115,5 +117,84 @@ class MessagesTest {
     @Test
     fun `a phone clock behind the server does not show a negative age`() {
         assertEquals("Подключено · сервер отвечал 0 с назад", connectionLine(true, false, 1000L, 990L))
+    }
+
+    // --- plan, the server's answer, the warning before the end ---------------
+
+    private fun paid(until: String?, active: Boolean? = true, plan: String? = "basic-1m") =
+        Profile("paid", null, true, until, plan, active)
+
+    @Test
+    fun `the server's active wins over a date still ahead`() {
+        assertEquals("Подписка не активна", subscriptionLine(paid("2026-10-12T09:26:42", active = false), moscow, sept26))
+    }
+
+    @Test
+    fun `the server's active wins over the phone's clock`() {
+        // The phone thinks the 25th has passed; the server, which decides, does not.
+        assertEquals("Подписка до 25 сентября 2026",
+            subscriptionLine(paid("2026-09-25T00:00:00+00:00", active = true), moscow, sept26))
+    }
+
+    @Test
+    fun `active without a readable date still says it runs`() {
+        assertEquals("Подписка действует", subscriptionLine(paid(null, active = true), moscow, sept26))
+    }
+
+    @Test
+    fun `the plan key reads as the portal shows it`() {
+        assertEquals("Базовый · 1 месяц", planLabel("basic-1m"))
+        assertEquals("Расширенный · 3 месяца", planLabel("ext-3m"))
+        assertEquals("Расширенный · 6 месяцев", planLabel("ext-6m"))
+        assertEquals("Family", planLabel("Family"))
+    }
+
+    @Test
+    fun `the plan is named only while it runs`() {
+        assertEquals("Тариф: Базовый · 1 месяц", planLine(paid("2026-10-12T09:26:42"), sept26))
+        assertNull(planLine(paid("2026-10-12T09:26:42", active = false), sept26))
+        assertNull(planLine(paid("2026-10-12T09:26:42", plan = null), sept26))
+    }
+
+    @Test
+    fun `the warning starts three calendar days before the end`() {
+        assertNull(expiryWarning(paid("2026-09-30T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается через 3 дня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-29T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается через 2 дня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-28T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается завтра. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-27T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается сегодня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-26T18:00:00Z"), moscow, sept26))
+    }
+
+    @Test
+    fun `tomorrow is counted in the phone's zone`() {
+        // 22:30 UTC on the 26th is 01:30 on the 27th in Moscow.
+        val p = paid("2026-09-26T22:30:00Z")
+        assertEquals("Подписка заканчивается завтра. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(p, moscow, sept26))
+        assertEquals("Подписка заканчивается сегодня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(p, ZoneId.of("UTC"), sept26))
+    }
+
+    @Test
+    fun `a longer warning window declines the days`() {
+        assertEquals("Подписка заканчивается через 5 дней. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-10-01T09:00:00Z"), moscow, sept26, warnDays = 7))
+    }
+
+    @Test
+    fun `no warning once the period is not running — the status line says it`() {
+        assertNull(expiryWarning(paid("2026-09-27T09:00:00Z", active = false), moscow, sept26))
+    }
+
+    @Test
+    fun `the pay button shows when the period ends soon or is not running`() {
+        assertFalse(needsPayment(paid("2026-10-12T09:26:42"), moscow, sept26))
+        assertTrue(needsPayment(paid("2026-09-28T09:00:00Z"), moscow, sept26))
+        assertTrue(needsPayment(paid("2026-10-12T09:26:42", active = false), moscow, sept26))
+        assertTrue(needsPayment(Profile("new", null, false, null), moscow, sept26))
     }
 }

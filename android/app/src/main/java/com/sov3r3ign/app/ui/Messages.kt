@@ -6,6 +6,7 @@ import com.sov3r3ign.app.api.Profile
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /*
@@ -83,11 +84,9 @@ fun describe(error: ApiError, action: Action): String = when (error) {
 private val DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.forLanguageTag("ru"))
 
 /**
- * Read the way the server's own gate reads it (has_active_subscription): the
- * flag *and* an end date still ahead. /api/client/me returns the raw flag,
- * which a periodic sweep clears some time after the date passes, so the flag
- * alone can say "subscribed" about a period that is over. A missing date
- * counts as no subscription, as it does on the server.
+ * The status line under the account name. Whether the period runs is
+ * Profile.activeAt: the server's `active` when it sends one, otherwise the
+ * same rule applied here (see there).
  *
  * Dates are shown in the phone's own time zone. The server's are UTC: a period
  * that ends at 22:30 UTC ends at 01:30 the next day in Moscow, and printing
@@ -98,13 +97,85 @@ fun subscriptionLine(
     zone: ZoneId = ZoneId.systemDefault(),
     now: Instant = Instant.now(),
 ): String {
-    val raw = profile.subscribedUntilRaw
     val until = profile.subscribedUntil
+    val date = until?.let { DATE.withZone(zone).format(it) }
+    return when (profile.activeAt(now)) {
+        // The server's word stands even when the phone's clock disagrees.
+        true -> if (date != null) "Подписка до $date" else "Подписка действует"
+        null -> "Подписка есть, но дату окончания не удалось прочитать"
+        false -> when {
+            profile.subscribedUntilRaw == null -> "Подписки нет"
+            until != null && !until.isAfter(now) -> "Подписка закончилась $date"
+            // A date still ahead that the server does not count: say it is not
+            // running, not when it "ends".
+            else -> "Подписка не активна"
+        }
+    }
+}
+
+/**
+ * "basic-1m" -> "Базовый · 1 месяц", as the portal shows it. A key the app
+ * does not know (a retired plan on an old account) is shown as it is.
+ */
+fun planLabel(key: String): String {
+    val m = Regex("(basic|ext)-(\\d+)m").matchEntire(key) ?: return key
+    val tier = if (m.groupValues[1] == "ext") "Расширенный" else "Базовый"
+    val months = m.groupValues[2].toLong()
+    return "$tier · $months ${plural(months, "месяц", "месяца", "месяцев")}"
+}
+
+/** The plan is only named while it runs; after that the portal says "no subscription" too. */
+fun planLine(profile: Profile, now: Instant = Instant.now()): String? =
+    if (profile.activeAt(now) == true) profile.plan?.let { "Тариф: " + planLabel(it) } else null
+
+/**
+ * Days before the end when the app starts saying so. Warned after the end,
+ * the customer finds out from a tunnel that stopped working.
+ */
+const val WARN_DAYS = 3L
+
+/**
+ * Said while the period still runs and ends within [warnDays]. Days are
+ * counted by the calendar in the phone's zone: an end at 01:30 tomorrow is
+ * "tomorrow", not "today" because it is under 24 hours away.
+ */
+fun expiryWarning(
+    profile: Profile,
+    zone: ZoneId = ZoneId.systemDefault(),
+    now: Instant = Instant.now(),
+    warnDays: Long = WARN_DAYS,
+): String? {
+    if (profile.activeAt(now) != true) return null
+    val until = profile.subscribedUntil ?: return null
+    val left = ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), until.atZone(zone).toLocalDate())
+    val tail = " Продлите на сайте, чтобы связь не прервалась."
     return when {
-        !profile.isSubscribed || raw == null -> "Подписки нет"
-        until == null -> "Подписка есть, но дату окончания не удалось прочитать"
-        !until.isAfter(now) -> "Подписка закончилась " + DATE.withZone(zone).format(until)
-        else -> "Подписка до " + DATE.withZone(zone).format(until)
+        left > warnDays -> null
+        // The server still says active past the phone's date: its clock is behind ours.
+        left <= 0L -> "Подписка заканчивается сегодня." + tail
+        left == 1L -> "Подписка заканчивается завтра." + tail
+        else -> "Подписка заканчивается через $left ${plural(left, "день", "дня", "дней")}." + tail
+    }
+}
+
+/** The renewal button shows when the period is not running, or is about to end. */
+fun needsPayment(
+    profile: Profile,
+    zone: ZoneId = ZoneId.systemDefault(),
+    now: Instant = Instant.now(),
+): Boolean = profile.activeAt(now) != true || expiryWarning(profile, zone, now) != null
+
+/** Payment is on the site, never in the app; the portal opens on sign-in. */
+const val PAYMENT_URL = "https://sov3r3ign.com/app"
+
+private fun plural(n: Long, one: String, few: String, many: String): String {
+    val mod100 = n % 100
+    val mod10 = n % 10
+    return when {
+        mod100 in 11L..14L -> many
+        mod10 == 1L -> one
+        mod10 in 2L..4L -> few
+        else -> many
     }
 }
 
