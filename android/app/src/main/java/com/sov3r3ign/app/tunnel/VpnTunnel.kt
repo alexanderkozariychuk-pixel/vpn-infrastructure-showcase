@@ -30,6 +30,21 @@ object VpnTunnel : Tunnel {
     @Volatile
     private var backend: GoBackend? = null
 
+    // Set for the whole of our own up() and down(). The library reports DOWN
+    // in the middle of a switch to another config, too, so "we asked for
+    // down" alone would misread a switch as the system stopping the tunnel.
+    @Volatile
+    private var changingHere = false
+
+    /**
+     * Whether the last DOWN came from outside this app: Android revoking the
+     * VPN, another VPN app starting, the switch in system settings. The
+     * screen says so instead of a bare "disconnected".
+     */
+    @Volatile
+    var stoppedFromOutside = false
+        private set
+
     private fun backend(context: Context): GoBackend =
         backend ?: synchronized(this) {
             backend ?: GoBackend(context.applicationContext).also { backend = it }
@@ -42,7 +57,8 @@ object VpnTunnel : Tunnel {
     /** The library calls this when the tunnel goes up or down, including when
      *  the system takes it down — another VPN app, or the switch in settings. */
     override fun onStateChange(newState: Tunnel.State) {
-        Log.i(TAG, "state -> $newState")
+        Log.i(TAG, "state -> $newState" + if (changingHere) "" else " (from outside the app)")
+        if (newState == Tunnel.State.DOWN) stoppedFromOutside = !changingHere
         mutableState.value = newState
     }
 
@@ -50,7 +66,13 @@ object VpnTunnel : Tunnel {
     @Throws(Exception::class)
     fun up(context: Context, conf: String) {
         val config = Config.parse(ByteArrayInputStream(conf.toByteArray(Charsets.UTF_8)))
-        mutableState.value = backend(context).setState(this, Tunnel.State.UP, config)
+        changingHere = true
+        try {
+            mutableState.value = backend(context).setState(this, Tunnel.State.UP, config)
+            stoppedFromOutside = false
+        } finally {
+            changingHere = false
+        }
     }
 
     @Throws(Exception::class)
@@ -58,7 +80,13 @@ object VpnTunnel : Tunnel {
         // Nothing was ever started in this process; nothing to stop, and no
         // reason to load the native library just to say so.
         val b = backend ?: return
-        mutableState.value = b.setState(this, Tunnel.State.DOWN, null)
+        changingHere = true
+        try {
+            mutableState.value = b.setState(this, Tunnel.State.DOWN, null)
+            stoppedFromOutside = false
+        } finally {
+            changingHere = false
+        }
     }
 
     /** Unix seconds of the last handshake; 0 before the first; null if unknown. */

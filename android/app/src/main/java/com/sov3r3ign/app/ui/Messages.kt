@@ -8,6 +8,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 import java.util.Locale
 
 /*
@@ -56,7 +59,12 @@ const val ONE_DEVICE_PER_CONFIG =
     "Один конфиг работает на одном устройстве за раз. Если выбрать конфиг, " +
         "который уже включён на другом телефоне, связь будет пропадать на обоих."
 
-fun describe(error: ApiError, action: Action): String = when (error) {
+/**
+ * [tunnelUp]: the VPN was on when the call failed. The portal is reached
+ * through the tunnel then, and a tunnel whose server stopped answering makes
+ * the site look down while the phone's internet is fine.
+ */
+fun describe(error: ApiError, action: Action, tunnelUp: Boolean = false): String = when (error) {
     ApiError.Unauthorized ->
         if (action == Action.SIGN_IN) "Неверное имя пользователя или пароль"
         else "Сессия истекла — войдите снова"
@@ -80,9 +88,24 @@ fun describe(error: ApiError, action: Action): String = when (error) {
         Action.LOAD -> "Сервер отклонил запрос"
     }
 
-    is ApiError.Network -> "Нет связи с сервером. Проверьте интернет."
+    is ApiError.Network -> networkLine(error.cause) + if (tunnelUp) {
+        " Запрос шёл через VPN: если выше написано, что сервер не отвечает, отключите VPN и повторите."
+    } else {
+        ""
+    }
     is ApiError.Server -> "Сервер временно недоступен (${error.code}). Попробуйте позже."
     is ApiError.Malformed -> "Сервер ответил неожиданно — возможно, пора обновить приложение."
+}
+
+/** No answer at all, by what kind of no answer it was. */
+private fun networkLine(cause: java.io.IOException): String = when (cause) {
+    is UnknownHostException -> "Не удаётся найти сайт. Проверьте, что интернет работает."
+    is SocketTimeoutException -> "Сайт не ответил вовремя. Проверьте интернет или повторите позже."
+    // A Wi-Fi that wants a sign-in page answers HTTPS with its own
+    // certificate; the handshake fails before anything reaches the site.
+    is SSLException -> "Не удалось установить защищённое соединение с сайтом. " +
+        "Если это Wi-Fi в кафе, гостинице или транспорте, сначала откройте браузер и войдите в сеть."
+    else -> "Нет связи с сайтом. Проверьте интернет."
 }
 
 private val DATE = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.forLanguageTag("ru"))
@@ -203,16 +226,59 @@ private fun plural(n: Long, one: String, few: String, many: String): String {
 const val STALE_HANDSHAKE_SECONDS = 180L
 
 /**
+ * No first handshake this long after the tunnel came up. It normally takes
+ * well under a second (65 ms measured at stage 0), and the tunnel retries
+ * every 5 s; 20 s without one is not a slow network.
+ */
+const val NO_FIRST_ANSWER_SECONDS = 20L
+
+/**
  * The status line under the switch. "Connected" is only said when the server
  * has answered recently: a tunnel can be up on the phone and carry nothing,
  * and a customer told they are connected will blame the sites, not us.
  */
-fun connectionLine(up: Boolean, busy: Boolean, handshakeUnixSeconds: Long?, nowUnixSeconds: Long): String {
+fun connectionLine(
+    up: Boolean,
+    busy: Boolean,
+    handshakeUnixSeconds: Long?,
+    nowUnixSeconds: Long,
+    upSinceUnixSeconds: Long? = null,
+): String {
     if (busy) return "Подключение…"
     if (!up) return "Отключено"
     val h = handshakeUnixSeconds
-    if (h == null || h <= 0L) return "Подключено, ждём ответа сервера"
+    if (h == null || h <= 0L) {
+        // Never answered since connecting: the path to the server is shut in
+        // this network (seen on some mobile networks and public Wi-Fi), or
+        // the key is no longer on the server. Another network tells which.
+        val since = upSinceUnixSeconds
+        return if (since != null && nowUnixSeconds - since > NO_FIRST_ANSWER_SECONDS) {
+            "Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
+                "попробуйте другую: Wi-Fi или мобильный интернет."
+        } else {
+            "Подключено, ждём ответа сервера"
+        }
+    }
     val age = (nowUnixSeconds - h).coerceAtLeast(0L)
     return if (age <= STALE_HANDSHAKE_SECONDS) "Подключено · сервер отвечал $age с назад"
-    else "Сервер не отвечает уже ${age / 60} мин. Проверьте интернет или переподключитесь."
+    // It answered, then stopped: most often the mobile network dropped the
+    // path (the journal's incidents), and a reconnect restores it.
+    else "Связь с сервером пропала ${age / 60} мин назад. Переподключитесь; если не поможет — смените сеть."
 }
+
+/** Why the tunnel would not start, by the library's reason name, kept apart from the library for tests. */
+fun tunnelFailure(reason: String?): String = when (reason) {
+    // Also what another app's always-on VPN looks like from here.
+    "VPN_NOT_AUTHORIZED" -> "Android не дал этому приложению включить VPN. Нажмите «Подключить» и разрешите; " +
+        "если в настройках включён постоянный VPN другого приложения, выключите его."
+    "TUN_CREATION_ERROR", "UNABLE_TO_START_VPN" ->
+        "Android не запустил VPN. Если работает другое VPN-приложение, выключите его и попробуйте снова."
+    "DNS_RESOLUTION_FAILURE" -> "Не удалось найти адрес сервера VPN. Проверьте, что интернет работает."
+    "BAD_CONFIG", "TUNNEL_MISSING_CONFIG" -> "Сохранённый конфиг не читается. Выберите устройство заново."
+    null -> "Не удалось включить VPN"
+    else -> "Не удалось включить VPN ($reason)"
+}
+
+/** The tunnel went down, and not because of this app. */
+const val STOPPED_FROM_OUTSIDE =
+    "VPN выключен системой или другим VPN-приложением. Нажмите «Подключить», чтобы включить снова."

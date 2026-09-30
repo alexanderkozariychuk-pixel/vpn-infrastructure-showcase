@@ -71,7 +71,7 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         if (e == ApiError.Unauthorized) {
             onSignedOut("Сессия истекла — войдите снова")
         } else {
-            error = describe(e, Action.LOAD)
+            error = describe(e, Action.LOAD, tunnelUp = VpnTunnel.state.value == Tunnel.State.UP)
             // The device is gone from the account: the list on screen is stale.
             if (e == ApiError.NotFound) reload++
         }

@@ -129,7 +129,7 @@ class MessagesTest {
         assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
         assertEquals("Подключено · сервер отвечал 32 с назад", connectionLine(true, false, now - 32, now))
         assertEquals("Подключено · сервер отвечал 180 с назад", connectionLine(true, false, now - 180, now))
-        assertEquals("Сервер не отвечает уже 3 мин. Проверьте интернет или переподключитесь.",
+        assertEquals("Связь с сервером пропала 3 мин назад. Переподключитесь; если не поможет — смените сеть.",
             connectionLine(true, false, now - 181, now))
     }
 
@@ -221,5 +221,46 @@ class MessagesTest {
     fun `the delete question says what happens to whose device`() {
         assertTrue(deleteQuestion("A71", onThisPhone = true).contains("устройство этого телефона"))
         assertTrue(deleteQuestion("lap", onThisPhone = false).contains("связь там пропадёт"))
+    }
+
+    // --- what went wrong, as far as the phone can tell ------------------------
+
+    @Test
+    fun `no first answer is waited for, then named as the network's doing`() {
+        val now = 1_790_418_984L
+        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 20))
+        assertEquals("Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
+            "попробуйте другую: Wi-Fi или мобильный интернет.",
+            connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 21))
+        // Without knowing when it came up, it cannot say how long it waited.
+        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
+    }
+
+    @Test
+    fun `a failed call names the kind of failure`() {
+        assertEquals("Не удаётся найти сайт. Проверьте, что интернет работает.",
+            describe(ApiError.Network(java.net.UnknownHostException("sov3r3ign.com")), Action.LOAD))
+        assertEquals("Сайт не ответил вовремя. Проверьте интернет или повторите позже.",
+            describe(ApiError.Network(java.net.SocketTimeoutException()), Action.LOAD))
+        assertTrue(describe(ApiError.Network(javax.net.ssl.SSLHandshakeException("cert")), Action.LOAD)
+            .startsWith("Не удалось установить защищённое соединение"))
+        assertEquals("Нет связи с сайтом. Проверьте интернет.",
+            describe(ApiError.Network(java.net.ConnectException()), Action.LOAD))
+    }
+
+    @Test
+    fun `a failed call with the VPN on points at the VPN`() {
+        val e = ApiError.Network(java.net.SocketTimeoutException())
+        assertTrue(describe(e, Action.LOAD, tunnelUp = true).endsWith("отключите VPN и повторите."))
+        assertFalse(describe(e, Action.LOAD, tunnelUp = false).contains("VPN"))
+    }
+
+    @Test
+    fun `the tunnel's refusals say what to do`() {
+        assertTrue(tunnelFailure("VPN_NOT_AUTHORIZED").contains("постоянный VPN другого приложения"))
+        assertTrue(tunnelFailure("TUN_CREATION_ERROR").startsWith("Android не запустил VPN"))
+        assertEquals(tunnelFailure("TUN_CREATION_ERROR"), tunnelFailure("UNABLE_TO_START_VPN"))
+        assertEquals("Сохранённый конфиг не читается. Выберите устройство заново.", tunnelFailure("BAD_CONFIG"))
+        assertEquals("Не удалось включить VPN (IllegalStateException)", tunnelFailure("IllegalStateException"))
     }
 }
