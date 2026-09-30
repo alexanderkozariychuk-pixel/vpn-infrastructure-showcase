@@ -236,6 +236,41 @@ Carried into later stages:
   journal's incidents are mostly mobile networks dropping handshakes, and the
   app knows things the customer does not.
 
+**Result (2026-09-30): the functions are done,** each checked on the Galaxy
+A71; the interface stays plain until the redesign.
+
+- **Subscription.** `/api/client/me` sends `plan` and `active` since the
+  29th; the app takes `active` as the answer — over its own date arithmetic
+  and over the phone's clock — and falls back to the old rule only for a
+  server that does not send it. The plan reads as on the portal ("Базовый ·
+  1 месяц"). Three calendar days before the end, counted in the phone's zone,
+  the screen says when it ends; a button opens the portal to pay.
+- **Devices: add, rename, remove.** Names follow the portal's rule (Latin
+  letters, digits, `-`, `_`), since the name becomes the downloaded file's
+  name. A rename made on the site reaches the phone with the next device list.
+  404 is its own state — "not on this account" — no longer "server
+  unavailable (404)".
+- **Removing this phone's own device has an order.** The server takes the
+  peer off the node before it answers, so a DELETE sent through that
+  device's tunnel loses its own answer. The tunnel goes down first; the key
+  is forgotten only once the server confirms. A device removed elsewhere is
+  noticed in the list: the phone forgets it and brings its dead tunnel down
+  without asking.
+- **Failures are named.** A name that does not resolve, a timeout, a TLS
+  handshake that fails (a Wi-Fi wanting its sign-in page); a request that
+  went through a VPN whose server stopped answering. No first handshake 20 s
+  after connecting reads as the network not letting the connection through;
+  one that answered and stopped reads as a lost connection. The tunnel
+  library's refusals, and a VPN stopped by Android or another app, say what
+  to do.
+- **Tests:** 95 on the JVM, 9 on the phone. New ones were checked to fail
+  when the code they guard is broken. `WordingTest` holds the app to the
+  site's list of words kept out of public text.
+
+Not yet seen on a device, waiting for a delete button in the portal: removing
+the device this phone is connected on, and the phone's reaction to its device
+being removed from elsewhere.
+
 ### 3. Distribution
 
 APK from the site, linked in the portal. No Google Play for the first
