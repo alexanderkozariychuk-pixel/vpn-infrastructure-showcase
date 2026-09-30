@@ -1,17 +1,10 @@
-package com.sov3r3ign.app.ui
+package com.sov3r3ign.app.ui.main
 
 import android.app.Activity
 import android.net.VpnService
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,11 +14,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.sov3r3ign.app.session.Session
 import com.sov3r3ign.app.tunnel.VpnTunnel
+import com.sov3r3ign.app.ui.ConnectionStatus
+import com.sov3r3ign.app.ui.Link
+import com.sov3r3ign.app.ui.STOPPED_FROM_OUTSIDE
+import com.sov3r3ign.app.ui.connectionStatus
+import com.sov3r3ign.app.ui.tunnelFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,13 +30,16 @@ import org.amnezia.awg.backend.BackendException
 import org.amnezia.awg.backend.Tunnel
 import org.amnezia.awg.config.BadConfigException
 
+/** The switch as the main screen sees it: what to say, and what one press does. */
+class Connection(val status: ConnectionStatus, val error: String?, val press: () -> Unit)
+
 /**
- * The switch. Starts the tunnel from the config stored for this phone — no
- * network call, so it works with an expired token and before the portal is
- * reachable.
+ * The tunnel's state, polled while it runs, and the one button. Starts from
+ * the config stored for this phone — no network call, so it works with an
+ * expired token and before the portal is reachable. Was ConnectionPanel.
  */
 @Composable
-fun ConnectionPanel(session: Session) {
+fun rememberConnection(session: Session): Connection {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by VpnTunnel.state.collectAsState()
@@ -51,7 +50,13 @@ fun ConnectionPanel(session: Session) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     var upSince by remember { mutableStateOf<Long?>(null) }
 
-    fun connect() {
+    fun reasonOf(e: Exception): String = when (e) {
+        is BackendException -> e.reason.name
+        is BadConfigException -> "BAD_CONFIG"
+        else -> e.javaClass.simpleName
+    }
+
+    fun start(downFirst: Boolean = false) {
         busy = true
         error = null
         scope.launch {
@@ -60,23 +65,22 @@ fun ConnectionPanel(session: Session) {
                 error = "Сначала выберите устройство"
             } else {
                 try {
-                    withContext(Dispatchers.IO) { VpnTunnel.up(context, conf) }
+                    withContext(Dispatchers.IO) {
+                        // A reconnect is a real one: down, then up, so the
+                        // tunnel handshakes afresh on whatever network is there now.
+                        if (downFirst) VpnTunnel.down(context)
+                        VpnTunnel.up(context, conf)
+                    }
                 } catch (e: Exception) {
                     Log.e("sovrn-tunnel", "up failed", e)
-                    error = tunnelFailure(
-                        when (e) {
-                            is BackendException -> e.reason.name
-                            is BadConfigException -> "BAD_CONFIG"
-                            else -> e.javaClass.simpleName
-                        }
-                    )
+                    error = tunnelFailure(reasonOf(e))
                 }
             }
             busy = false
         }
     }
 
-    fun disconnect() {
+    fun stop() {
         busy = true
         error = null
         scope.launch {
@@ -90,22 +94,13 @@ fun ConnectionPanel(session: Session) {
         }
     }
 
-    // Android asks once whether this app may be a VPN; the backend refuses
-    // to start until it has.
-    val consent = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            connect()
-        } else {
-            error = "Без разрешения Android не даст включить VPN"
-        }
+    // Android asks once whether this app may be a VPN; the backend refuses to start until it has.
+    val consent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) start() else error = "Без разрешения Android не даст включить VPN"
     }
 
     // The screen may open while the tunnel is already running.
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { VpnTunnel.refresh(context) }
-    }
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { VpnTunnel.refresh(context) } }
 
     LaunchedEffect(up) {
         if (up) {
@@ -122,27 +117,17 @@ fun ConnectionPanel(session: Session) {
         handshake = null
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            connectionLine(up, busy, handshake, now, upSince),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        if (up) {
-            OutlinedButton(
-                onClick = { disconnect() },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Отключить") }
-        } else {
-            Button(
-                onClick = {
-                    val intent = VpnService.prepare(context)
-                    if (intent != null) consent.launch(intent) else connect()
-                },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Подключить") }
+    val status = connectionStatus(up, busy, handshake, now, upSince)
+    val press: () -> Unit = {
+        when (status.link) {
+            Link.OFF -> {
+                val intent = VpnService.prepare(context)
+                if (intent != null) consent.launch(intent) else start()
+            }
+            Link.ON -> stop()
+            Link.CONNECTING -> if (!busy) stop()
+            Link.NO_ANSWER -> start(downFirst = true)
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
+    return Connection(status, error, press)
 }

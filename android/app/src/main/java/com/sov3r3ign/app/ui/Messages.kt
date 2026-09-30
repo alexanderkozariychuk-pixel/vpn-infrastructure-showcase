@@ -232,20 +232,28 @@ const val STALE_HANDSHAKE_SECONDS = 180L
  */
 const val NO_FIRST_ANSWER_SECONDS = 20L
 
+/** What the main screen draws: the route lit, dark, or broken, and the button's job. */
+enum class Link { OFF, CONNECTING, ON, NO_ANSWER }
+
+data class ConnectionStatus(val link: Link, val title: String, val detail: String, val action: String)
+
 /**
- * The status line under the switch. "Connected" is only said when the server
- * has answered recently: a tunnel can be up on the phone and carry nothing,
- * and a customer told they are connected will blame the sites, not us.
+ * The status under the button, and what the button does next. "Connected" is
+ * only said while the server has answered recently: a tunnel can be up on the
+ * phone and carry nothing, and a customer told they are connected will blame
+ * the sites, not us.
  */
-fun connectionLine(
+fun connectionStatus(
     up: Boolean,
     busy: Boolean,
     handshakeUnixSeconds: Long?,
     nowUnixSeconds: Long,
     upSinceUnixSeconds: Long? = null,
-): String {
-    if (busy) return "Подключение…"
-    if (!up) return "Отключено"
+): ConnectionStatus {
+    if (busy) return ConnectionStatus(Link.CONNECTING, "Подключение…", "", "Подождите")
+    if (!up) return ConnectionStatus(
+        Link.OFF, "Отключено", "Нажмите «Подключить», чтобы включить защищённое соединение.", "Подключить",
+    )
     val h = handshakeUnixSeconds
     if (h == null || h <= 0L) {
         // Never answered since connecting: the path to the server is shut in
@@ -253,17 +261,28 @@ fun connectionLine(
         // the key is no longer on the server. Another network tells which.
         val since = upSinceUnixSeconds
         return if (since != null && nowUnixSeconds - since > NO_FIRST_ANSWER_SECONDS) {
-            "Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
-                "попробуйте другую: Wi-Fi или мобильный интернет."
+            ConnectionStatus(
+                Link.NO_ANSWER, "Нет связи с сервером",
+                "Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
+                    "попробуйте другую: Wi-Fi или мобильный интернет.",
+                "Переподключить",
+            )
         } else {
-            "Подключено, ждём ответа сервера"
+            ConnectionStatus(Link.CONNECTING, "Подключение…", "Ждём ответа сервера", "Отключить")
         }
     }
     val age = (nowUnixSeconds - h).coerceAtLeast(0L)
-    return if (age <= STALE_HANDSHAKE_SECONDS) "Подключено · сервер отвечал $age с назад"
-    // It answered, then stopped: most often the mobile network dropped the
-    // path (the journal's incidents), and a reconnect restores it.
-    else "Связь с сервером пропала ${age / 60} мин назад. Переподключитесь; если не поможет — смените сеть."
+    return if (age <= STALE_HANDSHAKE_SECONDS) {
+        ConnectionStatus(Link.ON, "Подключено", "Сервер ответил $age с назад", "Отключить")
+    } else {
+        // It answered, then stopped: most often the mobile network dropped the
+        // path (the journal's incidents), and a reconnect restores it.
+        ConnectionStatus(
+            Link.NO_ANSWER, "Нет связи с сервером",
+            "Связь пропала ${age / 60} мин назад. Переподключитесь; если не поможет — смените сеть.",
+            "Переподключить",
+        )
+    }
 }
 
 /** Why the tunnel would not start, by the library's reason name, kept apart from the library for tests. */

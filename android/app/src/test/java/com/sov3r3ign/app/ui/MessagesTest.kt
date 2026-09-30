@@ -124,18 +124,21 @@ class MessagesTest {
     @Test
     fun `connected is only said while the server answers`() {
         val now = 1_790_418_984L
-        assertEquals("Подключение…", connectionLine(up = false, busy = true, handshakeUnixSeconds = null, nowUnixSeconds = now))
-        assertEquals("Отключено", connectionLine(false, false, null, now))
-        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
-        assertEquals("Подключено · сервер отвечал 32 с назад", connectionLine(true, false, now - 32, now))
-        assertEquals("Подключено · сервер отвечал 180 с назад", connectionLine(true, false, now - 180, now))
-        assertEquals("Связь с сервером пропала 3 мин назад. Переподключитесь; если не поможет — смените сеть.",
-            connectionLine(true, false, now - 181, now))
+        assertEquals(ConnectionStatus(Link.CONNECTING, "Подключение…", "", "Подождите"), connectionStatus(false, true, null, now))
+        assertEquals(ConnectionStatus(Link.OFF, "Отключено", "Нажмите «Подключить», чтобы включить защищённое соединение.", "Подключить"),
+            connectionStatus(false, false, null, now))
+        assertEquals(ConnectionStatus(Link.CONNECTING, "Подключение…", "Ждём ответа сервера", "Отключить"), connectionStatus(true, false, 0L, now))
+        assertEquals(ConnectionStatus(Link.ON, "Подключено", "Сервер ответил 32 с назад", "Отключить"), connectionStatus(true, false, now - 32, now))
+        assertEquals(Link.ON, connectionStatus(true, false, now - 180, now).link)
+        val lost = connectionStatus(true, false, now - 181, now)
+        assertEquals(Link.NO_ANSWER, lost.link)
+        assertEquals("Связь пропала 3 мин назад. Переподключитесь; если не поможет — смените сеть.", lost.detail)
+        assertEquals("Переподключить", lost.action)
     }
 
     @Test
     fun `a phone clock behind the server does not show a negative age`() {
-        assertEquals("Подключено · сервер отвечал 0 с назад", connectionLine(true, false, 1000L, 990L))
+        assertEquals("Сервер ответил 0 с назад", connectionStatus(true, false, 1000L, 990L).detail)
     }
 
     // --- plan, the server's answer, the warning before the end ---------------
@@ -228,12 +231,13 @@ class MessagesTest {
     @Test
     fun `no first answer is waited for, then named as the network's doing`() {
         val now = 1_790_418_984L
-        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 20))
+        assertEquals(Link.CONNECTING, connectionStatus(true, false, 0L, now, upSinceUnixSeconds = now - 20).link)
+        val none = connectionStatus(true, false, 0L, now, upSinceUnixSeconds = now - 21)
+        assertEquals(Link.NO_ANSWER, none.link)
         assertEquals("Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
-            "попробуйте другую: Wi-Fi или мобильный интернет.",
-            connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 21))
+            "попробуйте другую: Wi-Fi или мобильный интернет.", none.detail)
         // Without knowing when it came up, it cannot say how long it waited.
-        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
+        assertEquals(Link.CONNECTING, connectionStatus(true, false, 0L, now).link)
     }
 
     @Test

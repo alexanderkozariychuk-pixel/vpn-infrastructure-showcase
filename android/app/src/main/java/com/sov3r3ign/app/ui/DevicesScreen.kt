@@ -13,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,24 +27,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.sov3r3ign.app.api.Device
-import com.sov3r3ign.app.session.Session
 import com.sov3r3ign.app.state.AccountModel
 import kotlinx.coroutines.launch
 
 /**
- * The account, its devices, and which of them this phone uses. The screen
- * only shows [model]'s state and passes taps on; the order of operations —
- * what happens to the tunnel when — lives in AccountModel, where it is tested.
+ * The account's devices: choose one for this phone, add, rename, remove. Opened
+ * from the main screen's device row or its menu. The screen only shows
+ * [model]'s state and passes taps on; what happens to the tunnel when lives
+ * in AccountModel, where it is tested.
  */
 @Composable
-fun AccountScreen(session: Session, model: AccountModel, onSignedOut: (notice: String?) -> Unit) {
+fun DevicesScreen(model: AccountModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val uriHandler = LocalUriHandler.current
     val ui by model.ui.collectAsState()
-    val profile = ui.profile
     val devices = ui.devices
     val selected = ui.selected
     val busy = ui.busy
@@ -59,7 +55,6 @@ fun AccountScreen(session: Session, model: AccountModel, onSignedOut: (notice: S
     var addError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { model.load() }
-    LaunchedEffect(ui.signedOut) { ui.signedOut?.let { onSignedOut(it.notice) } }
 
     fun use(device: Device) { scope.launch { model.use(device) } }
 
@@ -89,30 +84,12 @@ fun AccountScreen(session: Session, model: AccountModel, onSignedOut: (notice: S
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Sovereign", style = MaterialTheme.typography.headlineMedium)
-
-        val p = profile
-        if (p != null) {
-            Text("Вы вошли как ${p.username}")
-            planLine(p)?.let { Text(it) }
-            Text(subscriptionLine(p))
-            expiryWarning(p)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (needsPayment(p)) {
-                // No browser on the phone is rare, but it must not crash the screen.
-                OutlinedButton(onClick = { runCatching { uriHandler.openUri(PAYMENT_URL) } }) {
-                    Text("Оплатить на сайте")
-                }
-            }
-        } else if (error == null) {
-            CircularProgressIndicator()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("‹ Назад") }
         }
-
+        Text("Устройства", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+        if (devices == null && error == null) CircularProgressIndicator()
         val here = selected
-        if (here != null) {
-            HorizontalDivider()
-            Text("На этом телефоне: ${here.name}")
-            ConnectionPanel(session)
-        }
 
         val list = devices
         if (list != null) {
@@ -226,7 +203,5 @@ fun AccountScreen(session: Session, model: AccountModel, onSignedOut: (notice: S
             )
         }
 
-        HorizontalDivider()
-        OutlinedButton(onClick = { scope.launch { model.signOut() } }) { Text("Выйти") }
     }
 }
