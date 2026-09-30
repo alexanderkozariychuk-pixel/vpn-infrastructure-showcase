@@ -30,7 +30,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.amnezia.awg.backend.BackendException
 import org.amnezia.awg.backend.Tunnel
+import org.amnezia.awg.config.BadConfigException
 
 /**
  * The switch. Starts the tunnel from the config stored for this phone — no
@@ -47,6 +49,7 @@ fun ConnectionPanel(session: Session) {
     var error by remember { mutableStateOf<String?>(null) }
     var handshake by remember { mutableStateOf<Long?>(null) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
+    var upSince by remember { mutableStateOf<Long?>(null) }
 
     fun connect() {
         busy = true
@@ -60,7 +63,13 @@ fun ConnectionPanel(session: Session) {
                     withContext(Dispatchers.IO) { VpnTunnel.up(context, conf) }
                 } catch (e: Exception) {
                     Log.e("sovrn-tunnel", "up failed", e)
-                    error = "Не удалось включить VPN (${e.javaClass.simpleName})"
+                    error = tunnelFailure(
+                        when (e) {
+                            is BackendException -> e.reason.name
+                            is BadConfigException -> "BAD_CONFIG"
+                            else -> e.javaClass.simpleName
+                        }
+                    )
                 }
             }
             busy = false
@@ -99,6 +108,12 @@ fun ConnectionPanel(session: Session) {
     }
 
     LaunchedEffect(up) {
+        if (up) {
+            upSince = System.currentTimeMillis() / 1000
+        } else {
+            upSince = null
+            if (VpnTunnel.stoppedFromOutside) error = STOPPED_FROM_OUTSIDE
+        }
         while (up) {
             handshake = withContext(Dispatchers.IO) { VpnTunnel.lastHandshake(context) }
             now = System.currentTimeMillis() / 1000
@@ -109,7 +124,7 @@ fun ConnectionPanel(session: Session) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            connectionLine(up, busy, handshake, now),
+            connectionLine(up, busy, handshake, now, upSince),
             style = MaterialTheme.typography.titleMedium,
         )
         if (up) {

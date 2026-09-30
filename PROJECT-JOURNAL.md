@@ -4733,3 +4733,51 @@ and a second added from the new slot. 268 tests.
 - `manual200` and `manual201` remain outside billing.
 - From the 22nd, not re-checked here: the admin password rotation, and the
   monitoring stack.
+
+## 2026-09-30
+
+### ✅ Android stage 2: what a subscriber needs
+Six steps on `android-stage2`, each applied, built and checked on the Galaxy
+A71 before the next.
+
+- **Subscription.** The app reads `active` from `/api/client/me` — the
+  server's gate, not its own arithmetic — and names the plan as the portal
+  does. A warning three calendar days before the end; a button to pay on the
+  site. Payment stays out of the app.
+- **Device names** follow the portal's rule, not the server's looser one:
+  the name becomes the `.conf` file name on the site.
+- **Rename.** Only the label changes; a running tunnel is untouched. Found
+  on the device: the name shown for this phone did not follow a rename made
+  on the site. The device list now keeps it current.
+- **Delete.** The server removes the peer before it answers, so a delete
+  sent through the removed device's own tunnel would lose its answer — the
+  app would report a failure after a success, and keep a dead key. The
+  tunnel goes down first. A device removed elsewhere is forgotten from the
+  list and its tunnel brought down without asking.
+- **Failure messages** that say which failure: DNS, timeout, a Wi-Fi's
+  sign-in page, a VPN whose server stopped answering; never answered since
+  connecting versus answered and stopped; the tunnel library's own refusal
+  reasons; a VPN stopped by the system or another app. The library reports
+  DOWN in the middle of a switch to another config, so "stopped from outside"
+  means a DOWN outside the app's own up() and down().
+
+### 🐛 Found on the way
+- The recorded contract's profile without a subscription predated `plan` and
+  `active`. Re-recorded, with the rename's four responses added;
+  `capture_api.py` takes its output path from `CAPTURE_OUT` instead of a
+  path from an old session.
+- The site's wording test misses "блокировок": its pattern `блокировк` does
+  not match the genitive plural, the likeliest form ("без блокировок"). The
+  app's new `WordingTest` uses `блокиров(к|ок)`, which still lets "заблокировать
+  промокод" in the terms through. The site's pattern is not fixed yet.
+
+95 JVM tests, 9 on the phone.
+
+### 📋 Next
+- Portal: a delete button for devices (the endpoint exists). With it, check
+  on a device: removing the device the phone is connected on, and the phone
+  noticing its device removed from elsewhere.
+- Carry `блокиров(к|ок)` into `tests/test_public_wording.py`.
+- Before the redesign: move the order of operations out of `AccountScreen`
+  into a shared state holder, so pages do not each carry a copy.
+- Stage 3: release signing key, the APK from the site.

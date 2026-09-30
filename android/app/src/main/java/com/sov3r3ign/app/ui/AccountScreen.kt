@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
@@ -50,6 +52,7 @@ import org.amnezia.awg.backend.Tunnel
 fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     var profile by remember { mutableStateOf<Profile?>(null) }
     var devices by remember { mutableStateOf<DeviceList?>(null) }
     var selected by remember { mutableStateOf<Session.Selected?>(null) }
@@ -57,25 +60,43 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var newName by rememberSaveable { mutableStateOf("phone") }
     var reload by remember { mutableIntStateOf(0) }
+    var renaming by remember { mutableStateOf<Device?>(null) }
+    var renameText by rememberSaveable { mutableStateOf("") }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<Device?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
     /** Every call can find the token expired; that always ends at sign-in. */
     fun failed(e: ApiError) {
         if (e == ApiError.Unauthorized) {
             onSignedOut("Сессия истекла — войдите снова")
         } else {
-            error = describe(e, Action.LOAD)
+            error = describe(e, Action.LOAD, tunnelUp = VpnTunnel.state.value == Tunnel.State.UP)
+            // The device is gone from the account: the list on screen is stale.
+            if (e == ApiError.NotFound) reload++
         }
     }
 
     LaunchedEffect(reload) {
         error = null
-        selected = withContext(Dispatchers.IO) { session.selected() }
+        val had = withContext(Dispatchers.IO) { session.selected() }
+        selected = had
         when (val p = withContext(Dispatchers.IO) { session.profile() }) {
             is ApiResult.Ok -> { profile = p.value }
             is ApiResult.Failed -> { failed(p.error); return@LaunchedEffect }
         }
         when (val d = withContext(Dispatchers.IO) { session.devices() }) {
-            is ApiResult.Ok -> { devices = d.value }
+            is ApiResult.Ok -> {
+                devices = d.value
+                // The list may carry a new name for this phone's device, or
+                // show it gone; then the session has already forgotten it.
+                val now = withContext(Dispatchers.IO) { session.selected() }
+                if (had != null && now == null) {
+                    withContext(Dispatchers.IO) { runCatching { VpnTunnel.down(context) } }
+                    notice = DEVICE_GONE
+                }
+                selected = now
+            }
             is ApiResult.Failed -> { devices = null; failed(d.error) }
         }
     }
@@ -101,6 +122,56 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 is ApiResult.Ok -> {
                     selected = withContext(Dispatchers.IO) { session.selected() }
                     followSelection()
+                }
+                is ApiResult.Failed -> failed(r.error)
+            }
+        }
+    }
+
+    fun rename() {
+        val device = renaming ?: return
+        val problem = validateDeviceName(renameText)
+        if (problem != null) {
+            renameError = problem
+            return
+        }
+        busy = true
+        error = null
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { session.renameDevice(device.id, renameText) }
+            busy = false
+            renaming = null
+            when (r) {
+                is ApiResult.Ok -> {
+                    selected = withContext(Dispatchers.IO) { session.selected() }
+                    reload++
+                }
+                is ApiResult.Failed -> failed(r.error)
+            }
+        }
+    }
+
+    fun delete(device: Device) {
+        val onThisPhone = selected?.id == device.id
+        busy = true
+        error = null
+        notice = null
+        scope.launch {
+            val r = withContext(Dispatchers.IO) {
+                // The server takes the peer off the node before it answers:
+                // sent through this device's own tunnel, the answer never
+                // comes back. Down first, then the request over the phone's
+                // own network. If removal fails, the tunnel stays down and
+                // the key stays: the customer can reconnect.
+                if (onThisPhone) runCatching { VpnTunnel.down(context) }
+                session.deleteDevice(device.id)
+            }
+            busy = false
+            deleting = null
+            when (r) {
+                is ApiResult.Ok -> {
+                    selected = withContext(Dispatchers.IO) { session.selected() }
+                    reload++
                 }
                 is ApiResult.Failed -> failed(r.error)
             }
@@ -146,7 +217,15 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         val p = profile
         if (p != null) {
             Text("Вы вошли как ${p.username}")
+            planLine(p)?.let { Text(it) }
             Text(subscriptionLine(p))
+            expiryWarning(p)?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (needsPayment(p)) {
+                // No browser on the phone is rare, but it must not crash the screen.
+                OutlinedButton(onClick = { runCatching { uriHandler.openUri(PAYMENT_URL) } }) {
+                    Text("Оплатить на сайте")
+                }
+            }
         } else if (error == null) {
             CircularProgressIndicator()
         }
@@ -175,11 +254,24 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(d.name, style = MaterialTheme.typography.bodyLarge)
-                    if (here?.id == d.id) {
-                        Text("выбрано", color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        TextButton(onClick = { use(d) }, enabled = !busy) {
-                            Text("Использовать здесь")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                renaming = d
+                                renameText = d.name
+                                renameError = null
+                            },
+                            enabled = !busy,
+                        ) { Text("Переименовать") }
+                        TextButton(onClick = { deleting = d }, enabled = !busy) {
+                            Text("Удалить", color = MaterialTheme.colorScheme.error)
+                        }
+                        if (here?.id == d.id) {
+                            Text("выбрано", color = MaterialTheme.colorScheme.primary)
+                        } else {
+                            TextButton(onClick = { use(d) }, enabled = !busy) {
+                                Text("Использовать здесь")
+                            }
                         }
                     }
                 }
@@ -191,7 +283,7 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
-                    label = { Text("Название, до 6 символов") },
+                    label = { Text("Название: до 6 символов, латиница и цифры") },
                     singleLine = true,
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -204,9 +296,56 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
 
         if (busy) CircularProgressIndicator()
 
+        notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = { reload++ }, enabled = !busy) { Text("Повторить") }
+        }
+
+        deleting?.let { d ->
+            AlertDialog(
+                onDismissRequest = { if (!busy) deleting = null },
+                title = { Text("Удалить «${d.name}»?") },
+                text = { Text(deleteQuestion(d.name, onThisPhone = selected?.id == d.id)) },
+                confirmButton = {
+                    TextButton(onClick = { delete(d) }, enabled = !busy) {
+                        Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleting = null }, enabled = !busy) { Text("Отмена") }
+                },
+            )
+        }
+
+        renaming?.let { d ->
+            AlertDialog(
+                onDismissRequest = { if (!busy) renaming = null },
+                title = { Text("Переименовать «${d.name}»") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = renameText,
+                            onValueChange = { renameText = it; renameError = null },
+                            label = { Text("До 6 символов, латиница и цифры") },
+                            singleLine = true,
+                            enabled = !busy,
+                        )
+                        renameError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        Text(
+                            "Меняется только название. Подключение и ключ остаются прежними.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { rename() }, enabled = !busy) { Text("Сохранить") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { renaming = null }, enabled = !busy) { Text("Отмена") }
+                },
+            )
         }
 
         HorizontalDivider()

@@ -3,7 +3,9 @@ package com.sov3r3ign.app.ui
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.Profile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
@@ -34,6 +36,19 @@ class MessagesTest {
     }
 
     @Test
+    fun `a device name follows the portal's rule, since it becomes a file name`() {
+        assertNull(validateDeviceName("a_b-1"))
+        assertNull(validateDeviceName("A71"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("тел"))
+        // Cyrillic "р" and "о" that look Latin are still refused.
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("рhоne"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("my ph"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("a.b"))
+        // Too long is said first: shortening is the fix the customer needs.
+        assertEquals("Название — не длиннее 6 символов", validateDeviceName("Телефон"))
+    }
+
+    @Test
     fun `sign-in needs both fields`() {
         assertEquals("Введите имя пользователя и пароль", validateSignIn("alex", ""))
         assertNull(validateSignIn("alex", "x"))
@@ -51,6 +66,12 @@ class MessagesTest {
             describe(ApiError.Conflict("Email already registered"), Action.REGISTER))
         assertEquals("Такое имя пользователя уже занято",
             describe(ApiError.Conflict("Username 'alex' already exists"), Action.REGISTER))
+    }
+
+    @Test
+    fun `a device that is gone says so, not that the server is down`() {
+        assertEquals("Устройство не найдено — возможно, его удалили на сайте. Список обновлён.",
+            describe(ApiError.NotFound, Action.LOAD))
     }
 
     @Test
@@ -108,12 +129,138 @@ class MessagesTest {
         assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
         assertEquals("Подключено · сервер отвечал 32 с назад", connectionLine(true, false, now - 32, now))
         assertEquals("Подключено · сервер отвечал 180 с назад", connectionLine(true, false, now - 180, now))
-        assertEquals("Сервер не отвечает уже 3 мин. Проверьте интернет или переподключитесь.",
+        assertEquals("Связь с сервером пропала 3 мин назад. Переподключитесь; если не поможет — смените сеть.",
             connectionLine(true, false, now - 181, now))
     }
 
     @Test
     fun `a phone clock behind the server does not show a negative age`() {
         assertEquals("Подключено · сервер отвечал 0 с назад", connectionLine(true, false, 1000L, 990L))
+    }
+
+    // --- plan, the server's answer, the warning before the end ---------------
+
+    private fun paid(until: String?, active: Boolean? = true, plan: String? = "basic-1m") =
+        Profile("paid", null, true, until, plan, active)
+
+    @Test
+    fun `the server's active wins over a date still ahead`() {
+        assertEquals("Подписка не активна", subscriptionLine(paid("2026-10-12T09:26:42", active = false), moscow, sept26))
+    }
+
+    @Test
+    fun `the server's active wins over the phone's clock`() {
+        // The phone thinks the 25th has passed; the server, which decides, does not.
+        assertEquals("Подписка до 25 сентября 2026",
+            subscriptionLine(paid("2026-09-25T00:00:00+00:00", active = true), moscow, sept26))
+    }
+
+    @Test
+    fun `active without a readable date still says it runs`() {
+        assertEquals("Подписка действует", subscriptionLine(paid(null, active = true), moscow, sept26))
+    }
+
+    @Test
+    fun `the plan key reads as the portal shows it`() {
+        assertEquals("Базовый · 1 месяц", planLabel("basic-1m"))
+        assertEquals("Расширенный · 3 месяца", planLabel("ext-3m"))
+        assertEquals("Расширенный · 6 месяцев", planLabel("ext-6m"))
+        assertEquals("Family", planLabel("Family"))
+    }
+
+    @Test
+    fun `the plan is named only while it runs`() {
+        assertEquals("Тариф: Базовый · 1 месяц", planLine(paid("2026-10-12T09:26:42"), sept26))
+        assertNull(planLine(paid("2026-10-12T09:26:42", active = false), sept26))
+        assertNull(planLine(paid("2026-10-12T09:26:42", plan = null), sept26))
+    }
+
+    @Test
+    fun `the warning starts three calendar days before the end`() {
+        assertNull(expiryWarning(paid("2026-09-30T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается через 3 дня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-29T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается через 2 дня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-28T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается завтра. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-27T09:00:00Z"), moscow, sept26))
+        assertEquals("Подписка заканчивается сегодня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-09-26T18:00:00Z"), moscow, sept26))
+    }
+
+    @Test
+    fun `tomorrow is counted in the phone's zone`() {
+        // 22:30 UTC on the 26th is 01:30 on the 27th in Moscow.
+        val p = paid("2026-09-26T22:30:00Z")
+        assertEquals("Подписка заканчивается завтра. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(p, moscow, sept26))
+        assertEquals("Подписка заканчивается сегодня. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(p, ZoneId.of("UTC"), sept26))
+    }
+
+    @Test
+    fun `a longer warning window declines the days`() {
+        assertEquals("Подписка заканчивается через 5 дней. Продлите на сайте, чтобы связь не прервалась.",
+            expiryWarning(paid("2026-10-01T09:00:00Z"), moscow, sept26, warnDays = 7))
+    }
+
+    @Test
+    fun `no warning once the period is not running — the status line says it`() {
+        assertNull(expiryWarning(paid("2026-09-27T09:00:00Z", active = false), moscow, sept26))
+    }
+
+    @Test
+    fun `the pay button shows when the period ends soon or is not running`() {
+        assertFalse(needsPayment(paid("2026-10-12T09:26:42"), moscow, sept26))
+        assertTrue(needsPayment(paid("2026-09-28T09:00:00Z"), moscow, sept26))
+        assertTrue(needsPayment(paid("2026-10-12T09:26:42", active = false), moscow, sept26))
+        assertTrue(needsPayment(Profile("new", null, false, null), moscow, sept26))
+    }
+
+    @Test
+    fun `the delete question says what happens to whose device`() {
+        assertTrue(deleteQuestion("A71", onThisPhone = true).contains("устройство этого телефона"))
+        assertTrue(deleteQuestion("lap", onThisPhone = false).contains("связь там пропадёт"))
+    }
+
+    // --- what went wrong, as far as the phone can tell ------------------------
+
+    @Test
+    fun `no first answer is waited for, then named as the network's doing`() {
+        val now = 1_790_418_984L
+        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 20))
+        assertEquals("Сервер не отвечает с момента подключения. Возможно, эта сеть не пропускает VPN — " +
+            "попробуйте другую: Wi-Fi или мобильный интернет.",
+            connectionLine(true, false, 0L, now, upSinceUnixSeconds = now - 21))
+        // Without knowing when it came up, it cannot say how long it waited.
+        assertEquals("Подключено, ждём ответа сервера", connectionLine(true, false, 0L, now))
+    }
+
+    @Test
+    fun `a failed call names the kind of failure`() {
+        assertEquals("Не удаётся найти сайт. Проверьте, что интернет работает.",
+            describe(ApiError.Network(java.net.UnknownHostException("sov3r3ign.com")), Action.LOAD))
+        assertEquals("Сайт не ответил вовремя. Проверьте интернет или повторите позже.",
+            describe(ApiError.Network(java.net.SocketTimeoutException()), Action.LOAD))
+        assertTrue(describe(ApiError.Network(javax.net.ssl.SSLHandshakeException("cert")), Action.LOAD)
+            .startsWith("Не удалось установить защищённое соединение"))
+        assertEquals("Нет связи с сайтом. Проверьте интернет.",
+            describe(ApiError.Network(java.net.ConnectException()), Action.LOAD))
+    }
+
+    @Test
+    fun `a failed call with the VPN on points at the VPN`() {
+        val e = ApiError.Network(java.net.SocketTimeoutException())
+        assertTrue(describe(e, Action.LOAD, tunnelUp = true).endsWith("отключите VPN и повторите."))
+        assertFalse(describe(e, Action.LOAD, tunnelUp = false).contains("VPN"))
+    }
+
+    @Test
+    fun `the tunnel's refusals say what to do`() {
+        assertTrue(tunnelFailure("VPN_NOT_AUTHORIZED").contains("постоянный VPN другого приложения"))
+        assertTrue(tunnelFailure("TUN_CREATION_ERROR").startsWith("Android не запустил VPN"))
+        assertEquals(tunnelFailure("TUN_CREATION_ERROR"), tunnelFailure("UNABLE_TO_START_VPN"))
+        assertEquals("Сохранённый конфиг не читается. Выберите устройство заново.", tunnelFailure("BAD_CONFIG"))
+        assertEquals("Не удалось включить VPN (IllegalStateException)", tunnelFailure("IllegalStateException"))
     }
 }

@@ -41,9 +41,62 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
 
     fun profile(): ApiResult<Profile> = authorized { api.profile(it) }
 
-    fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }
+    /**
+     * The account's devices. The list is also where the name shown for this
+     * phone's device is kept current: a rename on the site, or on another
+     * phone, reaches this phone only this way. The config is not touched —
+     * a rename changes only the label.
+     */
+    fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }.also { r ->
+        if (r is ApiResult.Ok) {
+            val id = secrets.get(DEVICE_ID) ?: return@also
+            val current = r.value.configs.firstOrNull { it.id == id }
+            when {
+                // Removed on the site or from another phone: its peer is off
+                // the node, and the stored key opens nothing. The caller
+                // brings the tunnel down (decided 2026-09-30: without asking).
+                current == null -> forgetSelection()
+                secrets.get(DEVICE_NAME) != current.name -> secrets.put(DEVICE_NAME, current.name)
+            }
+        }
+    }
+
+    /**
+     * Removes a device from the account. When it is this phone's, the stored
+     * config and choice go too — only once the server has confirmed, so a
+     * failed removal leaves the phone able to reconnect.
+     *
+     * 404 counts as done: the device is not on the account, which is what
+     * was asked — it was removed on the site a moment earlier, say.
+     */
+    fun deleteDevice(deviceId: String): ApiResult<Unit> = authorized { token ->
+        when (val r = api.deleteDevice(token, deviceId)) {
+            is ApiResult.Ok -> r
+            is ApiResult.Failed -> if (r.error == ApiError.NotFound) ApiResult.Ok(Unit) else r
+        }.also { if (it is ApiResult.Ok && secrets.get(DEVICE_ID) == deviceId) forgetSelection() }
+    }
+
+    /** The id goes first: it is what marks a selection complete (see select). */
+    private fun forgetSelection() {
+        secrets.remove(DEVICE_ID)
+        secrets.remove(DEVICE_NAME)
+        secrets.remove(CONF)
+    }
 
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
+
+    /**
+     * Renames a device on the account. When it is the one this phone uses,
+     * the stored name follows; the stored config does not change, since the
+     * server changes only the label.
+     */
+    fun renameDevice(deviceId: String, name: String): ApiResult<Device> = authorized { token ->
+        val r = api.renameDevice(token, deviceId, name)
+        if (r is ApiResult.Ok && secrets.get(DEVICE_ID) == deviceId) {
+            secrets.put(DEVICE_NAME, r.value.name)
+        }
+        r
+    }
 
     /**
      * Makes [device] the one this phone uses: downloads its .conf and keeps

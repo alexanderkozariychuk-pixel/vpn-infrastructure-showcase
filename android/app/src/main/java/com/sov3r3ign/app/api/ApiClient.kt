@@ -32,6 +32,12 @@ sealed interface ApiError {
     /** 402 — the paid period is over. */
     data object SubscriptionLapsed : ApiError
 
+    /**
+     * 404 — no such device on this account. The server does not tell someone
+     * else's id from one that never existed or was removed on the site.
+     */
+    data object NotFound : ApiError
+
     /** 409 — the plan is full, or the username or email is taken. */
     data class Conflict(val message: String) : ApiError
 
@@ -96,14 +102,49 @@ class ApiClient(private val transport: Transport) {
 
     fun addDevice(token: String, name: String): ApiResult<Device> {
         val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.length > MAX_DEVICE_NAME) {
+        if (!DEVICE_NAME.matches(trimmed)) {
             return ApiResult.Failed(
-                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME characters")
+                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME Latin letters, digits, - or _")
             )
         }
         val body = json.encodeToString(NewDeviceRequest.serializer(), NewDeviceRequest(trimmed))
         return call("POST", "/api/client/configs", token, body) {
             json.decodeFromString(AddedDevice.serializer(), it).config
+        }
+    }
+
+    /** Only the label changes; the key, the address and a running tunnel stay as they are. */
+    fun renameDevice(token: String, deviceId: String, name: String): ApiResult<Device> {
+        if (!DEVICE_ID.matches(deviceId)) {
+            return ApiResult.Failed(ApiError.Rejected("Not a device id"))
+        }
+        val trimmed = name.trim()
+        if (!DEVICE_NAME.matches(trimmed)) {
+            return ApiResult.Failed(
+                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME Latin letters, digits, - or _")
+            )
+        }
+        val body = json.encodeToString(NewDeviceRequest.serializer(), NewDeviceRequest(trimmed))
+        return call("PATCH", "/api/client/configs/$deviceId", token, body) {
+            json.decodeFromString(RenamedDevice.serializer(), it).config
+        }
+    }
+
+    /**
+     * Removes a device and frees its slot. The server takes the peer off the
+     * node before it answers, so a request sent through the tunnel of the
+     * device being removed loses its own answer: bring that tunnel down first.
+     */
+    fun deleteDevice(token: String, deviceId: String): ApiResult<Unit> {
+        if (!DEVICE_ID.matches(deviceId)) {
+            return ApiResult.Failed(ApiError.Rejected("Not a device id"))
+        }
+        val r = call("DELETE", "/api/client/configs/$deviceId", token, null) {
+            json.decodeFromString(RemovedDevice.serializer(), it)
+        }
+        return when (r) {
+            is ApiResult.Ok -> ApiResult.Ok(Unit)
+            is ApiResult.Failed -> r
         }
     }
 
@@ -138,6 +179,7 @@ class ApiClient(private val transport: Transport) {
             }
             401 -> ApiResult.Failed(ApiError.Unauthorized)
             402 -> ApiResult.Failed(ApiError.SubscriptionLapsed)
+            404 -> ApiResult.Failed(ApiError.NotFound)
             409 -> ApiResult.Failed(ApiError.Conflict(detail(reply.body)))
             400, 422 -> ApiResult.Failed(ApiError.Rejected(detail(reply.body)))
             else -> ApiResult.Failed(ApiError.Server(reply.code))
