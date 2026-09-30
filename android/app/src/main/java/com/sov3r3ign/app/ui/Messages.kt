@@ -43,7 +43,7 @@ fun validateRegistration(username: String, email: String, password: String, conf
     }
 
 fun validateDeviceName(name: String): String? = when {
-    name.isBlank() -> "Введите название устройства"
+    name.isBlank() -> "Введите название профиля"
     name.trim().length > MAX_DEVICE_NAME -> "Название — не длиннее $MAX_DEVICE_NAME символов"
     !DEVICE_NAME.matches(name.trim()) -> "Только латинские буквы, цифры, - и _"
     else -> null
@@ -56,8 +56,8 @@ fun validateDeviceName(name: String): String? = when {
  * see the other device.
  */
 const val ONE_DEVICE_PER_CONFIG =
-    "Один конфиг работает на одном устройстве за раз. Если выбрать конфиг, " +
-        "который уже включён на другом телефоне, связь будет пропадать на обоих."
+    "В случае подключения больше одного устройства к выбранному выше профилю " +
+        "работоспособность сервиса не гарантируется."
 
 /**
  * [tunnelUp]: the VPN was on when the call failed. The portal is reached
@@ -71,12 +71,12 @@ fun describe(error: ApiError, action: Action, tunnelUp: Boolean = false): String
 
     ApiError.SubscriptionLapsed -> "Подписка закончилась. Продлить её можно на сайте."
 
-    ApiError.NotFound -> "Устройство не найдено — возможно, его удалили на сайте. Список обновлён."
+    ApiError.NotFound -> "Профиль не найден — возможно, его удалили на сайте. Список обновлён."
 
     // The server's reasons are in English and name the field; the app says
     // it in Russian rather than showing them raw.
     is ApiError.Conflict -> when {
-        action != Action.REGISTER -> "В тарифе нет свободных мест — удалите одно из устройств"
+        action != Action.REGISTER -> "В тарифе больше нет мест."
         error.message.contains("email", ignoreCase = true) -> "Этот email уже зарегистрирован"
         else -> "Такое имя пользователя уже занято"
     }
@@ -192,20 +192,43 @@ fun needsPayment(
     now: Instant = Instant.now(),
 ): Boolean = profile.activeAt(now) != true || expiryWarning(profile, zone, now) != null
 
-/** Asked before a device is removed; what removal does depends on whose it is. */
-fun deleteQuestion(name: String, onThisPhone: Boolean): String =
+/*
+ * What the app calls the account's configs: "профиль" (decided 2026-09-30 on
+ * the design canvas). The API and the code keep "device"; the words people
+ * read say профиль.
+ */
+
+/** Asked before a profile is removed. */
+const val DELETE_QUESTION = "Вы уверены, что хотите удалить этот профиль?"
+
+/** Under the question; what removal does depends on whose profile it is. */
+fun deleteExplanation(onThisPhone: Boolean): String =
     if (onThisPhone) {
-        "«$name» — устройство этого телефона. Подключение выключится, ключ будет удалён; " +
-            "чтобы подключиться снова, выберите другое устройство или добавьте этот телефон."
+        "Подключение будет разорвано. Чтобы подключиться снова — выберите другой профиль или добавьте заново."
     } else {
-        "Если «$name» включено на другом телефоне или компьютере, связь там пропадёт. " +
-            "Место в тарифе освободится."
+        "Если этот профиль включён на другом телефоне или компьютере, связь там пропадёт."
     }
 
-/** Said once, when the list shows this phone's device is gone from the account. */
+/** Said once, when the list shows this phone's profile is gone from the account. */
 const val DEVICE_GONE =
-    "Устройство этого телефона удалено с аккаунта, подключение выключено. " +
-        "Выберите другое устройство или добавьте этот телефон."
+    "Профиль этого телефона удалён с аккаунта, подключение разорвано. " +
+        "Выберите другой профиль или добавьте новый."
+
+/**
+ * What to do when the plan has no room. Moving to the extended plan is advice
+ * only for the basic one: on the extended plan all five places are taken, and
+ * the same advice would read as a mistake. An unknown plan gets the advice
+ * that is true on every plan.
+ */
+fun planFullAdvice(plan: String?): String =
+    if (plan != null && plan.lowercase().startsWith("basic")) {
+        "Воспользуйтесь тарифом «Расширенный», чтобы подключить до 5 устройств."
+    } else {
+        "Удалите один из профилей, чтобы добавить новый."
+    }
+
+/** The landing's plans, for "Тарифы на сайте". */
+const val PLANS_URL = "https://sov3r3ign.com/#tariffs"
 
 /** Payment is on the site, never in the app; the portal opens on sign-in. */
 const val PAYMENT_URL = "https://sov3r3ign.com/app"
@@ -293,7 +316,7 @@ fun tunnelFailure(reason: String?): String = when (reason) {
     "TUN_CREATION_ERROR", "UNABLE_TO_START_VPN" ->
         "Android не запустил VPN. Если работает другое VPN-приложение, выключите его и попробуйте снова."
     "DNS_RESOLUTION_FAILURE" -> "Не удалось найти адрес сервера VPN. Проверьте, что интернет работает."
-    "BAD_CONFIG", "TUNNEL_MISSING_CONFIG" -> "Сохранённый конфиг не читается. Выберите устройство заново."
+    "BAD_CONFIG", "TUNNEL_MISSING_CONFIG" -> "Сохранённый профиль не читается. Выберите профиль заново."
     null -> "Не удалось включить VPN"
     else -> "Не удалось включить VPN ($reason)"
 }

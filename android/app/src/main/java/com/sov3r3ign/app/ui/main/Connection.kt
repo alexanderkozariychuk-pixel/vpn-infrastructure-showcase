@@ -62,7 +62,7 @@ fun rememberConnection(session: Session): Connection {
         scope.launch {
             val conf = withContext(Dispatchers.IO) { session.storedConfig() }
             if (conf == null) {
-                error = "Сначала выберите устройство"
+                error = "Сначала выберите профиль"
             } else {
                 try {
                     withContext(Dispatchers.IO) {

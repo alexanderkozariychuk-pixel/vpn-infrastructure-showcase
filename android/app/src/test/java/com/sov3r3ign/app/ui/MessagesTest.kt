@@ -31,7 +31,7 @@ class MessagesTest {
     fun `a device name is checked before the server sees it`() {
         assertNull(validateDeviceName("phone"))
         assertNull(validateDeviceName(" tab "))
-        assertEquals("Введите название устройства", validateDeviceName("  "))
+        assertEquals("Введите название профиля", validateDeviceName("  "))
         assertEquals("Название — не длиннее 6 символов", validateDeviceName("Galaxy A71"))
     }
 
@@ -70,7 +70,7 @@ class MessagesTest {
 
     @Test
     fun `a device that is gone says so, not that the server is down`() {
-        assertEquals("Устройство не найдено — возможно, его удалили на сайте. Список обновлён.",
+        assertEquals("Профиль не найден — возможно, его удалили на сайте. Список обновлён.",
             describe(ApiError.NotFound, Action.LOAD))
     }
 
@@ -221,9 +221,17 @@ class MessagesTest {
     }
 
     @Test
-    fun `the delete question says what happens to whose device`() {
-        assertTrue(deleteQuestion("A71", onThisPhone = true).contains("устройство этого телефона"))
-        assertTrue(deleteQuestion("lap", onThisPhone = false).contains("связь там пропадёт"))
+    fun `the delete question says what happens to whose profile`() {
+        assertTrue(deleteExplanation(onThisPhone = true).startsWith("Подключение будет разорвано."))
+        assertTrue(deleteExplanation(onThisPhone = false).contains("связь там пропадёт"))
+    }
+
+    @Test
+    fun `a full plan suggests the extended plan only on the basic one`() {
+        assertEquals("Воспользуйтесь тарифом «Расширенный», чтобы подключить до 5 устройств.", planFullAdvice("basic-1m"))
+        assertEquals("Воспользуйтесь тарифом «Расширенный», чтобы подключить до 5 устройств.", planFullAdvice("Basic"))
+        assertEquals("Удалите один из профилей, чтобы добавить новый.", planFullAdvice("ext-6m"))
+        assertEquals("Удалите один из профилей, чтобы добавить новый.", planFullAdvice(null))
     }
 
     // --- what went wrong, as far as the phone can tell ------------------------
@@ -264,7 +272,7 @@ class MessagesTest {
         assertTrue(tunnelFailure("VPN_NOT_AUTHORIZED").contains("постоянный VPN другого приложения"))
         assertTrue(tunnelFailure("TUN_CREATION_ERROR").startsWith("Android не запустил VPN"))
         assertEquals(tunnelFailure("TUN_CREATION_ERROR"), tunnelFailure("UNABLE_TO_START_VPN"))
-        assertEquals("Сохранённый конфиг не читается. Выберите устройство заново.", tunnelFailure("BAD_CONFIG"))
+        assertEquals("Сохранённый профиль не читается. Выберите профиль заново.", tunnelFailure("BAD_CONFIG"))
         assertEquals("Не удалось включить VPN (IllegalStateException)", tunnelFailure("IllegalStateException"))
     }
 }

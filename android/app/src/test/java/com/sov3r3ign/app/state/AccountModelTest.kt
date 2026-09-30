@@ -159,7 +159,7 @@ class AccountModelTest {
         m.load()
         m.rename(lap, "lap2")
         assertEquals(listOf(phone), m.ui.value.devices!!.configs.map { Device(it.id, it.name) })
-        assertTrue(m.ui.value.error!!.startsWith("Устройство не найдено"))
+        assertTrue(m.ui.value.error!!.startsWith("Профиль не найден"))
     }
 
     @Test

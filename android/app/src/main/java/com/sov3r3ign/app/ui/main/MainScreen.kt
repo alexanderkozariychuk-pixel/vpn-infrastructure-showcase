@@ -143,7 +143,7 @@ fun MainScreen(
                     },
                     textAlign = TextAlign.Center,
                 )
-                val detail = if (ui.selected == null) "Выберите устройство, чтобы подключиться." else status.detail
+                val detail = if (ui.selected == null) "Выберите профиль, чтобы подключиться." else status.detail
                 if (detail.isNotEmpty()) {
                     Text(detail, style = MaterialTheme.typography.bodyMedium, color = Sov.TextDim, textAlign = TextAlign.Center)
                 }
@@ -219,7 +219,7 @@ private fun TopBar(onDevices: () -> Unit, onPay: () -> Unit, onSignOut: () -> Un
                 }
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                DropdownMenuItem(text = { Text("Устройства") }, onClick = { open = false; onDevices() })
+                DropdownMenuItem(text = { Text("Профили") }, onClick = { open = false; onDevices() })
                 DropdownMenuItem(text = { Text("Оплатить на сайте") }, onClick = { open = false; onPay() })
                 DropdownMenuItem(text = { Text("Выйти", color = Sov.Red) }, onClick = { open = false; onSignOut() })
             }
@@ -436,7 +436,7 @@ private fun DeviceRow(name: String?, onOpen: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("ВАШЕ УСТРОЙСТВО", style = MaterialTheme.typography.labelMedium, color = Sov.TextDim)
+            Text("ВАШ ПРОФИЛЬ", style = MaterialTheme.typography.labelMedium, color = Sov.TextDim)
             Text(name ?: "Не выбрано", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight(600)), color = Sov.TextBright)
         }
         Text(if (name == null) "Выбрать ›" else "Сменить ›", style = MaterialTheme.typography.bodyMedium, color = Sov.Accent)
