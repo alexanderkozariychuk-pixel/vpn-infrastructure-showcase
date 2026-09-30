@@ -96,9 +96,9 @@ class ApiClient(private val transport: Transport) {
 
     fun addDevice(token: String, name: String): ApiResult<Device> {
         val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.length > MAX_DEVICE_NAME) {
+        if (!DEVICE_NAME.matches(trimmed)) {
             return ApiResult.Failed(
-                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME characters")
+                ApiError.Rejected("Device name must be 1 to $MAX_DEVICE_NAME Latin letters, digits, - or _")
             )
         }
         val body = json.encodeToString(NewDeviceRequest.serializer(), NewDeviceRequest(trimmed))

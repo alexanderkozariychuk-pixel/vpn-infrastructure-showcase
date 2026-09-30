@@ -18,6 +18,16 @@ import java.time.format.DateTimeParseException
 /** The server enforces this (422 above it); the app checks first to say why. */
 const val MAX_DEVICE_NAME = 6
 
+/**
+ * The portal's rule, stricter than the server's: the name becomes the file
+ * name of the downloaded .conf, and the portal lets through only these
+ * characters. A name the app accepted and the portal would not — Cyrillic,
+ * a space — would reach the site as a mangled file name. Names already on
+ * the account (the server's own "device-1" is eight characters) are shown
+ * as they are; the rule is for names typed in the app.
+ */
+val DEVICE_NAME = Regex("[A-Za-z0-9_-]{1,$MAX_DEVICE_NAME}")
+
 @Serializable
 data class LoginRequest(val username: String, val password: String)
 

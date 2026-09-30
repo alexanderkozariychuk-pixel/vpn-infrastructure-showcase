@@ -1,6 +1,7 @@
 package com.sov3r3ign.app.ui
 
 import com.sov3r3ign.app.api.ApiError
+import com.sov3r3ign.app.api.DEVICE_NAME
 import com.sov3r3ign.app.api.MAX_DEVICE_NAME
 import com.sov3r3ign.app.api.Profile
 import java.time.Instant
@@ -41,6 +42,7 @@ fun validateRegistration(username: String, email: String, password: String, conf
 fun validateDeviceName(name: String): String? = when {
     name.isBlank() -> "Введите название устройства"
     name.trim().length > MAX_DEVICE_NAME -> "Название — не длиннее $MAX_DEVICE_NAME символов"
+    !DEVICE_NAME.matches(name.trim()) -> "Только латинские буквы, цифры, - и _"
     else -> null
 }
 

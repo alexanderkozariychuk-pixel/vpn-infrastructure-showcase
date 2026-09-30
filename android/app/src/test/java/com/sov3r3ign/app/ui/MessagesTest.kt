@@ -36,6 +36,19 @@ class MessagesTest {
     }
 
     @Test
+    fun `a device name follows the portal's rule, since it becomes a file name`() {
+        assertNull(validateDeviceName("a_b-1"))
+        assertNull(validateDeviceName("A71"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("тел"))
+        // Cyrillic "р" and "о" that look Latin are still refused.
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("рhоne"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("my ph"))
+        assertEquals("Только латинские буквы, цифры, - и _", validateDeviceName("a.b"))
+        // Too long is said first: shortening is the fix the customer needs.
+        assertEquals("Название — не длиннее 6 символов", validateDeviceName("Телефон"))
+    }
+
+    @Test
     fun `sign-in needs both fields`() {
         assertEquals("Введите имя пользователя и пароль", validateSignIn("alex", ""))
         assertNull(validateSignIn("alex", "x"))

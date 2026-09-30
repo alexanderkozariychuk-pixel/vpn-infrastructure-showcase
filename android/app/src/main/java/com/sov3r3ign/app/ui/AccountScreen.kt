@@ -201,7 +201,7 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
-                    label = { Text("Название, до 6 символов") },
+                    label = { Text("Название: до 6 символов, латиница и цифры") },
                     singleLine = true,
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),

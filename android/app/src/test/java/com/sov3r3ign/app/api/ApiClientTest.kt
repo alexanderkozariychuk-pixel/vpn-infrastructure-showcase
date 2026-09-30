@@ -262,6 +262,20 @@ class ApiClientTest {
     }
 
     @Test
+    fun `a name the portal would not accept is refused before any request`() {
+        val never = Transport { _, _, _, _ -> fail("must not reach the network"); HttpReply(0, "") }
+        assertTrue(error(ApiClient(never).addDevice("tok", "тел")) is ApiError.Rejected)
+        assertTrue(error(ApiClient(never).addDevice("tok", "my ph")) is ApiError.Rejected)
+    }
+
+    @Test
+    fun `a name within the rule is sent, trimmed`() {
+        val t = Recorder(201, added)
+        ok(ApiClient(t).addDevice("tok", " a_b-1 "))
+        assertEquals("""{"name":"a_b-1"}""", t.lastBody)
+    }
+
+    @Test
     fun `a validation error reads the message out of FastAPI's list`() {
         val body = """{"detail":[{"type":"string_too_long","loc":["body","name"],"msg":"String should have at most 6 characters"}]}"""
         val r = ApiClient(Recorder(422, body)).addDevice("tok", "phone")
