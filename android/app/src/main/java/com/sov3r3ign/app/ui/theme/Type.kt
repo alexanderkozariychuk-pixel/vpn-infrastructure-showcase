@@ -1,6 +1,7 @@
 package com.sov3r3ign.app.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -16,12 +17,16 @@ import com.sov3r3ign.app.R
  * the APK (SIL OFL 1.1, licences in assets/licenses): the app asks Google
  * for nothing — the privacy policy promises no third-party services.
  * Each file is a variable font; the weights the site uses are set by axis.
+ * FontVariation is still marked experimental in this Compose; without it a
+ * variable font renders at its default instance (400) whatever weight is asked.
  */
+@OptIn(ExperimentalTextApi::class)
 private fun unbounded(w: Int) = Font(
     R.font.unbounded, FontWeight(w),
     variationSettings = FontVariation.Settings(FontVariation.weight(w)),
 )
 
+@OptIn(ExperimentalTextApi::class)
 private fun mono(w: Int) = Font(
     R.font.jetbrains_mono, FontWeight(w),
     variationSettings = FontVariation.Settings(FontVariation.weight(w)),
