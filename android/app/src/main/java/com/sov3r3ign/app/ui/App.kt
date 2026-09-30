@@ -15,7 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.sov3r3ign.app.api.ApiClient
 import com.sov3r3ign.app.api.HttpTransport
 import com.sov3r3ign.app.session.Session
+import com.sov3r3ign.app.state.AccountModel
 import com.sov3r3ign.app.storage.SecureStore
+import com.sov3r3ign.app.tunnel.AppTunnel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,7 +44,9 @@ fun App() {
             notice = null
             signedIn = true
         }
-        true -> AccountScreen(session) { reason ->
+        // A new model for each signed-in session: nothing of the last account's
+        // state may show on the next one's screen.
+        true -> AccountScreen(session, remember { AccountModel(session, AppTunnel(context)) }) { reason ->
             notice = reason
             signedIn = false
         }

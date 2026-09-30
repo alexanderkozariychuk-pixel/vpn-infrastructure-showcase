@@ -19,8 +19,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,181 +28,58 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
-import com.sov3r3ign.app.api.ApiError
-import com.sov3r3ign.app.api.ApiResult
 import com.sov3r3ign.app.api.Device
-import com.sov3r3ign.app.api.DeviceList
-import com.sov3r3ign.app.api.Profile
 import com.sov3r3ign.app.session.Session
-import com.sov3r3ign.app.tunnel.VpnTunnel
-import kotlinx.coroutines.Dispatchers
+import com.sov3r3ign.app.state.AccountModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.amnezia.awg.backend.Tunnel
 
 /**
- * The account, its devices, and which of them this phone uses. Choosing a
- * device downloads its config into the encrypted store; the switch above the
- * list starts the tunnel from that stored copy.
+ * The account, its devices, and which of them this phone uses. The screen
+ * only shows [model]'s state and passes taps on; the order of operations —
+ * what happens to the tunnel when — lives in AccountModel, where it is tested.
  */
 @Composable
-fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
+fun AccountScreen(session: Session, model: AccountModel, onSignedOut: (notice: String?) -> Unit) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    var profile by remember { mutableStateOf<Profile?>(null) }
-    var devices by remember { mutableStateOf<DeviceList?>(null) }
-    var selected by remember { mutableStateOf<Session.Selected?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    val ui by model.ui.collectAsState()
+    val profile = ui.profile
+    val devices = ui.devices
+    val selected = ui.selected
+    val busy = ui.busy
+    val error = ui.error
+    val notice = ui.notice
     var newName by rememberSaveable { mutableStateOf("phone") }
-    var reload by remember { mutableIntStateOf(0) }
     var renaming by remember { mutableStateOf<Device?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<Device?>(null) }
-    var notice by remember { mutableStateOf<String?>(null) }
+    var addError by remember { mutableStateOf<String?>(null) }
 
-    /** Every call can find the token expired; that always ends at sign-in. */
-    fun failed(e: ApiError) {
-        if (e == ApiError.Unauthorized) {
-            onSignedOut("Сессия истекла — войдите снова")
-        } else {
-            error = describe(e, Action.LOAD, tunnelUp = VpnTunnel.state.value == Tunnel.State.UP)
-            // The device is gone from the account: the list on screen is stale.
-            if (e == ApiError.NotFound) reload++
-        }
-    }
+    LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(ui.signedOut) { ui.signedOut?.let { onSignedOut(it.notice) } }
 
-    LaunchedEffect(reload) {
-        error = null
-        val had = withContext(Dispatchers.IO) { session.selected() }
-        selected = had
-        when (val p = withContext(Dispatchers.IO) { session.profile() }) {
-            is ApiResult.Ok -> { profile = p.value }
-            is ApiResult.Failed -> { failed(p.error); return@LaunchedEffect }
-        }
-        when (val d = withContext(Dispatchers.IO) { session.devices() }) {
-            is ApiResult.Ok -> {
-                devices = d.value
-                // The list may carry a new name for this phone's device, or
-                // show it gone; then the session has already forgotten it.
-                val now = withContext(Dispatchers.IO) { session.selected() }
-                if (had != null && now == null) {
-                    withContext(Dispatchers.IO) { runCatching { VpnTunnel.down(context) } }
-                    notice = DEVICE_GONE
-                }
-                selected = now
-            }
-            is ApiResult.Failed -> { devices = null; failed(d.error) }
-        }
-    }
-
-    /**
-     * A running tunnel is on the previous device's key: move it onto the one
-     * just chosen, or the phone keeps using a config the customer left.
-     */
-    suspend fun followSelection() {
-        if (VpnTunnel.state.value != Tunnel.State.UP) return
-        withContext(Dispatchers.IO) {
-            session.storedConfig()?.let { conf -> runCatching { VpnTunnel.up(context, conf) } }
-        }
-    }
-
-    fun use(device: Device) {
-        busy = true
-        error = null
-        scope.launch {
-            val r = withContext(Dispatchers.IO) { session.select(device) }
-            busy = false
-            when (r) {
-                is ApiResult.Ok -> {
-                    selected = withContext(Dispatchers.IO) { session.selected() }
-                    followSelection()
-                }
-                is ApiResult.Failed -> failed(r.error)
-            }
-        }
-    }
+    fun use(device: Device) { scope.launch { model.use(device) } }
 
     fun rename() {
         val device = renaming ?: return
-        val problem = validateDeviceName(renameText)
-        if (problem != null) {
-            renameError = problem
-            return
-        }
-        busy = true
-        error = null
         scope.launch {
-            val r = withContext(Dispatchers.IO) { session.renameDevice(device.id, renameText) }
-            busy = false
-            renaming = null
-            when (r) {
-                is ApiResult.Ok -> {
-                    selected = withContext(Dispatchers.IO) { session.selected() }
-                    reload++
-                }
-                is ApiResult.Failed -> failed(r.error)
-            }
+            val problem = model.rename(device, renameText)
+            if (problem != null) renameError = problem else renaming = null
         }
     }
 
     fun delete(device: Device) {
-        val onThisPhone = selected?.id == device.id
-        busy = true
-        error = null
-        notice = null
         scope.launch {
-            val r = withContext(Dispatchers.IO) {
-                // The server takes the peer off the node before it answers:
-                // sent through this device's own tunnel, the answer never
-                // comes back. Down first, then the request over the phone's
-                // own network. If removal fails, the tunnel stays down and
-                // the key stays: the customer can reconnect.
-                if (onThisPhone) runCatching { VpnTunnel.down(context) }
-                session.deleteDevice(device.id)
-            }
-            busy = false
+            model.delete(device)
             deleting = null
-            when (r) {
-                is ApiResult.Ok -> {
-                    selected = withContext(Dispatchers.IO) { session.selected() }
-                    reload++
-                }
-                is ApiResult.Failed -> failed(r.error)
-            }
         }
     }
 
     fun add() {
-        val problem = validateDeviceName(newName)
-        if (problem != null) {
-            error = problem
-            return
-        }
-        busy = true
-        error = null
-        scope.launch {
-            when (val r = withContext(Dispatchers.IO) { session.addDevice(newName) }) {
-                is ApiResult.Ok -> {
-                    // A device added from this phone is meant for this phone.
-                    when (val s = withContext(Dispatchers.IO) { session.select(r.value) }) {
-                        is ApiResult.Ok -> followSelection()
-                        is ApiResult.Failed -> failed(s.error)
-                    }
-                    busy = false
-                    reload++
-                }
-                is ApiResult.Failed -> {
-                    busy = false
-                    failed(r.error)
-                }
-            }
-        }
+        scope.launch { addError = model.add(newName) }
     }
 
     Column(
@@ -282,12 +159,13 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                 HorizontalDivider()
                 OutlinedTextField(
                     value = newName,
-                    onValueChange = { newName = it },
+                    onValueChange = { newName = it; addError = null },
                     label = { Text("Название: до 6 символов, латиница и цифры") },
                     singleLine = true,
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                addError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 Button(onClick = { add() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                     Text("Добавить этот телефон")
                 }
@@ -300,7 +178,7 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
 
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error)
-            TextButton(onClick = { reload++ }, enabled = !busy) { Text("Повторить") }
+            TextButton(onClick = { scope.launch { model.load() } }, enabled = !busy) { Text("Повторить") }
         }
 
         deleting?.let { d ->
@@ -349,16 +227,6 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         }
 
         HorizontalDivider()
-        OutlinedButton(onClick = {
-            scope.launch {
-                withContext(Dispatchers.IO) {
-                    // Down first: wiping the key under a running tunnel would
-                    // leave the phone connected on an account it signed out of.
-                    runCatching { VpnTunnel.down(context) }
-                    session.signOut()
-                }
-                onSignedOut(null)
-            }
-        }) { Text("Выйти") }
+        OutlinedButton(onClick = { scope.launch { model.signOut() } }) { Text("Выйти") }
     }
 }
