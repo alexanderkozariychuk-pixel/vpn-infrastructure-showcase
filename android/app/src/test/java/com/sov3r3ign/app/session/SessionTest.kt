@@ -218,13 +218,71 @@ class SessionTest {
         assertEquals("[Interface]\nPrivateKey = k", s.storedConfig())
     }
 
+    private val noDevices = HttpReply(200, """{"ok":true,"plan":"basic-1m","limit":2,"used":0,"configs":[]}""")
+
     @Test
-    fun `a list without this phone's device leaves the choice for now`() {
-        // What to do when the device is gone is decided with deletion, not here.
-        val secrets = chosePhone().apply { put("device_name", "old") }
-        val empty = HttpReply(200, """{"ok":true,"plan":"basic-1m","limit":2,"used":0,"configs":[]}""")
-        assertTrue(Session(ApiClient(Script(empty)), secrets).devices() is ApiResult.Ok)
-        assertEquals("old", secrets.map["device_name"])
+    fun `a device removed on the site is forgotten here, key and all`() {
+        val secrets = chosePhone()
+        val s = Session(ApiClient(Script(noDevices)), secrets)
+        assertTrue(s.devices() is ApiResult.Ok)
+        assertNull(s.selected())
+        assertEquals(mapOf("token" to "T1"), secrets.map)
+    }
+
+    @Test
+    fun `a failed list forgets nothing`() {
+        // Only a list the server returned says what is on the account.
+        val secrets = chosePhone()
+        val s = Session(ApiClient(Script(HttpReply(502, "<html>"))), secrets)
+        assertTrue(s.devices() is ApiResult.Failed)
+        assertEquals(Session.Selected(phone.id, "phone"), s.selected())
+    }
+
+    @Test
+    fun `with nothing chosen here, a list changes nothing stored`() {
+        val secrets = MapSecrets().apply { put("token", "T1") }
+        assertTrue(Session(ApiClient(Script(noDevices)), secrets).devices() is ApiResult.Ok)
+        assertEquals(mapOf("token" to "T1"), secrets.map)
+    }
+
+    // --- delete ---------------------------------------------------------------
+
+    private val removed = HttpReply(200, """{"ok":true,"removed":"${phone.id}"}""")
+
+    @Test
+    fun `deleting this phone's device forgets it once the server confirms`() {
+        val secrets = chosePhone()
+        val script = Script(removed)
+        assertTrue(Session(ApiClient(script), secrets).deleteDevice(phone.id) is ApiResult.Ok)
+        assertEquals(listOf("DELETE /api/client/configs/${phone.id}"), script.calls)
+        assertEquals(mapOf("token" to "T1"), secrets.map)
+    }
+
+    @Test
+    fun `a removal the node refused keeps the key, so the phone can reconnect`() {
+        val secrets = chosePhone()
+        val r = Session(ApiClient(Script(HttpReply(503, """{"detail":"Could not remove the device"}"""))), secrets)
+            .deleteDevice(phone.id)
+        assertEquals(ApiResult.Failed(ApiError.Server(503)), r)
+        assertEquals("[Interface]\nPrivateKey = k", secrets.map["conf"])
         assertEquals(phone.id, secrets.map["device_id"])
+    }
+
+    @Test
+    fun `already gone counts as removed`() {
+        val secrets = chosePhone()
+        val r = Session(ApiClient(Script(HttpReply(404, """{"detail":"Config not found"}"""))), secrets)
+            .deleteDevice(phone.id)
+        assertEquals(ApiResult.Ok(Unit), r)
+        assertNull(secrets.map["conf"])
+    }
+
+    @Test
+    fun `deleting another device leaves this phone's choice alone`() {
+        val secrets = chosePhone()
+        val other = "bddb174e-f00a-4d37-89a3-7a9d7b5dd227"
+        val reply = HttpReply(200, """{"ok":true,"removed":"$other"}""")
+        assertTrue(Session(ApiClient(Script(reply)), secrets).deleteDevice(other) is ApiResult.Ok)
+        assertEquals(Session.Selected(phone.id, "phone"), Session(ApiClient(Script()), secrets).selected())
     }
 }

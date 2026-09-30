@@ -379,4 +379,26 @@ class ApiClientTest {
         val r = ApiClient(Recorder(422, """{"detail": "Name is empty"}""")).renameDevice("tok", id, "x")
         assertEquals(ApiError.Rejected("Name is empty"), error(r))
     }
+
+    // --- delete ---------------------------------------------------------------
+
+    @Test
+    fun `a delete is a DELETE on the device`() {
+        // «Удалить устройство»
+        val t = Recorder(200, """{"ok": true, "removed": "$id"}""")
+        assertEquals(ApiResult.Ok(Unit), ApiClient(t).deleteDevice("tok", id))
+        assertEquals(listOf("DELETE /api/client/configs/$id tok"), t.calls)
+    }
+
+    @Test
+    fun `a node that could not remove the peer is a server error`() {
+        val r = ApiClient(Recorder(503, """{"detail": "Could not remove the device"}""")).deleteDevice("tok", id)
+        assertEquals(ApiError.Server(503), error(r))
+    }
+
+    @Test
+    fun `a delete with a path in the id is refused before any request`() {
+        val never = Transport { _, _, _, _ -> fail("must not reach the network"); HttpReply(0, "") }
+        assertTrue(error(ApiClient(never).deleteDevice("tok", "x/../../me")) is ApiError.Rejected)
+    }
 }

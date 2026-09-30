@@ -122,3 +122,6 @@ data class AddedDevice(val config: Device, val used: Int, val limit: Int)
 
 @Serializable
 data class RenamedDevice(val config: Device)
+
+@Serializable
+data class RemovedDevice(val removed: String)

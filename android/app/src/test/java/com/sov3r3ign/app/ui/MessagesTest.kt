@@ -216,4 +216,10 @@ class MessagesTest {
         assertTrue(needsPayment(paid("2026-10-12T09:26:42", active = false), moscow, sept26))
         assertTrue(needsPayment(Profile("new", null, false, null), moscow, sept26))
     }
+
+    @Test
+    fun `the delete question says what happens to whose device`() {
+        assertTrue(deleteQuestion("A71", onThisPhone = true).contains("устройство этого телефона"))
+        assertTrue(deleteQuestion("lap", onThisPhone = false).contains("связь там пропадёт"))
+    }
 }

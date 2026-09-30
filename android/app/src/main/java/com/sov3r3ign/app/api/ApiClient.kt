@@ -130,6 +130,24 @@ class ApiClient(private val transport: Transport) {
         }
     }
 
+    /**
+     * Removes a device and frees its slot. The server takes the peer off the
+     * node before it answers, so a request sent through the tunnel of the
+     * device being removed loses its own answer: bring that tunnel down first.
+     */
+    fun deleteDevice(token: String, deviceId: String): ApiResult<Unit> {
+        if (!DEVICE_ID.matches(deviceId)) {
+            return ApiResult.Failed(ApiError.Rejected("Not a device id"))
+        }
+        val r = call("DELETE", "/api/client/configs/$deviceId", token, null) {
+            json.decodeFromString(RemovedDevice.serializer(), it)
+        }
+        return when (r) {
+            is ApiResult.Ok -> ApiResult.Ok(Unit)
+            is ApiResult.Failed -> r
+        }
+    }
+
     /** The .conf text, handed to the tunnel as it is. */
     fun config(token: String, deviceId: String): ApiResult<String> {
         // Ids come from our own server and are UUIDs. Checked anyway: an id

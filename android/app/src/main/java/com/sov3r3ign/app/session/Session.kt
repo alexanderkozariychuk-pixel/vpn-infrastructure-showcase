@@ -49,12 +49,38 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
      */
     fun devices(): ApiResult<DeviceList> = authorized { api.devices(it) }.also { r ->
         if (r is ApiResult.Ok) {
-            val id = secrets.get(DEVICE_ID)
+            val id = secrets.get(DEVICE_ID) ?: return@also
             val current = r.value.configs.firstOrNull { it.id == id }
-            if (current != null && secrets.get(DEVICE_NAME) != current.name) {
-                secrets.put(DEVICE_NAME, current.name)
+            when {
+                // Removed on the site or from another phone: its peer is off
+                // the node, and the stored key opens nothing. The caller
+                // brings the tunnel down (decided 2026-09-30: without asking).
+                current == null -> forgetSelection()
+                secrets.get(DEVICE_NAME) != current.name -> secrets.put(DEVICE_NAME, current.name)
             }
         }
+    }
+
+    /**
+     * Removes a device from the account. When it is this phone's, the stored
+     * config and choice go too — only once the server has confirmed, so a
+     * failed removal leaves the phone able to reconnect.
+     *
+     * 404 counts as done: the device is not on the account, which is what
+     * was asked — it was removed on the site a moment earlier, say.
+     */
+    fun deleteDevice(deviceId: String): ApiResult<Unit> = authorized { token ->
+        when (val r = api.deleteDevice(token, deviceId)) {
+            is ApiResult.Ok -> r
+            is ApiResult.Failed -> if (r.error == ApiError.NotFound) ApiResult.Ok(Unit) else r
+        }.also { if (it is ApiResult.Ok && secrets.get(DEVICE_ID) == deviceId) forgetSelection() }
+    }
+
+    /** The id goes first: it is what marks a selection complete (see select). */
+    private fun forgetSelection() {
+        secrets.remove(DEVICE_ID)
+        secrets.remove(DEVICE_NAME)
+        secrets.remove(CONF)
     }
 
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }

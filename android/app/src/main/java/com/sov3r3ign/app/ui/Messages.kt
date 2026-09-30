@@ -169,6 +169,21 @@ fun needsPayment(
     now: Instant = Instant.now(),
 ): Boolean = profile.activeAt(now) != true || expiryWarning(profile, zone, now) != null
 
+/** Asked before a device is removed; what removal does depends on whose it is. */
+fun deleteQuestion(name: String, onThisPhone: Boolean): String =
+    if (onThisPhone) {
+        "«$name» — устройство этого телефона. Подключение выключится, ключ будет удалён; " +
+            "чтобы подключиться снова, выберите другое устройство или добавьте этот телефон."
+    } else {
+        "Если «$name» включено на другом телефоне или компьютере, связь там пропадёт. " +
+            "Место в тарифе освободится."
+    }
+
+/** Said once, when the list shows this phone's device is gone from the account. */
+const val DEVICE_GONE =
+    "Устройство этого телефона удалено с аккаунта, подключение выключено. " +
+        "Выберите другое устройство или добавьте этот телефон."
+
 /** Payment is on the site, never in the app; the portal opens on sign-in. */
 const val PAYMENT_URL = "https://sov3r3ign.com/app"
 

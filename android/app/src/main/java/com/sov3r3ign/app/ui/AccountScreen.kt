@@ -63,6 +63,8 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
     var renaming by remember { mutableStateOf<Device?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf<Device?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
     /** Every call can find the token expired; that always ends at sign-in. */
     fun failed(e: ApiError) {
@@ -77,7 +79,8 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
 
     LaunchedEffect(reload) {
         error = null
-        selected = withContext(Dispatchers.IO) { session.selected() }
+        val had = withContext(Dispatchers.IO) { session.selected() }
+        selected = had
         when (val p = withContext(Dispatchers.IO) { session.profile() }) {
             is ApiResult.Ok -> { profile = p.value }
             is ApiResult.Failed -> { failed(p.error); return@LaunchedEffect }
@@ -85,8 +88,14 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
         when (val d = withContext(Dispatchers.IO) { session.devices() }) {
             is ApiResult.Ok -> {
                 devices = d.value
-                // The list may carry a new name for this phone's device.
-                selected = withContext(Dispatchers.IO) { session.selected() }
+                // The list may carry a new name for this phone's device, or
+                // show it gone; then the session has already forgotten it.
+                val now = withContext(Dispatchers.IO) { session.selected() }
+                if (had != null && now == null) {
+                    withContext(Dispatchers.IO) { runCatching { VpnTunnel.down(context) } }
+                    notice = DEVICE_GONE
+                }
+                selected = now
             }
             is ApiResult.Failed -> { devices = null; failed(d.error) }
         }
@@ -132,6 +141,33 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
             val r = withContext(Dispatchers.IO) { session.renameDevice(device.id, renameText) }
             busy = false
             renaming = null
+            when (r) {
+                is ApiResult.Ok -> {
+                    selected = withContext(Dispatchers.IO) { session.selected() }
+                    reload++
+                }
+                is ApiResult.Failed -> failed(r.error)
+            }
+        }
+    }
+
+    fun delete(device: Device) {
+        val onThisPhone = selected?.id == device.id
+        busy = true
+        error = null
+        notice = null
+        scope.launch {
+            val r = withContext(Dispatchers.IO) {
+                // The server takes the peer off the node before it answers:
+                // sent through this device's own tunnel, the answer never
+                // comes back. Down first, then the request over the phone's
+                // own network. If removal fails, the tunnel stays down and
+                // the key stays: the customer can reconnect.
+                if (onThisPhone) runCatching { VpnTunnel.down(context) }
+                session.deleteDevice(device.id)
+            }
+            busy = false
+            deleting = null
             when (r) {
                 is ApiResult.Ok -> {
                     selected = withContext(Dispatchers.IO) { session.selected() }
@@ -227,6 +263,9 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
                             },
                             enabled = !busy,
                         ) { Text("Переименовать") }
+                        TextButton(onClick = { deleting = d }, enabled = !busy) {
+                            Text("Удалить", color = MaterialTheme.colorScheme.error)
+                        }
                         if (here?.id == d.id) {
                             Text("выбрано", color = MaterialTheme.colorScheme.primary)
                         } else {
@@ -257,9 +296,27 @@ fun AccountScreen(session: Session, onSignedOut: (notice: String?) -> Unit) {
 
         if (busy) CircularProgressIndicator()
 
+        notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = { reload++ }, enabled = !busy) { Text("Повторить") }
+        }
+
+        deleting?.let { d ->
+            AlertDialog(
+                onDismissRequest = { if (!busy) deleting = null },
+                title = { Text("Удалить «${d.name}»?") },
+                text = { Text(deleteQuestion(d.name, onThisPhone = selected?.id == d.id)) },
+                confirmButton = {
+                    TextButton(onClick = { delete(d) }, enabled = !busy) {
+                        Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deleting = null }, enabled = !busy) { Text("Отмена") }
+                },
+            )
         }
 
         renaming?.let { d ->
