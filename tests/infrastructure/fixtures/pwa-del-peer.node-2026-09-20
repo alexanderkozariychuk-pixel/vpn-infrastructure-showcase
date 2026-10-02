@@ -14,9 +14,8 @@
 #      comes back on the next reboot, which is the same class of bug that
 #      cost four incidents in June.
 #
-# Refuses to touch anything outside the client subnets (paying 10.88.88.0/24,
-# trial 10.88.89.0/24), so the backbone peer cannot be removed through this
-# path even if the portal is compromised.
+# Refuses to touch anything outside the client subnet, so the backbone peer
+# cannot be removed through this path even if the portal is compromised.
 #
 # Exit status is 0 only when the peer is gone from both places. Output is
 # "ok: ..." on success and "error: ..." on refusal, matching pwa-add-peer.
@@ -25,7 +24,7 @@ set -euo pipefail
 
 IFACE="${PWA_AWG_INTERFACE:-awg0}"
 CONF="/etc/amnezia/amneziawg/${IFACE}.conf"
-CLIENT_SUBNET_PREFIXES=("10.88.88." "10.88.89.")
+CLIENT_SUBNET_PREFIX="10.88.88."
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -57,11 +56,10 @@ if [[ -z "$ALLOWED" && "$IN_CONFIG" -eq 0 ]]; then
 fi
 
 if [[ -n "$ALLOWED" ]]; then
-    in_subnet=0
-    for prefix in "${CLIENT_SUBNET_PREFIXES[@]}"; do
-        [[ "$ALLOWED" == "$prefix"* ]] && in_subnet=1
-    done
-    [[ "$in_subnet" -eq 1 ]] || die "refusing: $ALLOWED is outside the client subnets"
+    case "$ALLOWED" in
+        "${CLIENT_SUBNET_PREFIX}"*) : ;;
+        *) die "refusing: $ALLOWED is outside the client subnet" ;;
+    esac
 fi
 
 # ── config first, and only then runtime ──────────────────────────────────────

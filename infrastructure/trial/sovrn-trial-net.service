@@ -1,0 +1,25 @@
+# /etc/systemd/system/sovrn-trial-net.service
+#
+# Brings the trial subnet up with awg0 and takes it down with it.
+#
+# PartOf rather than BindsTo: stopping or restarting awg0 stops and restarts
+# this unit too (the address and the qdiscs live on the interface and vanish
+# with it), but starting this unit never tries to start awg0. On a node where
+# awg0 was ever brought up by hand, BindsTo would make `systemctl start` here
+# run awg-quick against a live interface.
+#
+# After sov-split.service: `up` needs the ru_nets ipset that unit restores.
+
+[Unit]
+Description=Sovereign trial subnet 10.88.89.0/24 (routing, limits, kill switch)
+After=awg-quick@awg0.service awg-quick@awg1.service sov-split.service
+PartOf=awg-quick@awg0.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/sovrn-trial-net up
+ExecStop=/usr/local/bin/sovrn-trial-net down
+
+[Install]
+WantedBy=awg-quick@awg0.service

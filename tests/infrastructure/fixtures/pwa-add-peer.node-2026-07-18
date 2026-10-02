@@ -1,0 +1,34 @@
+#!/bin/bash
+# Validating wrapper: the ONLY write path the PWA has into awg0.conf.
+# Called as: pwa-add-peer <pubkey> <psk> <client_ip> <client_name>
+set -euo pipefail
+
+CONF=/etc/amnezia/amneziawg/awg0.conf
+SUBNET_PREFIX="10.88.88."
+
+pubkey="${1:-}"; psk="${2:-}"; cip="${3:-}"; name="${4:-}"
+
+b64key='^[A-Za-z0-9+/]{43}=$'
+[[ "$pubkey" =~ $b64key ]] || { echo "bad pubkey" >&2; exit 2; }
+[[ "$psk"    =~ $b64key ]] || { echo "bad psk" >&2; exit 2; }
+
+[[ "$cip" =~ ^${SUBNET_PREFIX}[0-9]{1,3}/32$ ]] || { echo "ip must be ${SUBNET_PREFIX}X/32" >&2; exit 2; }
+octet="${cip#$SUBNET_PREFIX}"; octet="${octet%/32}"
+(( octet >= 2 && octet <= 254 )) || { echo "ip octet out of range" >&2; exit 2; }
+
+[[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { echo "bad name" >&2; exit 2; }
+
+# reject duplicate KEY
+if awg show awg0 | grep -q "$pubkey"; then echo "peer exists (key)" >&2; exit 3; fi
+
+# reject duplicate IP — an IP already allowed on any peer would collide
+if awg show awg0 allowed-ips | grep -qw "$cip"; then echo "ip in use: $cip" >&2; exit 3; fi
+
+pskfile="$(mktemp)"; trap 'rm -f "$pskfile"' EXIT
+printf '%s\n' "$psk" > "$pskfile"
+awg set awg0 peer "$pubkey" preshared-key "$pskfile" allowed-ips "$cip"
+
+printf '\n\n### %s\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s\n' \
+  "$name" "$pubkey" "$psk" "$cip" >> "$CONF"
+
+echo "ok: added $name ($cip)"

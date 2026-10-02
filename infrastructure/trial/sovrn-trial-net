@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+#
+# sovrn-trial-net — the trial subnet on the entry node.
+#
+# Installed at /usr/local/bin/sovrn-trial-net, run by sovrn-trial-net.service.
+#
+# Trial clients get addresses in 10.88.89.0/24 on the same awg0 interface and
+# port as paying clients, so a trial config is the same product: same
+# endpoint, same obfuscation, same RU split. What differs is applied here:
+#
+#   * a route back to them      — awg0 only carries 10.88.88.1/24 by itself,
+#                                 and `awg set` (pwa-add-peer) adds no routes
+#   * the RU split              — sov-split-tunnel.sh and rc.local match
+#                                 10.88.88.0/24 only; without the two rules
+#                                 below every trial packet would leave through
+#                                 eth0 from a Russian address
+#   * a firewall chain          — kill switch, no reaching other clients,
+#                                 no SMTP, a connection cap per address
+#   * a bandwidth ceiling       — one shared ceiling for the whole trial pool,
+#                                 so trials can never crowd out paying clients
+#
+# Nothing here edits awg0.conf, sov-split-tunnel.sh or rc.local. Everything is
+# added alongside them and removed by `down`, which is what makes the rollback
+# a matter of stopping one unit.
+#
+# Usage:
+#   sovrn-trial-net up       apply everything (idempotent)
+#   sovrn-trial-net down     remove everything this script added
+#   sovrn-trial-net off      kill switch: drop all trial traffic, persists
+#   sovrn-trial-net on       let trial traffic through again, persists
+#   sovrn-trial-net check    verify every piece is in place; non-zero if not
+#
+# Limits can be tuned in /etc/sovereign/trial.conf (root-owned), e.g.:
+#   DOWN_RATE=50mbit
+#   UP_RATE=15mbit
+#   CONN_LIMIT=200
+# then `systemctl restart sovrn-trial-net`.
+
+set -euo pipefail
+
+IFACE=awg0
+TRIAL_NET=10.88.89.0/24
+TRIAL_GW=10.88.89.1/24
+CLIENT_NETS=10.88.88.0/23          # paid + trial: what a trial may not reach
+RU_SET=ru_nets
+FWMARK=0x64
+RULE_PRIO=101                      # rc.local holds 100 for the paid subnet
+TABLE=200
+CHAIN=SOVRN-TRIAL
+
+DOWN_RATE=20mbit                   # whole trial pool, towards clients
+UP_RATE=5mbit                      # whole trial pool, from clients; "off" disables
+UP_BURST=256k
+PAID_CEIL=10gbit                   # above any port this VPS has: no cap
+CONN_LIMIT=150                     # new connections per trial address
+LEAF_QDISC=fq_codel                # fair sharing inside each class
+
+STATE_DIR=/etc/sovereign
+STATE_FILE=$STATE_DIR/trial.state
+CONF_FILE=$STATE_DIR/trial.conf
+
+die()  { echo "error: $*" >&2; exit 1; }
+info() { echo "sovrn-trial-net: $*"; }
+
+if [[ -f "$CONF_FILE" ]]; then
+    # Sourced as root, so it must be as trusted as this script.
+    owner="$(stat -c '%u' "$CONF_FILE")"
+    mode="$(stat -c '%a' "$CONF_FILE")"
+    [[ "$owner" == 0 ]] || die "$CONF_FILE must be owned by root"
+    (( (8#$mode & 8#022) == 0 )) || die "$CONF_FILE must not be group/world writable"
+    # shellcheck source=/dev/null
+    . "$CONF_FILE"
+fi
+
+# Missing state reads as "off": a broken install should drop trial traffic,
+# not let it through without limits.
+state() {
+    if [[ -f "$STATE_FILE" ]] && [[ "$(tr -d '[:space:]' < "$STATE_FILE")" == on ]]; then
+        echo on
+    else
+        echo off
+    fi
+}
+
+iface_present() { ip link show "$IFACE" >/dev/null 2>&1; }
+
+MANGLE=(-s "$TRIAL_NET" -m set --match-set "$RU_SET" dst -j MARK --set-mark "$FWMARK")
+JUMP=(-s "$TRIAL_NET" -j "$CHAIN")
+
+# ── firewall chain ───────────────────────────────────────────────────────────
+#
+# Rebuilt with iptables-restore --noflush: the ":CHAIN" line flushes and
+# refills it in one commit, so switching the kill switch never leaves a moment
+# with an empty chain that lets everything through.
+build_chain() {
+    local rules
+    if [[ "$(state)" == on ]]; then
+        rules="-A $CHAIN -d $CLIENT_NETS -j DROP
+-A $CHAIN -p tcp --dport 25 -j REJECT --reject-with tcp-reset
+-A $CHAIN -m conntrack --ctstate NEW -m connlimit --connlimit-above $CONN_LIMIT --connlimit-mask 32 -j REJECT
+-A $CHAIN -j RETURN"
+    else
+        rules="-A $CHAIN -j DROP"
+    fi
+    iptables-restore --noflush <<EOF
+*filter
+:$CHAIN - [0:0]
+$rules
+COMMIT
+EOF
+}
+
+chain_up() {
+    build_chain
+    # First in FORWARD: before `-i awg0 -j ACCEPT`, which would otherwise
+    # accept trial traffic unconditionally. Docker re-inserts its own jump to
+    # DOCKER-USER above this on restart; that chain returns non-Docker
+    # traffic, so the order still holds.
+    iptables -C FORWARD "${JUMP[@]}" 2>/dev/null || iptables -I FORWARD 1 "${JUMP[@]}"
+}
+
+chain_down() {
+    while iptables -C FORWARD "${JUMP[@]}" 2>/dev/null; do
+        iptables -D FORWARD "${JUMP[@]}"
+    done
+    if iptables -nL "$CHAIN" >/dev/null 2>&1; then
+        iptables -F "$CHAIN"
+        iptables -X "$CHAIN"
+    fi
+}
+
+# ── routing ──────────────────────────────────────────────────────────────────
+
+routing_up() {
+    ip addr replace "$TRIAL_GW" dev "$IFACE"
+    iptables -t mangle -C PREROUTING "${MANGLE[@]}" 2>/dev/null \
+        || iptables -t mangle -A PREROUTING "${MANGLE[@]}"
+    while ip rule del from "$TRIAL_NET" lookup "$TABLE" priority "$RULE_PRIO" 2>/dev/null; do :; done
+    ip rule add from "$TRIAL_NET" lookup "$TABLE" priority "$RULE_PRIO"
+}
+
+routing_down() {
+    while ip rule del from "$TRIAL_NET" lookup "$TABLE" priority "$RULE_PRIO" 2>/dev/null; do :; done
+    while iptables -t mangle -C PREROUTING "${MANGLE[@]}" 2>/dev/null; do
+        iptables -t mangle -D PREROUTING "${MANGLE[@]}"
+    done
+    if iface_present && ip -4 addr show dev "$IFACE" | grep -qF "inet $TRIAL_GW "; then
+        ip addr del "$TRIAL_GW" dev "$IFACE"
+    fi
+}
+
+# ── bandwidth ────────────────────────────────────────────────────────────────
+#
+# Towards clients: HTB on awg0. Paying clients fall into the default class,
+# whose ceiling is above anything the port can carry; trial addresses are
+# sorted into one class with the pool's ceiling. fq_codel in both shares
+# fairly between the flows inside a class.
+#
+# From clients: an ingress policer on awg0, trial sources only. Paying
+# clients pass the filter without matching it.
+
+tc_up() {
+    # Rebuilt from scratch: `tc qdisc replace` cannot change an existing HTB
+    # root ("Change operation not supported"), so a second `up` would fail.
+    tc_down
+    tc qdisc add dev "$IFACE" root handle 1: htb default 10
+    tc class add dev "$IFACE" parent 1: classid 1:1 htb rate "$PAID_CEIL" ceil "$PAID_CEIL" quantum 1514
+    tc class add dev "$IFACE" parent 1:1 classid 1:10 htb rate "$PAID_CEIL" ceil "$PAID_CEIL" prio 0 quantum 1514
+    tc class add dev "$IFACE" parent 1:1 classid 1:20 htb rate "$DOWN_RATE" ceil "$DOWN_RATE" prio 1 quantum 1514
+    tc qdisc add dev "$IFACE" parent 1:10 handle 10: "$LEAF_QDISC"
+    tc qdisc add dev "$IFACE" parent 1:20 handle 20: "$LEAF_QDISC"
+    tc filter add dev "$IFACE" parent 1: protocol ip prio 1 u32 \
+        match ip dst "$TRIAL_NET" flowid 1:20
+
+    [[ "$UP_RATE" == off ]] && return 0
+    tc qdisc add dev "$IFACE" handle ffff: ingress
+    tc filter add dev "$IFACE" parent ffff: protocol ip prio 1 u32 \
+        match ip src "$TRIAL_NET" police rate "$UP_RATE" burst "$UP_BURST" drop flowid :1
+}
+
+tc_down() {
+    iface_present || return 0
+    if tc qdisc show dev "$IFACE" | grep -q '^qdisc htb 1: root'; then
+        tc qdisc del dev "$IFACE" root
+    fi
+    if tc qdisc show dev "$IFACE" | grep -q '^qdisc ingress ffff:'; then
+        tc qdisc del dev "$IFACE" ingress
+    fi
+}
+
+# ── check ────────────────────────────────────────────────────────────────────
+
+check() {
+    local bad=0
+    ok()   { printf '  %-34s ok\n' "$1"; }
+    miss() { printf '  %-34s MISSING\n' "$1"; bad=1; }
+
+    echo "kill switch: trial traffic is $(state)"
+    ip -4 addr show dev "$IFACE" 2>/dev/null | grep -qF "inet $TRIAL_GW " \
+        && ok "address $TRIAL_GW on $IFACE" || miss "address $TRIAL_GW on $IFACE"
+    iptables -t mangle -C PREROUTING "${MANGLE[@]}" 2>/dev/null \
+        && ok "RU mark for $TRIAL_NET" || miss "RU mark for $TRIAL_NET"
+    ip rule show | grep -qE "^${RULE_PRIO}:[[:space:]]+from ${TRIAL_NET} lookup ${TABLE}" \
+        && ok "ip rule $RULE_PRIO -> table $TABLE" || miss "ip rule $RULE_PRIO -> table $TABLE"
+    ip route show table "$TABLE" 2>/dev/null | grep -q '^default' \
+        && ok "default route in table $TABLE" || miss "default route in table $TABLE (awg1)"
+    iptables -C FORWARD "${JUMP[@]}" 2>/dev/null \
+        && ok "FORWARD jump to $CHAIN" || miss "FORWARD jump to $CHAIN"
+    # The jump only protects anything if it comes before the blanket accept.
+    local jump_at accept_at
+    jump_at="$(iptables -S FORWARD | grep -nxF -- "-A FORWARD ${JUMP[*]}" | head -1 | cut -d: -f1)"
+    accept_at="$(iptables -S FORWARD | grep -nxF -- "-A FORWARD -i $IFACE -j ACCEPT" | head -1 | cut -d: -f1)"
+    if [[ -n "$jump_at" ]] && { [[ -z "$accept_at" ]] || (( jump_at < accept_at )); }; then
+        ok "$CHAIN before -i $IFACE ACCEPT"
+    else
+        miss "$CHAIN before -i $IFACE ACCEPT"
+    fi
+    local first
+    first="$(iptables -S "$CHAIN" 2>/dev/null | sed -n '2p')"
+    if [[ "$(state)" == off ]]; then
+        [[ "$first" == "-A $CHAIN -j DROP" ]] && ok "$CHAIN drops everything" || miss "$CHAIN drops everything"
+    else
+        [[ "$first" == "-A $CHAIN -d $CLIENT_NETS -j DROP" ]] && ok "$CHAIN limits" || miss "$CHAIN limits"
+    fi
+    tc filter show dev "$IFACE" parent 1: 2>/dev/null | grep -q 'flowid 1:20' \
+        && ok "download ceiling $DOWN_RATE" || miss "download ceiling $DOWN_RATE"
+    if [[ "$UP_RATE" == off ]]; then
+        printf '  %-34s disabled\n' "upload ceiling"
+    else
+        tc filter show dev "$IFACE" parent ffff: 2>/dev/null | grep -q 'police' \
+            && ok "upload ceiling $UP_RATE" || miss "upload ceiling $UP_RATE"
+    fi
+
+    if command -v awg >/dev/null 2>&1; then
+        local n
+        n="$(awg show "$IFACE" allowed-ips 2>/dev/null | awk '$2 ~ /^10\.88\.89\./' | wc -l)"
+        echo "trial peers on $IFACE: $n"
+    fi
+    return "$bad"
+}
+
+set_state() {
+    mkdir -p "$STATE_DIR"
+    local tmp
+    tmp="$(mktemp "$STATE_DIR/.trial.state.XXXXXX")"
+    echo "$1" > "$tmp"
+    chmod 0644 "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+    if iptables -nL "$CHAIN" >/dev/null 2>&1; then
+        build_chain
+    fi
+    info "trial traffic is $1"
+}
+
+case "${1:-}" in
+    up)
+        [[ $EUID -eq 0 ]] || die "run as root"
+        iface_present || die "$IFACE does not exist"
+        ipset list -n "$RU_SET" >/dev/null 2>&1 || die "ipset $RU_SET missing — is sov-split.service up?"
+        # Firewall first: the moment the route back exists, the limits must
+        # already be in place.
+        #
+        # Fail closed: if any step fails, take everything down again. A
+        # half-applied subnet — routed but without its ceiling, say — would
+        # carry trial traffic with none of the limits this script exists for;
+        # without the route back it carries nothing at all.
+        # An EXIT trap rather than ERR: under `set -e` a failure inside a
+        # function exits without running a non-inherited ERR trap.
+        applied=0
+        trap '[[ $applied -eq 1 ]] || { echo "sovrn-trial-net: up failed, removing what was applied" >&2; tc_down; routing_down; chain_down; }' EXIT
+        chain_up
+        routing_up
+        tc_up
+        applied=1
+        trap - EXIT
+        info "up (trial traffic is $(state))"
+        check
+        ;;
+    down)
+        [[ $EUID -eq 0 ]] || die "run as root"
+        # Reverse order: firewall goes last.
+        tc_down
+        routing_down
+        chain_down
+        info "down"
+        ;;
+    on|off)
+        [[ $EUID -eq 0 ]] || die "run as root"
+        set_state "$1"
+        ;;
+    check|status)
+        check
+        ;;
+    *)
+        echo "usage: sovrn-trial-net up|down|on|off|check" >&2
+        exit 2
+        ;;
+esac

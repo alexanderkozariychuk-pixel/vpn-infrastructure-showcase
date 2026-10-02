@@ -12,19 +12,24 @@ that an older `sudo` on another node had silently accepted.
 
 | Wrapper | Purpose | Validates |
 |---|---|---|
-| `pwa-add-peer` | add a client peer | key format, `/32` inside the client subnet, duplicate key, duplicate IP |
-| `pwa-del-peer` | remove a client peer | key format, peer exists, allowed-ips inside the client subnet |
+| `pwa-add-peer` | add a client peer | key format, `/32` inside a client subnet, duplicate key and IP in both the runtime and the config |
+| `pwa-del-peer` | remove a client peer | key format, peer exists, allowed-ips inside a client subnet |
+
+Client subnets: `10.88.88.0/24` for paying clients, `10.88.89.0/24` for
+trials (see `../trial/README.md`). Both add and remove write the config
+before touching the runtime and undo the config if the runtime refuses.
 | `pwa-awg-show` | read tunnel state | read-only |
 | `pwa-logs` | read service logs | read-only |
 
-Only `pwa-del-peer` is currently version-controlled here. The other three live
-on the nodes and should be brought into this directory — production code that
-exists in exactly one place, with no history, is one bad edit from being gone.
+`pwa-add-peer` and `pwa-del-peer` are version-controlled here. The two
+read-only wrappers still live only on the nodes and should be brought in too —
+production code that exists in exactly one place, with no history, is one bad
+edit from being gone.
 
 ## Installing
 
 ```bash
-sudo install -o root -g root -m 0755 pwa-del-peer /usr/local/bin/pwa-del-peer
+sudo install -o root -g root -m 0755 pwa-add-peer pwa-del-peer /usr/local/bin/
 ```
 
 Then extend the existing sudoers entry — as a drop-in, validated before it is
