@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stand-in for `awg` in the infrastructure tests. Peers live in $AWG_STATE as
+# "<pubkey> <allowed-ip>" lines. Covers exactly the calls the wrappers and the
+# trial scripts make; anything else fails loudly.
+set -euo pipefail
+state="${AWG_STATE:?AWG_STATE not set}"
+touch "$state"
+case "$1 ${3:-}" in
+    "show peers")       awk '{ print $1 }' "$state" ;;
+    "show allowed-ips") awk '{ printf "%s\t%s\n", $1, $2 }' "$state" ;;
+    "show ")            awk '{ printf "peer: %s\n  allowed ips: %s\n", $1, $2 }' "$state" ;;
+    "set peer")
+        key="$4"
+        if [[ "${5:-}" == remove ]]; then
+            grep -vF -- "$key " "$state" > "$state.tmp" || true
+            mv "$state.tmp" "$state"
+        else
+            [[ -z "${AWG_FAIL_SET:-}" ]] || { echo "fake awg: set refused" >&2; exit 1; }
+            [[ "$5" == preshared-key && "$7" == allowed-ips ]] || exit 9
+            echo "$key $8" >> "$state"
+        fi ;;
+    *) echo "fake awg: unsupported: $*" >&2; exit 9 ;;
+esac

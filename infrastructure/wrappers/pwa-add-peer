@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+#
+# pwa-add-peer — add one client peer to the entry node.
+#
+# Installed at /usr/local/bin/pwa-add-peer on the entry node, owned by root,
+# mode 0755. The portal reaches it as the restricted pwa-provisioner user
+# through a sudoers entry that permits this wrapper and nothing else.
+#
+# Called as: pwa-add-peer <pubkey> <psk> <client_ip>/32 <client_name>
+#
+# Same two rules as pwa-del-peer:
+#
+#   1. Re-validate every argument here. The caller is a web application; its
+#      checks are a convenience, this is the boundary.
+#   2. Config and runtime change together. The config is written first and
+#      put back if the runtime refuses, so a failure leaves neither a
+#      runtime-only peer (gone on reboot, invisible to the portal) nor a
+#      config-only one (appears on reboot with nobody expecting it).
+#      The version this replaces did it the other way round.
+#
+# Client subnets:
+#   10.88.88.0/24  paying clients
+#   10.88.89.0/24  trial clients (see sovrn-trial-net)
+#
+# Output is "ok: ..." on success and an error on stderr otherwise. The portal
+# matches "ip in use" to retry with the next address — keep that wording.
+# Exit codes: 2 bad argument, 3 duplicate, 4 node-side failure.
+
+set -euo pipefail
+
+IFACE=awg0
+CONF=/etc/amnezia/amneziawg/awg0.conf
+SUBNET_PREFIXES=("10.88.88." "10.88.89.")
+
+die() { echo "$1" >&2; exit "${2:-2}"; }
+
+[[ $# -eq 4 ]] || die "usage: pwa-add-peer <pubkey> <psk> <client_ip>/32 <client_name>"
+pubkey="$1"; psk="$2"; cip="$3"; name="$4"
+
+b64key='^[A-Za-z0-9+/]{43}=$'
+[[ "$pubkey" =~ $b64key ]] || die "bad pubkey"
+[[ "$psk"    =~ $b64key ]] || die "bad psk"
+
+host=""
+for prefix in "${SUBNET_PREFIXES[@]}"; do
+    if [[ "$cip" == "$prefix"* ]]; then
+        host="${cip#"$prefix"}"
+    fi
+done
+[[ -n "$host" ]] || die "ip must be in a client subnet: ${SUBNET_PREFIXES[*]} (X/32)"
+# No leading zeros: "10.88.88.042" would pass a numeric check and still be a
+# different string from the address the duplicate checks compare against.
+[[ "$host" =~ ^(0|[1-9][0-9]{0,2})/32$ ]] || die "ip must be X/32"
+octet="${host%/32}"
+(( octet >= 2 && octet <= 254 )) || die "ip octet out of range"
+
+[[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || die "bad name"
+
+[[ -f "$CONF" ]] || die "config not found: $CONF" 4
+
+# ── duplicates, in the runtime and in the file ───────────────────────────────
+#
+# Exact comparisons on whole fields. The old checks grepped regexes, where the
+# dots in an address match any character. The runtime is read once into a
+# variable: piping `awg show` into `grep -q` under pipefail can report "not
+# found" when grep exits early and awg dies of SIGPIPE.
+
+runtime_peers="$(awg show "$IFACE" peers)" || die "cannot read $IFACE peers" 4
+runtime_ips="$(awg show "$IFACE" allowed-ips)" || die "cannot read $IFACE allowed-ips" 4
+
+if grep -qxF -- "$pubkey" <<< "$runtime_peers" || grep -qF -- "$pubkey" "$CONF"; then
+    die "peer exists (key)" 3
+fi
+
+if awk -v ip="$cip" '{ for (i = 2; i <= NF; i++) if ($i == ip) found = 1 } END { exit !found }' \
+        <<< "$runtime_ips"; then
+    die "ip in use: $cip" 3
+fi
+if awk -v ip="$cip" '
+        /^[[:space:]]*AllowedIPs[[:space:]]*=/ {
+            v = $0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/[[:space:]]+$/, "", v)
+            n = split(v, a, /[[:space:]]*,[[:space:]]*/)
+            for (i = 1; i <= n; i++) if (a[i] == ip) found = 1
+        }
+        END { exit !found }' "$CONF"; then
+    die "ip in use: $cip (config only)" 3
+fi
+
+# ── config first, then runtime ───────────────────────────────────────────────
+
+backup="$(mktemp "${CONF}.add.XXXXXX")"
+pskfile="$(mktemp)"
+trap 'rm -f "$backup" "$pskfile"' EXIT
+
+cp -p "$CONF" "$backup"
+printf '%s\n' "$psk" > "$pskfile"
+
+# Block format is what pwa-del-peer parses: "### <name>" opens the block.
+printf '\n\n### %s\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s\n' \
+    "$name" "$pubkey" "$psk" "$cip" >> "$CONF"
+
+if ! awg set "$IFACE" peer "$pubkey" preshared-key "$pskfile" allowed-ips "$cip"; then
+    cat "$backup" > "$CONF"
+    die "runtime add failed; config restored" 4
+fi
+
+echo "ok: added $name ($cip)"
