@@ -238,7 +238,7 @@ def test_the_reset_limit_does_not_reveal_whether_an_address_is_registered(db, se
 # ── letters ───────────────────────────────────────────────────────────────
 
 def test_a_username_cannot_put_markup_into_a_letter():
-    _, html, _ = mailer.welcome_email('<a href="https://evil.test">pay</a>')
+    _, html, _ = mailer.welcome_email('<a href="https://evil.test">pay</a>', "https://example.com/verify?token=t")
     assert '<a href="https://evil.test">' not in html
     assert "&lt;a href=" in html
 

@@ -42,6 +42,8 @@ def _user(db, name):
     u = User(
         id=str(uuid.uuid4()), username=name, email=f"{name}@example.test",
         password_hash="x",
+        # Orders need a confirmed address (test_email_verification.py).
+        email_verified_at=NOW,
     )
     db.add(u)
     return u

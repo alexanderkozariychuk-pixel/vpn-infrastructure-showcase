@@ -11,6 +11,7 @@ from db.base import get_db
 from db.models import User, Payment
 from auth.jwt import hash_password, require_auth, require_admin
 from services.mailer import send_email, welcome_email
+from api.email_verify import issue_token, verify_url
 from services.subscriptions import has_active_subscription
 from services import ratelimit
 from services.net import resolve_source_ip
@@ -47,6 +48,11 @@ class RegisterRequest(BaseModel):
         if v.lower() in RESERVED:
             raise ValueError("This username is reserved")
         return v
+
+    @field_validator("lang")
+    @classmethod
+    def _lang(cls, v: str) -> str:
+        return v if v in ("ru", "en") else "ru"
 
     @field_validator("email")
     @classmethod
@@ -95,14 +101,17 @@ async def register(
         username=req.username,
         email=req.email,
         password_hash=hash_password(req.password),
+        lang=req.lang,
     )
+    token = issue_token(user)
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    # send welcome email (best-effort — never blocks registration)
+    # Welcome and confirmation in one letter (best-effort — never blocks
+    # registration; a lost letter is re-sent from the portal).
     try:
-        subject, html, text = welcome_email(user.username, req.lang)
+        subject, html, text = welcome_email(user.username, verify_url(token), user.lang)
         await send_email(user.email, subject, html, text)
     except Exception as e:
         logger.error("Welcome email failed for %s: %s", user.email, e)
@@ -175,6 +184,8 @@ async def get_me(
         "ok": True,
         "username": user.username,
         "email": user.email,
+        # Purchases need it; the portal shows a banner while it is false.
+        "email_verified": user.email_verified_at is not None,
         "is_subscribed": user.is_subscribed,
         # The plan key ("basic-1m"). The portal read it all along and never
         # got it, so every customer's plan showed as "no subscription".

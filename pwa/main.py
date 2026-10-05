@@ -27,6 +27,7 @@ from api.password_reset import router as password_reset_router
 from api.support import router as support_router
 from api.referral import router as referral_router
 from api.admin_promo import router as admin_promo_router
+from api.email_verify import router as email_verify_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
 app.add_middleware(
@@ -47,6 +48,7 @@ app.include_router(password_reset_router)
 app.include_router(support_router)
 app.include_router(referral_router)
 app.include_router(admin_promo_router)
+app.include_router(email_verify_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -73,6 +75,12 @@ async def app_page():
 @app.get("/reset")
 async def reset_page():
     # serves the same SPA; frontend reads ?token= and shows the reset form
+    return FileResponse("static/index.html")
+
+@app.get("/verify")
+async def verify_page():
+    # The confirmation link from the welcome letter. The page posts the token
+    # to /api/auth/verify-email; nothing is confirmed by the GET itself.
     return FileResponse("static/index.html")
 
 # Both must answer from the site root — a crawler looks for /robots.txt and

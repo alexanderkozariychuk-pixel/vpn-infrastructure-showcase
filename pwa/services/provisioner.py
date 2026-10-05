@@ -28,7 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from db.models import User, Config, Payment
 from config import plan_info
-from services import credit
+from services import credit, mailer
 
 logger = logging.getLogger(__name__)
 
@@ -370,6 +370,21 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
         payment.plan, user.username, user.subscribed_until.date(),
         "renewal" if existing else "first purchase",
     )
+
+    # The receipt. After the commit, so a letter never announces an
+    # activation that was rolled back; scheduled rather than awaited, so the
+    # gateway's callback is answered without waiting on the mail service.
+    # Only this path sends it, and it runs once per payment: both callbacks
+    # return early for a payment already marked paid.
+    try:
+        subject, html, text = mailer.payment_email(
+            user.username, info["tier"], info["days"], int(payment.amount),
+            payment.currency or "RUB", user.subscribed_until,
+            first=not existing, lang=user.lang or "ru",
+        )
+        mailer.send_later(user.email, subject, html, text)
+    except Exception as e:
+        logger.error("Receipt for payment %s not sent: %s", payment.id, e)
     return True
 
 

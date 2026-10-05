@@ -29,6 +29,7 @@ from db.base import get_db
 from db.models import User
 from auth.jwt import hash_password
 from services.mailer import send_email, password_reset_email
+from api.email_verify import mark_verified
 from services import ratelimit
 from services.net import resolve_source_ip
 
@@ -124,6 +125,9 @@ async def reset_password(
     user.password_hash = hash_password(req.new_password)
     user.reset_token = None
     user.reset_expires = None
+    # The link came from a letter to this address, so the address is theirs.
+    if user.email_verified_at is None:
+        mark_verified(user)
     await db.commit()
 
     logger.info("Password reset completed for user %s", user.username)

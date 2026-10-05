@@ -118,5 +118,13 @@ RESET_PER_IP = Limiter(limit=10, window=60 * 60)
 # Support tickets are letters to our own inbox, through the same sending quota.
 SUPPORT_PER_IP = Limiter(limit=5, window=60 * 60)
 
+# Email confirmation. Submitting a token: as with reset, guessing 256 bits is
+# not the threat, hammering is. Asking for a new letter: per account and per
+# address, since each request is a letter to the account's inbox.
+VERIFY_PER_IP = Limiter(limit=20, window=60 * 60)
+VERIFY_RESEND = Limiter(limit=3, window=60 * 60)
+VERIFY_RESEND_PER_IP = Limiter(limit=10, window=60 * 60)
+
 ALL = (LOGIN_PER_IP, LOGIN_FAILS, REGISTER_PER_IP,
-       FORGOT_PER_IP, FORGOT_PER_EMAIL, RESET_PER_IP, SUPPORT_PER_IP)
+       FORGOT_PER_IP, FORGOT_PER_EMAIL, RESET_PER_IP, SUPPORT_PER_IP,
+       VERIFY_PER_IP, VERIFY_RESEND, VERIFY_RESEND_PER_IP)
