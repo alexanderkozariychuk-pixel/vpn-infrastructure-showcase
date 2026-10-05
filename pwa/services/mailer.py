@@ -10,6 +10,8 @@ request path, so a mail outage can't break registration/payment/etc.
 """
 import os
 import logging
+from html import escape
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,12 @@ async def send_email(to: str, subject: str, body_html: str, body_text: str = "")
 
 
 # ── Email templates (RU / EN) ────────────────────────────────────────
+#
+# Everything that came from a request is escaped before it goes into HTML.
+# The welcome letter used to put the username in raw, and registration took
+# any username and any address: one request made support@sov3r3ign.com send
+# a stranger a letter with someone else's markup and links in it. Escaping
+# here holds even if a field's own validation is ever loosened.
 
 def _wrap(inner_html: str) -> str:
     """Shared dark-themed wrapper matching the portal aesthetic."""
@@ -70,10 +78,11 @@ def _wrap(inner_html: str) -> str:
 
 def welcome_email(username: str, lang: str = "ru") -> tuple[str, str, str]:
     """Returns (subject, body_html, body_text) for a registration welcome."""
+    name = escape(username)
     if lang == "en":
         subject = "Welcome to Sovereign"
         inner = f"""\
-        <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Welcome, {username}</p>
+        <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Welcome, {name}</p>
         <p style="margin:0 0 16px">Your Sovereign account has been created successfully.</p>
         <p style="margin:0 0 16px">You can now sign in to the portal, choose a plan, and get your personal connection config.</p>
         <p style="margin:0;color:#7a9fb5;font-size:13px">If you didn't create this account, you can safely ignore this message.</p>"""
@@ -81,7 +90,7 @@ def welcome_email(username: str, lang: str = "ru") -> tuple[str, str, str]:
     else:
         subject = "Добро пожаловать в Sovereign"
         inner = f"""\
-        <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Здравствуйте, {username}</p>
+        <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Здравствуйте, {name}</p>
         <p style="margin:0 0 16px">Ваш аккаунт Sovereign успешно создан.</p>
         <p style="margin:0 0 16px">Теперь вы можете войти в портал, выбрать тариф и получить персональный конфиг для подключения.</p>
         <p style="margin:0;color:#7a9fb5;font-size:13px">Если вы не создавали этот аккаунт, просто проигнорируйте это письмо.</p>"""
@@ -91,12 +100,13 @@ def welcome_email(username: str, lang: str = "ru") -> tuple[str, str, str]:
 
 def password_reset_email(reset_url: str, lang: str = "ru") -> tuple[str, str, str]:
     """Returns (subject, body_html, body_text) for a password reset."""
+    href = escape(reset_url, quote=True)
     if lang == "en":
         subject = "Reset your Sovereign password"
         inner = f"""\
         <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Password reset</p>
         <p style="margin:0 0 16px">We received a request to reset your password. Click the button below to set a new one. This link expires in 1 hour.</p>
-        <p style="margin:24px 0"><a href="{reset_url}" style="background:#00d4ff;color:#080c0f;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Reset password</a></p>
+        <p style="margin:24px 0"><a href="{href}" style="background:#00d4ff;color:#080c0f;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Reset password</a></p>
         <p style="margin:0;color:#7a9fb5;font-size:13px">If you didn't request this, you can safely ignore this message — your password won't change.</p>"""
         text = f"Reset your Sovereign password: {reset_url} (expires in 1 hour). If you didn't request this, ignore this email."
     else:
@@ -104,7 +114,7 @@ def password_reset_email(reset_url: str, lang: str = "ru") -> tuple[str, str, st
         inner = f"""\
         <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">Сброс пароля</p>
         <p style="margin:0 0 16px">Мы получили запрос на сброс пароля. Нажмите кнопку ниже чтобы задать новый. Ссылка действительна 1 час.</p>
-        <p style="margin:24px 0"><a href="{reset_url}" style="background:#00d4ff;color:#080c0f;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Сбросить пароль</a></p>
+        <p style="margin:24px 0"><a href="{href}" style="background:#00d4ff;color:#080c0f;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600">Сбросить пароль</a></p>
         <p style="margin:0;color:#7a9fb5;font-size:13px">Если вы не запрашивали сброс, проигнорируйте это письмо — пароль не изменится.</p>"""
         text = f"Сброс пароля Sovereign: {reset_url} (действует 1 час). Если вы не запрашивали — проигнорируйте."
     return subject, _wrap(inner), text
@@ -114,13 +124,13 @@ def support_ticket_email(category: str, details: dict, user_email: str) -> tuple
     """Returns (subject, body_html, body_text) for a support ticket (to support inbox)."""
     subject = f"[Support] {category}"
     rows = "".join(
-        f'<p style="margin:0 0 8px"><b style="color:#7a9fb5">{k}:</b> {v}</p>'
+        f'<p style="margin:0 0 8px"><b style="color:#7a9fb5">{escape(str(k))}:</b> {escape(str(v))}</p>'
         for k, v in details.items() if v
     )
     inner = f"""\
         <p style="margin:0 0 16px;font-size:18px;color:#e8f4ff">New support request</p>
-        <p style="margin:0 0 8px"><b style="color:#7a9fb5">Category:</b> {category}</p>
+        <p style="margin:0 0 8px"><b style="color:#7a9fb5">Category:</b> {escape(category)}</p>
         {rows}
-        <p style="margin:16px 0 0"><b style="color:#7a9fb5">From:</b> {user_email}</p>"""
+        <p style="margin:16px 0 0"><b style="color:#7a9fb5">From:</b> {escape(user_email)}</p>"""
     text = f"New support request. Category: {category}. From: {user_email}. Details: {details}"
     return subject, _wrap(inner), text

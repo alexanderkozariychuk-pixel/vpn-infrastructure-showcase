@@ -3,14 +3,21 @@ api/support.py — support ticket submission.
 
 Receives a structured support request from the portal form and emails it
 to the support inbox. No auth required (users may be logged out / pre-sub).
+
+Limited per address, with capped field lengths. Every ticket is a letter sent
+through the same Resend account as the confirmation and reset letters, so a
+script posting here could otherwise use up the sending quota and stop those
+from going out.
 """
 import os
 import logging
 
-from fastapi import APIRouter
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, EmailStr, Field
 
 from services.mailer import send_email, support_ticket_email
+from services import ratelimit
+from services.net import resolve_source_ip
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,20 +34,21 @@ CATEGORY_LABELS = {
 
 
 class SupportTicket(BaseModel):
-    issue_type: str
-    os: str | None = None
-    service: str | None = None
-    details: str | None = None
+    issue_type: str = Field(max_length=32)
+    os: str | None = Field(default=None, max_length=100)
+    service: str | None = Field(default=None, max_length=200)
+    details: str | None = Field(default=None, max_length=4000)
     email: EmailStr
 
 
 @router.post("/api/support/ticket")
-async def submit_ticket(ticket: SupportTicket):
+async def submit_ticket(ticket: SupportTicket, request: Request):
     """
     Accept a support ticket and email it to the support inbox.
     Always returns ok — the user's success screen shouldn't depend on
     mail delivery, and we don't want to leak internal failures.
     """
+    ratelimit.take(ratelimit.SUPPORT_PER_IP, resolve_source_ip(request))
     category = CATEGORY_LABELS.get(ticket.issue_type, ticket.issue_type)
 
     details = {

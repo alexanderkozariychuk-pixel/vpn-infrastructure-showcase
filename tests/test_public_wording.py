@@ -27,6 +27,11 @@ STATIC = Path(__file__).resolve().parents[1] / "pwa" / "static"
 # listed so a new page is covered the day it is added.
 SERVED = sorted(STATIC.glob("*.html")) + [STATIC / "icons" / "manifest.json"]
 
+# Letters are public text too: they land in customers' inboxes, and a
+# moderator who signs up to test the site reads them. Their templates live in
+# the mailer module, so its whole source is held to the same vocabulary.
+SERVED.append(STATIC.parent / "services" / "mailer.py")
+
 # Case-insensitive. Deliberately narrow: "заблокировать промокод" in the terms
 # is ordinary language, and "VPN" is what the phone's own permission prompt
 # says, so the setup guide has to use it.

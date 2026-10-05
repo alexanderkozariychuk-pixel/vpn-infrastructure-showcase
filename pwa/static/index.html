@@ -1347,7 +1347,8 @@
     </div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
-      <input type="text" id="reg-user" placeholder="username" autocomplete="username">
+      <input type="text" id="reg-user" placeholder="username" autocomplete="username"
+        maxlength="27" autocapitalize="off" spellcheck="false">
     </div>
     <div class="field">
       <label data-i18n="label-email">Email</label>
@@ -1355,7 +1356,7 @@
     </div>
     <div class="field">
       <label data-i18n="label-password">Password</label>
-      <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password">
+      <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password" minlength="8">
     </div>
     <div class="field">
       <label data-i18n="label-confirm">Confirm Password</label>
@@ -1991,6 +1992,10 @@ const translations = {
     'dev-created': 'Device added. Its file is below.',
     'dev-err-name': 'Up to 6 characters: Latin letters, digits, - and _.',
     'dev-err-limit': 'Your plan has no free device slots left.',
+    'auth-err-username': 'Username: 3–27 characters — Latin letters, digits, - and _.',
+    'auth-err-password': 'Password must be at least 8 characters.',
+    'auth-err-taken': 'This username or email is already registered.',
+    'auth-err-wait': 'Too many attempts. Try again in {m} min.',
     'dev-err-provision': 'Could not create the device right now. Try again in a minute, or write to support.',
     'dev-err-generic': 'Something went wrong. Try again.',
     'nav-support': 'Support',
@@ -2274,6 +2279,10 @@ const translations = {
     'dev-created': 'Устройство добавлено. Его файл — ниже.',
     'dev-err-name': 'До 6 символов: латиница, цифры, «-» и «_».',
     'dev-err-limit': 'Свободных мест для устройств в тарифе не осталось.',
+    'auth-err-username': 'Логин: 3–27 символов — латиница, цифры, «-» и «_».',
+    'auth-err-password': 'Пароль должен быть не короче 8 символов.',
+    'auth-err-taken': 'Этот логин или email уже зарегистрирован.',
+    'auth-err-wait': 'Слишком много попыток. Попробуйте через {m} мин.',
     'dev-err-provision': 'Не получилось создать устройство. Попробуйте через минуту или напишите в поддержку.',
     'dev-err-generic': 'Что-то пошло не так. Попробуйте ещё раз.',
     'nav-support': 'Техподдержка',
@@ -3133,13 +3142,17 @@ function showForgotPrompt() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.trim(), lang: currentLang })
   })
-  .then(r => r.json())
+  .then(r => {
+    if (r.status === 429) { alert(waitText(r)); throw null; }
+    return r.json();
+  })
   .then(() => {
     alert(currentLang === 'ru'
       ? 'Если этот email зарегистрирован, ссылка для сброса отправлена. Проверьте почту.'
       : 'If that email is registered, a reset link has been sent. Check your inbox.');
   })
-  .catch(() => {
+  .catch(e => {
+    if (e === null) return;  // a 429, already explained
     alert(currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.');
   });
 }
@@ -3175,6 +3188,7 @@ function doReset() {
     body: JSON.stringify({ token: resetToken, new_password: pass })
   })
   .then(async r => {
+    if (r.status === 429) { errEl.textContent = waitText(r); return; }
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Reset failed');
     okEl.textContent = currentLang === 'ru'
@@ -3229,6 +3243,16 @@ function showPage(panel, page) {
 
 // ── AUTH ─────────────────────────────────────────
 
+// Same rule as the server (api/register.py): the username becomes the device
+// name on the node, which takes only these characters.
+const USERNAME_RE = /^[A-Za-z0-9_-]{3,27}$/;
+
+// A 429 says how long to wait in Retry-After (seconds).
+function waitText(res) {
+  const s = parseInt(res.headers.get('Retry-After') || '0', 10) || 60;
+  return t('auth-err-wait').replace('{m}', Math.max(1, Math.ceil(s / 60)));
+}
+
 async function doRegister() {
   const username = document.getElementById('reg-user').value.trim();
   const email = document.getElementById('reg-email').value.trim();
@@ -3241,8 +3265,9 @@ async function doRegister() {
   ok.textContent = '';
 
   if (!username || !email || !password) { err.textContent = 'Fill in all fields'; return; }
+  if (!USERNAME_RE.test(username)) { err.textContent = t('auth-err-username'); return; }
+  if (password.length < 8) { err.textContent = t('auth-err-password'); return; }
   if (password !== password2) { err.textContent = 'Passwords do not match'; return; }
-  if (password.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
 
   btn.disabled = true;
   btn.textContent = 'Creating account...';
@@ -3252,15 +3277,23 @@ async function doRegister() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({username, email, password})
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.status === 201) {
       ok.textContent = 'Account created! Redirecting...';
       setTimeout(() => {
         document.getElementById('inp-user').value = username;
         showView('login', 'client');
       }, 1500);
+    } else if (res.status === 429) {
+      err.textContent = waitText(res);
+    } else if (res.status === 409) {
+      err.textContent = t('auth-err-taken');
+    } else if (res.status === 422) {
+      // FastAPI's 422 detail is a list of objects, not a sentence.
+      const where = JSON.stringify(data.detail || '');
+      err.textContent = where.includes('password') ? t('auth-err-password') : t('auth-err-username');
     } else {
-      err.textContent = data.detail || 'Registration failed';
+      err.textContent = (typeof data.detail === 'string' && data.detail) || 'Registration failed';
     }
   } catch(e) {
     err.textContent = 'Connection error';
@@ -3283,6 +3316,12 @@ async function doLogin() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({username, password})
     });
+    if (res.status === 429) {
+      err.textContent = waitText(res);
+      btn.disabled = false;
+      btn.textContent = 'Authenticate';
+      return;
+    }
     const data = await res.json();
     if (data.access_token) {
       token = data.access_token;
