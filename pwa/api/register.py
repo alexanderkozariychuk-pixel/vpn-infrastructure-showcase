@@ -1,26 +1,65 @@
 import asyncio
+import os
+import re
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from db.base import get_db
 from db.models import User, Payment
 from auth.jwt import hash_password, require_auth, require_admin
 from services.mailer import send_email, welcome_email
+from api.email_verify import issue_token, verify_url
 from services.subscriptions import has_active_subscription
+from services import ratelimit
+from services.net import resolve_source_ip
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# The username becomes part of a peer name on the entry node: a paid device is
+# issued as "auto-<username>", and pwa-add-peer accepts [A-Za-z0-9_-]{1,32}.
+# Anything wider here registers fine, takes the money and then fails to get a
+# device — so the rule is the wrapper's alphabet, and 27 = 32 - len("auto-").
+# It also keeps markup out of the name before it is ever put in a letter.
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]{3,27}$")
+PASSWORD_MIN = 8
+PASSWORD_MAX = 128
+# Names that would read as the operator. Compared without case.
+RESERVED = {os.getenv("ADMIN_USERNAME", "admin").lower(), "admin", "root",
+            "support", "sovereign", "sovrn"}
+
+
 class RegisterRequest(BaseModel):
     username: str
     email: EmailStr
-    password: str
+    password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
     lang: str = "ru"
+
+    @field_validator("username")
+    @classmethod
+    def _username(cls, v: str) -> str:
+        if not USERNAME_RE.fullmatch(v):
+            raise ValueError("3-27 characters: Latin letters, digits, - and _")
+        if v.lower() in RESERVED:
+            raise ValueError("This username is reserved")
+        return v
+
+    @field_validator("lang")
+    @classmethod
+    def _lang(cls, v: str) -> str:
+        return v if v in ("ru", "en") else "ru"
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        # One mailbox, one account: "Ivan@x.ru" and "ivan@x.ru" are the same
+        # inbox to every provider a customer is likely to use.
+        return v.lower()
 
 
 class UserResponse(BaseModel):
@@ -45,26 +84,34 @@ class AssignPeerRequest(BaseModel):
 @router.post("/api/client/register", response_model=UserResponse, status_code=201)
 async def register(
     req: RegisterRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.username == req.username))
+    ratelimit.take(ratelimit.REGISTER_PER_IP, resolve_source_ip(request))
+
+    result = await db.execute(
+        select(User).where(func.lower(User.username) == req.username.lower())
+    )
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail=f"Username '{req.username}' already exists")
-    result = await db.execute(select(User).where(User.email == req.email))
+        raise HTTPException(status_code=409, detail="Username already exists")
+    result = await db.execute(select(User).where(func.lower(User.email) == req.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail=f"Email already registered")
     user = User(
         username=req.username,
         email=req.email,
         password_hash=hash_password(req.password),
+        lang=req.lang,
     )
+    token = issue_token(user)
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    # send welcome email (best-effort — never blocks registration)
+    # Welcome and confirmation in one letter (best-effort — never blocks
+    # registration; a lost letter is re-sent from the portal).
     try:
-        subject, html, text = welcome_email(user.username, req.lang)
+        subject, html, text = welcome_email(user.username, verify_url(token), user.lang)
         await send_email(user.email, subject, html, text)
     except Exception as e:
         logger.error("Welcome email failed for %s: %s", user.email, e)
@@ -137,6 +184,8 @@ async def get_me(
         "ok": True,
         "username": user.username,
         "email": user.email,
+        # Purchases need it; the portal shows a banner while it is false.
+        "email_verified": user.email_verified_at is not None,
         "is_subscribed": user.is_subscribed,
         # The plan key ("basic-1m"). The portal read it all along and never
         # got it, so every customer's plan showed as "no subscription".

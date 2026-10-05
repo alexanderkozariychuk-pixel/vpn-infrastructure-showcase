@@ -604,6 +604,23 @@
     }
 
     .btn-sm:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+    /* Shown above every client page while the address is unconfirmed. */
+    .verify-banner {
+      display: none;
+      align-items: center; gap: 12px 16px; flex-wrap: wrap;
+      border: 1px solid var(--yellow);
+      background: rgba(255, 208, 77, 0.06);
+      padding: 14px 18px; margin-bottom: 24px;
+      font-size: 14px; line-height: 1.5;
+    }
+    .verify-banner.show { display: flex; }
+    .verify-banner .vb-text { flex: 1 1 260px; }
+    .verify-banner .vb-text b { color: var(--text-bright); font-weight: 600; word-break: break-all; }
+    .verify-banner .vb-note { flex-basis: 100%; font-size: 13px; color: var(--text-dim); min-height: 0; }
+    /* On a phone the menu and language buttons are fixed to the top corners;
+       the page title steps aside for them, the banner goes below them. */
+    @media (max-width: 720px) { .verify-banner { margin-top: 56px; } }
     .btn-sm.danger:hover { border-color: var(--red); color: var(--red); }
 
     /* ADMIN ANALYZE */
@@ -1335,6 +1352,17 @@
   </div>
 </div>
 
+<div id="view-verify" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-title"><span class="plain" data-i18n="verify-title-1">Email</span><span data-i18n="verify-title-2"> confirmation</span></div>
+    </div>
+    <div class="login-ok" id="verify-ok"></div>
+    <div class="login-error" id="verify-error"></div>
+    <button class="btn-full" onclick="leaveVerify()" data-i18n="verify-go">Go to my account</button>
+  </div>
+</div>
+
 
 <!-- ═══════════════════════════════════════════
      REGISTER
@@ -1347,7 +1375,8 @@
     </div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
-      <input type="text" id="reg-user" placeholder="username" autocomplete="username">
+      <input type="text" id="reg-user" placeholder="username" autocomplete="username"
+        maxlength="27" autocapitalize="off" spellcheck="false">
     </div>
     <div class="field">
       <label data-i18n="label-email">Email</label>
@@ -1355,7 +1384,7 @@
     </div>
     <div class="field">
       <label data-i18n="label-password">Password</label>
-      <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password">
+      <input type="password" id="reg-pass" placeholder="••••••••" autocomplete="new-password" minlength="8">
     </div>
     <div class="field">
       <label data-i18n="label-confirm">Confirm Password</label>
@@ -1413,6 +1442,12 @@
     </aside>
 
     <main class="main-content">
+
+      <div class="verify-banner" id="verify-banner" role="status">
+        <div class="vb-text"><span data-i18n="vb-text">Confirm your email to buy a plan. The link was sent to</span> <b id="vb-email"></b></div>
+        <button class="btn-sm" id="vb-resend" onclick="resendVerification()" data-i18n="vb-resend">Send again</button>
+        <div class="vb-note" id="vb-note"></div>
+      </div>
 
       <!-- OVERVIEW -->
       
@@ -1991,6 +2026,21 @@ const translations = {
     'dev-created': 'Device added. Its file is below.',
     'dev-err-name': 'Up to 6 characters: Latin letters, digits, - and _.',
     'dev-err-limit': 'Your plan has no free device slots left.',
+    'auth-err-username': 'Username: 3–27 characters — Latin letters, digits, - and _.',
+    'auth-err-password': 'Password must be at least 8 characters.',
+    'auth-err-taken': 'This username or email is already registered.',
+    'auth-err-wait': 'Too many attempts. Try again in {m} min.',
+    'reg-sent': 'Account created. We sent a confirmation link to {e}.',
+    'vb-text': 'Confirm your email to buy a plan. The link was sent to',
+    'vb-resend': 'Send again',
+    'vb-sent': 'Sent. Check your inbox and the spam folder.',
+    'vb-already': 'Your email is already confirmed.',
+    'pay-need-verify': 'Confirm your email first — the link is in the letter we sent after registration.',
+    'verify-title-1': 'Email', 'verify-title-2': ' confirmation',
+    'verify-wait': 'Confirming…',
+    'verify-ok': 'Email confirmed. You can buy a plan now.',
+    'verify-bad': 'This link has already been used or has expired. Sign in — you can request a new one in your account.',
+    'verify-go': 'Go to my account',
     'dev-err-provision': 'Could not create the device right now. Try again in a minute, or write to support.',
     'dev-err-generic': 'Something went wrong. Try again.',
     'nav-support': 'Support',
@@ -2274,6 +2324,21 @@ const translations = {
     'dev-created': 'Устройство добавлено. Его файл — ниже.',
     'dev-err-name': 'До 6 символов: латиница, цифры, «-» и «_».',
     'dev-err-limit': 'Свободных мест для устройств в тарифе не осталось.',
+    'auth-err-username': 'Логин: 3–27 символов — латиница, цифры, «-» и «_».',
+    'auth-err-password': 'Пароль должен быть не короче 8 символов.',
+    'auth-err-taken': 'Этот логин или email уже зарегистрирован.',
+    'auth-err-wait': 'Слишком много попыток. Попробуйте через {m} мин.',
+    'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
+    'vb-text': 'Подтвердите почту, чтобы оформить тариф. Ссылка отправлена на',
+    'vb-resend': 'Отправить ещё раз',
+    'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
+    'vb-already': 'Почта уже подтверждена.',
+    'pay-need-verify': 'Сначала подтвердите почту — ссылка в письме, которое пришло после регистрации.',
+    'verify-title-1': 'Подтверждение', 'verify-title-2': ' почты',
+    'verify-wait': 'Подтверждаем…',
+    'verify-ok': 'Почта подтверждена. Теперь можно оформить тариф.',
+    'verify-bad': 'Ссылка уже использована или устарела. Войдите — в кабинете можно запросить новую.',
+    'verify-go': 'Перейти в кабинет',
     'dev-err-provision': 'Не получилось создать устройство. Попробуйте через минуту или напишите в поддержку.',
     'dev-err-generic': 'Что-то пошло не так. Попробуйте ещё раз.',
     'nav-support': 'Техподдержка',
@@ -2575,6 +2640,45 @@ function toggleLang() {
 (function initLang() {
   const saved = localStorage.getItem('sov_lang') || 'ru';
   currentLang = saved;
+})();
+
+// /verify?token= — the link from the welcome letter. The token is posted,
+// never acted on by the page load itself, and then removed from the address
+// bar so it is not left in history or shared by accident.
+async function runVerify(tok) {
+  showView('verify');
+  applyTranslations();
+  const ok = document.getElementById('verify-ok');
+  const err = document.getElementById('verify-error');
+  ok.textContent = t('verify-wait');
+  history.replaceState(null, '', '/verify');
+  try {
+    const res = await fetch(`${API}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: tok}),
+    });
+    ok.textContent = '';
+    if (res.ok) { ok.textContent = t('verify-ok'); return; }
+    err.textContent = res.status === 429 ? waitText(res) : t('verify-bad');
+  } catch (e) {
+    ok.textContent = '';
+    err.textContent = currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.';
+  }
+}
+
+function leaveVerify() {
+  window.location.href = '/app';
+}
+
+(function initVerifyCheck() {
+  const tok = new URLSearchParams(window.location.search).get('token');
+  if (!tok || window.location.pathname !== '/verify') return;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => runVerify(tok));
+  } else {
+    runVerify(tok);
+  }
 })();
 
 // on load: show reset view if arriving via /reset?token=
@@ -3003,7 +3107,12 @@ async function startPayment() {
       window.location.href = d.url;
       return;
     }
-    if (out) out.textContent = (d.detail ? (t('pay-error') + ': ' + d.detail) : t('pay-error'));
+    if (res.status === 403 && d.detail === 'email_not_verified') {
+      if (out) out.textContent = t('pay-need-verify');
+      loadClientMe();
+    } else if (out) {
+      out.textContent = (d.detail ? (t('pay-error') + ': ' + d.detail) : t('pay-error'));
+    }
   } catch(e) {
     if (out) out.textContent = t('pay-error');
   }
@@ -3133,13 +3242,17 @@ function showForgotPrompt() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.trim(), lang: currentLang })
   })
-  .then(r => r.json())
+  .then(r => {
+    if (r.status === 429) { alert(waitText(r)); throw null; }
+    return r.json();
+  })
   .then(() => {
     alert(currentLang === 'ru'
       ? 'Если этот email зарегистрирован, ссылка для сброса отправлена. Проверьте почту.'
       : 'If that email is registered, a reset link has been sent. Check your inbox.');
   })
-  .catch(() => {
+  .catch(e => {
+    if (e === null) return;  // a 429, already explained
     alert(currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.');
   });
 }
@@ -3175,6 +3288,7 @@ function doReset() {
     body: JSON.stringify({ token: resetToken, new_password: pass })
   })
   .then(async r => {
+    if (r.status === 429) { errEl.textContent = waitText(r); return; }
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Reset failed');
     okEl.textContent = currentLang === 'ru'
@@ -3229,6 +3343,16 @@ function showPage(panel, page) {
 
 // ── AUTH ─────────────────────────────────────────
 
+// Same rule as the server (api/register.py): the username becomes the device
+// name on the node, which takes only these characters.
+const USERNAME_RE = /^[A-Za-z0-9_-]{3,27}$/;
+
+// A 429 says how long to wait in Retry-After (seconds).
+function waitText(res) {
+  const s = parseInt(res.headers.get('Retry-After') || '0', 10) || 60;
+  return t('auth-err-wait').replace('{m}', Math.max(1, Math.ceil(s / 60)));
+}
+
 async function doRegister() {
   const username = document.getElementById('reg-user').value.trim();
   const email = document.getElementById('reg-email').value.trim();
@@ -3241,8 +3365,9 @@ async function doRegister() {
   ok.textContent = '';
 
   if (!username || !email || !password) { err.textContent = 'Fill in all fields'; return; }
+  if (!USERNAME_RE.test(username)) { err.textContent = t('auth-err-username'); return; }
+  if (password.length < 8) { err.textContent = t('auth-err-password'); return; }
   if (password !== password2) { err.textContent = 'Passwords do not match'; return; }
-  if (password.length < 6) { err.textContent = 'Password must be at least 6 characters'; return; }
 
   btn.disabled = true;
   btn.textContent = 'Creating account...';
@@ -3250,17 +3375,25 @@ async function doRegister() {
     const res = await fetch(`${API}/api/client/register`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, email, password})
+      body: JSON.stringify({username, email, password, lang: currentLang})
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (res.status === 201) {
-      ok.textContent = 'Account created! Redirecting...';
+      ok.textContent = t('reg-sent').replace('{e}', email);
       setTimeout(() => {
         document.getElementById('inp-user').value = username;
         showView('login', 'client');
-      }, 1500);
+      }, 4000);
+    } else if (res.status === 429) {
+      err.textContent = waitText(res);
+    } else if (res.status === 409) {
+      err.textContent = t('auth-err-taken');
+    } else if (res.status === 422) {
+      // FastAPI's 422 detail is a list of objects, not a sentence.
+      const where = JSON.stringify(data.detail || '');
+      err.textContent = where.includes('password') ? t('auth-err-password') : t('auth-err-username');
     } else {
-      err.textContent = data.detail || 'Registration failed';
+      err.textContent = (typeof data.detail === 'string' && data.detail) || 'Registration failed';
     }
   } catch(e) {
     err.textContent = 'Connection error';
@@ -3283,6 +3416,12 @@ async function doLogin() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({username, password})
     });
+    if (res.status === 429) {
+      err.textContent = waitText(res);
+      btn.disabled = false;
+      btn.textContent = 'Authenticate';
+      return;
+    }
     const data = await res.json();
     if (data.access_token) {
       token = data.access_token;
@@ -3604,6 +3743,39 @@ function renderMe(d) {
     statEl.className = 'metric-value ' + (active ? 'green' : 'red');
   }
   if (expEl) expEl.textContent = fmtDate(d.subscribed_until) || '—';
+  renderVerifyBanner(d);
+}
+
+// Older servers do not send email_verified: show nothing rather than a
+// banner nobody can clear.
+function renderVerifyBanner(d) {
+  const b = document.getElementById('verify-banner');
+  if (!b) return;
+  const show = d && d.email_verified === false;
+  b.classList.toggle('show', show);
+  if (show) document.getElementById('vb-email').textContent = d.email || '';
+}
+
+async function resendVerification() {
+  const btn = document.getElementById('vb-resend');
+  const note = document.getElementById('vb-note');
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/api/auth/resend-verification`, {method: 'POST', headers: hdrs()});
+    if (res.status === 401) { doLogout(); return; }
+    if (res.status === 429) { note.textContent = waitText(res); return; }
+    const d = await res.json();
+    if (d.already_verified) {
+      note.textContent = t('vb-already');
+      loadClientMe();
+    } else {
+      note.textContent = t('vb-sent');
+    }
+  } catch (e) {
+    note.textContent = currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function loadClientMe() {

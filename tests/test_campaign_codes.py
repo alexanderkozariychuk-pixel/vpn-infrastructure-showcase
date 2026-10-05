@@ -38,8 +38,9 @@ ADMIN = {"sub": "admin", "role": "admin"}
 
 
 def _user(db, name):
+    # Orders need a confirmed address (test_email_verification.py).
     u = User(id=str(uuid.uuid4()), username=name, email=f"{name}@example.test",
-             password_hash="x")
+             password_hash="x", email_verified_at=datetime.now(timezone.utc))
     db.add(u)
     return u
 

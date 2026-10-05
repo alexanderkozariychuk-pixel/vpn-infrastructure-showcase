@@ -19,6 +19,15 @@ class User(Base):
     subscribed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reset_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Mailbox ownership. Set once a link from a letter sent to `email` has been
+    # opened (or a password reset through it completed). Purchases need it.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SHA-256 of the current confirmation token; the letter carries the token.
+    email_verify_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email_verify_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Language the account was created in, so letters sent later — a payment
+    # receipt from a gateway callback, with no browser behind it — match it.
+    lang: Mapped[str] = mapped_column(String(2), default="ru", server_default="ru")
     configs: Mapped[list["Config"]] = relationship("Config", back_populates="user")
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
 

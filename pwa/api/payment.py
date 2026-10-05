@@ -68,6 +68,12 @@ async def _open_order(
     Someone who typed a code is waiting for a discount, and an invoice that
     silently ignores it is how a customer decides they were overcharged.
     """
+    # A receipt, the device files and any notice reach the customer only
+    # through this address. Checked before pricing, so no pending order is
+    # left behind by a refusal. 403 with a fixed code the portal recognises.
+    if user.email_verified_at is None:
+        raise HTTPException(status_code=403, detail="email_not_verified")
+
     quote = await credit.price_order(
         db, user, req.plan, code=req.code, use_credit=req.use_credit
     )
