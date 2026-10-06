@@ -654,7 +654,73 @@
       --red: #c02020;
     }
 
-    /* THEME TOGGLE */
+    /* SETTINGS (gear) — the one fixed control in the top-right corner. */
+    .settings-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 300;
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-2); border: 1px solid var(--border);
+      color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+    }
+    .settings-btn:hover, .settings-btn.on { border-color: var(--accent-dim); color: var(--accent); }
+    .settings-btn svg { width: 18px; height: 18px; }
+
+    .set-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px 24px; flex-wrap: wrap;
+      padding: 14px 0; border-top: 1px solid var(--border);
+    }
+    .set-row:first-of-type { border-top: 0; padding-top: 0; }
+    .set-label { font-size: 15px; color: var(--text); }
+    .set-sub { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+    .seg { display: inline-flex; border: 1px solid var(--border); }
+    .seg button {
+      background: transparent; border: 0; color: var(--text-dim);
+      padding: 8px 16px; font: 14px var(--font-body); cursor: pointer;
+    }
+    .seg button + button { border-left: 1px solid var(--border); }
+    .seg button.on { background: var(--accent-glow); color: var(--accent); }
+    .set-ok { color: var(--green); }
+
+    /* TRIAL — the offer on "My config" when nothing is paid, and the strip
+       while a trial runs. */
+    .trial-card {
+      display: none; position: relative; overflow: hidden;
+      border: 1px solid var(--accent-dim);
+      background: radial-gradient(120% 140% at 100% 0%, var(--accent-glow), transparent 60%), var(--bg-2);
+      padding: 24px; margin-bottom: 20px;
+    }
+    .trial-card.show { display: block; }
+    .trial-badge {
+      display: inline-block; margin-bottom: 12px;
+      font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 20px; padding: 4px 12px;
+    }
+    .trial-title { font-size: 20px; color: var(--text-bright); margin-bottom: 12px; }
+    .trial-points { list-style: none; margin: 0 0 18px; display: grid; gap: 8px; }
+    .trial-points li { position: relative; padding-left: 20px; font-size: 14px; color: var(--text); }
+    .trial-points li::before {
+      content: ""; position: absolute; left: 2px; top: .6em;
+      width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    }
+    .trial-card .btn-full { max-width: 360px; }
+    .trial-card .btn-full:disabled { opacity: .45; cursor: not-allowed; }
+    .trial-note { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
+    .trial-note:empty { display: none; }
+    .trial-note.bad { color: var(--red); }
+    .trial-note.good { color: var(--green); }
+    .trial-strip {
+      display: none; align-items: center; gap: 10px 16px; flex-wrap: wrap;
+      border: 1px solid var(--accent-dim); background: var(--accent-glow);
+      padding: 12px 16px; margin-bottom: 16px; font-size: 14px;
+    }
+    .trial-strip.show { display: flex; }
+    .trial-strip span { flex: 1 1 240px; }
+    .reg-intent { display: none; margin-bottom: 16px; font-size: 14px; color: var(--accent); line-height: 1.5; }
+    .reg-intent.show { display: block; }
+    .set-warn { color: var(--yellow); }
+
+    /* THEME TOGGLE (kept for older markup; no longer rendered) */
     .theme-toggle {
       position: fixed;
       top: 16px;
@@ -1297,8 +1363,9 @@
   </style>
 </head>
 <body>
-<div class="lang-toggle" onclick="toggleLang()" id="lang-btn">EN</div>
-<div class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">◐</div>
+<button class="settings-btn" id="settings-btn" onclick="openSettings()" aria-label="Settings" title="Settings">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
 
 <!-- ═══════════════════════════════════════════
      LOGIN
@@ -1352,6 +1419,30 @@
   </div>
 </div>
 
+<div id="view-settings" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-back" onclick="closeSettings()" data-i18n="login-back">← Back</div>
+      <div class="login-title"><span class="plain" data-i18n="set-title">Settings</span></div>
+    </div>
+          <div class="card">
+            <div class="card-title" data-i18n="set-appearance">Appearance</div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-lang">Language</div></div>
+              <div class="seg" data-seg="lang">
+                <button onclick="setLang('ru')" data-v="ru">Русский</button><button onclick="setLang('en')" data-v="en">English</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-theme">Theme</div></div>
+              <div class="seg" data-seg="theme">
+                <button onclick="setTheme('dark')" data-v="dark" data-i18n="set-dark">Dark</button><button onclick="setTheme('light')" data-v="light" data-i18n="set-light">Light</button>
+              </div>
+            </div>
+          </div>
+  </div>
+</div>
+
 <div id="view-verify" class="view">
   <div class="login-box">
     <div class="login-header">
@@ -1373,6 +1464,7 @@
       <div class="login-back" onclick="showView('login','client')" data-i18n="login-back">← Back</div>
       <div class="login-title"><span class="plain" data-i18n="reg-title-1">Create</span><span data-i18n="reg-title-2"> account</span></div>
     </div>
+    <div class="reg-intent" id="reg-intent" data-i18n="trial-reg-intent">Create an account and confirm your email — the trial starts from your account.</div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
       <input type="text" id="reg-user" placeholder="username" autocomplete="username"
@@ -1425,6 +1517,9 @@
         <div class="nav-item" data-page="support" onclick="showPage('client', 'support')">
           <span class="nav-icon">✆</span> <span data-i18n="nav-support">Support</span>
         </div>
+        <div class="nav-item" data-page="settings" onclick="showPage('client', 'settings')">
+          <span class="nav-icon">⚙</span> <span data-i18n="set-title">Settings</span>
+        </div>
       </div>
       <div class="sidebar-bottom">
         <nav class="legal-links">
@@ -1460,6 +1555,18 @@
 
         <!-- no subscription state -->
         <div id="config-no-sub" style="display:none">
+          <div class="trial-card" id="trial-card">
+            <span class="trial-badge" id="trial-badge">3 дня бесплатно</span>
+            <div class="trial-title" data-i18n="trial-title">Try it free first</div>
+            <ul class="trial-points">
+              <li data-i18n="trial-p1">One device for the whole trial — phone or computer</li>
+              <li data-i18n="trial-p2">The same multi-node route as the paid plans</li>
+              <li data-i18n="trial-p3">Speed is capped during the trial; plans run at full speed</li>
+              <li data-i18n="trial-p4">No card needed, nothing renews on its own</li>
+            </ul>
+            <button class="btn-full" id="trial-btn" onclick="startTrial()" data-i18n="trial-btn">Start free trial</button>
+            <div class="trial-note" id="trial-note" role="status"></div>
+          </div>
           <div class="wip-banner">
             <span class="wip-code">—</span>
             <div class="wip-title" data-i18n="config-no-sub-title">No active subscription</div>
@@ -1472,6 +1579,10 @@
 
         <!-- has subscription -->
         <div id="config-has-sub" style="display:none">
+          <div class="trial-strip" id="trial-strip" role="status">
+            <span id="trial-strip-text"></span>
+            <button class="btn-sm" onclick="showPage('client','payment');showPayTab('sub')" data-i18n="btn-go-plans">Choose a plan →</button>
+          </div>
           <div class="card">
             <div class="dev-head">
               <div class="card-title" data-i18n="card-devices">Devices</div>
@@ -1757,6 +1868,48 @@
 
           
       <!-- SUPPORT -->
+      <div class="page" id="client-page-settings">
+        <div class="page-header">
+          <div class="page-title" data-i18n="set-title">Settings</div>
+          <div class="page-sub" data-i18n="set-sub">Language, theme and account</div>
+        </div>
+          <div class="card">
+            <div class="card-title" data-i18n="set-appearance">Appearance</div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-lang">Language</div></div>
+              <div class="seg" data-seg="lang">
+                <button onclick="setLang('ru')" data-v="ru">Русский</button><button onclick="setLang('en')" data-v="en">English</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-theme">Theme</div></div>
+              <div class="seg" data-seg="theme">
+                <button onclick="setTheme('dark')" data-v="dark" data-i18n="set-dark">Dark</button><button onclick="setTheme('light')" data-v="light" data-i18n="set-light">Light</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" data-i18n="set-account">Account</div>
+            <div class="set-row">
+              <div>
+                <div class="set-label" id="set-email">—</div>
+                <div class="set-sub" id="set-email-state"></div>
+              </div>
+              <button class="btn-sm" id="set-resend" style="display:none" onclick="resendVerification()" data-i18n="vb-resend">Send again</button>
+            </div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-password">Password</div>
+                <div class="set-sub" data-i18n="set-password-sub">A link to set a new one is sent to your email</div></div>
+              <button class="btn-sm" onclick="sendPasswordLink()" data-i18n="set-password-btn">Send link</button>
+            </div>
+            <div class="set-row">
+              <div><div class="set-label" data-i18n="set-logout">Sign out on this device</div></div>
+              <button class="btn-sm danger" onclick="doLogout()" data-i18n="set-logout-btn">Sign out</button>
+            </div>
+            <div class="vb-note" id="set-note" style="font-size:13px;color:var(--text-dim)"></div>
+          </div>
+      </div>
+
       <div class="page" id="client-page-support">
         <div class="page-header">
           <div class="page-title" data-i18n="nav-support">Support</div>
@@ -2031,6 +2184,29 @@ const translations = {
     'auth-err-taken': 'This username or email is already registered.',
     'auth-err-wait': 'Too many attempts. Try again in {m} min.',
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
+    'set-title': 'Settings', 'set-sub': 'Language, theme and account',
+    'trial-badge': '{n} days free', 'trial-title': 'Try it free first',
+    'trial-p1': 'One device for the whole trial — phone or computer',
+    'trial-p2': 'The same multi-node route as the paid plans',
+    'trial-p3': 'Speed is capped during the trial; plans run at full speed',
+    'trial-p4': 'No card needed, nothing renews on its own',
+    'trial-btn': 'Start free trial', 'trial-starting': 'Creating your device…',
+    'trial-started': 'Trial started. Your device is ready below.',
+    'trial-need-verify': 'Confirm your email first — the link is in the letter we sent after registration.',
+    'trial-err-used': 'The trial for this account or email has already been used.',
+    'trial-err-off': 'The trial is not available right now.',
+    'trial-err-unavailable': 'The trial is not available for this email provider. Choose a plan, or register with another address.',
+    'trial-err-busy': 'Trial places for today are taken. Try again tomorrow — or choose a plan.',
+    'trial-until': 'Trial until {d} ({left}). One device, speed capped.',
+    'trial-left-d': '{n} d left', 'trial-left-h': '{n} h left',
+    'trial-plan': 'Free trial',
+    'trial-reg-intent': 'Create an account and confirm your email — the trial starts from your account.',
+    'set-appearance': 'Appearance', 'set-lang': 'Language', 'set-theme': 'Theme',
+    'set-dark': 'Dark', 'set-light': 'Light', 'set-account': 'Account',
+    'set-verified': 'Email confirmed', 'set-unverified': 'Email not confirmed — needed to buy a plan or start a trial',
+    'set-password': 'Password', 'set-password-sub': 'A link to set a new one is sent to your email',
+    'set-password-btn': 'Send link', 'set-password-sent': 'Sent. The link is valid for 1 hour.',
+    'set-logout': 'Sign out on this device', 'set-logout-btn': 'Sign out',
     'vb-text': 'Confirm your email to buy a plan. The link was sent to',
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
@@ -2329,6 +2505,29 @@ const translations = {
     'auth-err-taken': 'Этот логин или email уже зарегистрирован.',
     'auth-err-wait': 'Слишком много попыток. Попробуйте через {m} мин.',
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
+    'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
+    'trial-badge': '{n} бесплатно', 'trial-title': 'Сначала попробуйте бесплатно',
+    'trial-p1': 'Одно устройство на весь пробный период — телефон или компьютер',
+    'trial-p2': 'Тот же маршрут через несколько узлов, что и в тарифах',
+    'trial-p3': 'Скорость на пробном периоде ограничена, в тарифах — полная',
+    'trial-p4': 'Карта не нужна, ничего не продлевается само',
+    'trial-btn': 'Активировать пробный период', 'trial-starting': 'Создаём устройство…',
+    'trial-started': 'Пробный период начался. Устройство готово — ниже.',
+    'trial-need-verify': 'Сначала подтвердите почту — ссылка в письме, которое пришло после регистрации.',
+    'trial-err-used': 'Пробный период для этого аккаунта или адреса почты уже использован.',
+    'trial-err-off': 'Пробный период сейчас недоступен.',
+    'trial-err-unavailable': 'Для этого почтового сервиса пробный период недоступен. Выберите тариф или зарегистрируйтесь с другим адресом.',
+    'trial-err-busy': 'Места для пробного периода на сегодня закончились. Попробуйте завтра — или выберите тариф.',
+    'trial-until': 'Пробный период до {d} ({left}). Одно устройство, скорость ограничена.',
+    'trial-left-d': 'осталось {n} дн.', 'trial-left-h': 'осталось {n} ч',
+    'trial-plan': 'Пробный период',
+    'trial-reg-intent': 'Зарегистрируйтесь и подтвердите почту — пробный период активируется в личном кабинете.',
+    'set-appearance': 'Оформление', 'set-lang': 'Язык', 'set-theme': 'Тема',
+    'set-dark': 'Тёмная', 'set-light': 'Светлая', 'set-account': 'Аккаунт',
+    'set-verified': 'Почта подтверждена', 'set-unverified': 'Почта не подтверждена — без этого нельзя оформить тариф или пробный период',
+    'set-password': 'Пароль', 'set-password-sub': 'Ссылка, чтобы задать новый, придёт на почту',
+    'set-password-btn': 'Отправить ссылку', 'set-password-sent': 'Отправили. Ссылка действует 1 час.',
+    'set-logout': 'Выйти на этом устройстве', 'set-logout-btn': 'Выйти',
     'vb-text': 'Подтвердите почту, чтобы оформить тариф. Ссылка отправлена на',
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
@@ -2620,22 +2819,87 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
-  const langBtn = document.getElementById('lang-btn');
-  if (langBtn) langBtn.textContent = currentLang.toUpperCase();
-  const themeBtn = document.getElementById('theme-btn');
-  if (themeBtn) themeBtn.textContent = document.body.classList.contains('light') ? '◑' : '◐';
+  syncSettings();
 }
 
-function toggleLang() {
-  currentLang = currentLang === 'en' ? 'ru' : 'en';
-  localStorage.setItem('sov_lang', currentLang);
-  document.getElementById('lang-btn').textContent = currentLang.toUpperCase();
+// Mark the current choice in every settings block on the page.
+function syncSettings() {
+  const theme = document.body.classList.contains('light') ? 'light' : 'dark';
+  document.querySelectorAll('.seg[data-seg="lang"] button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === currentLang));
+  document.querySelectorAll('.seg[data-seg="theme"] button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === theme));
+}
+
+function setLang(lang) {
+  if (lang !== 'ru' && lang !== 'en') return;
+  currentLang = lang;
+  try { localStorage.setItem('sov_lang', currentLang); } catch (e) {}
   applyTranslations();
   // The per-month line is built in JS, so applyTranslations cannot reach it.
   if (typeof renderPlans === 'function') renderPlans();
-  // Nor the current-plan block, which is filled from /me.
+  // Nor the blocks filled from /me.
   if (_lastMe) renderMe(_lastMe);
 }
+
+function setTheme(theme) {
+  document.body.classList.toggle('light', theme === 'light');
+  try { localStorage.setItem('sov_theme', theme === 'light' ? 'light' : 'dark'); } catch (e) {}
+  updateMapImage();
+  syncSettings();
+}
+
+// The gear: inside the account it is a page of the account; anywhere else
+// (sign-in, registration, reset) a screen of its own that returns to where
+// it was opened from.
+let _settingsReturn = null;
+function openSettings() {
+  const dash = document.getElementById('view-dashboard');
+  if (dash && dash.classList.contains('active')) {
+    showPage('client', 'settings');
+    return;
+  }
+  const cur = document.querySelector('.view.active');
+  if (cur && cur.id === 'view-settings') { closeSettings(); return; }
+  _settingsReturn = cur ? cur.id.replace(/^view-/, '') : 'login';
+  showView('settings');
+  syncSettings();
+  document.getElementById('settings-btn').classList.add('on');
+}
+
+function closeSettings() {
+  document.getElementById('settings-btn').classList.remove('on');
+  showView(_settingsReturn || 'login');
+}
+
+function renderSettingsAccount(d) {
+  const em = document.getElementById('set-email');
+  if (!em || !d) return;
+  em.textContent = d.email || '—';
+  const st = document.getElementById('set-email-state');
+  const verified = d.email_verified !== false;
+  st.textContent = t(verified ? 'set-verified' : 'set-unverified');
+  st.className = 'set-sub ' + (verified ? 'set-ok' : 'set-warn');
+  document.getElementById('set-resend').style.display = verified ? 'none' : '';
+}
+
+// The same reset flow as "forgot password", for someone who is signed in and
+// knows their address is right.
+async function sendPasswordLink() {
+  const note = document.getElementById('set-note');
+  if (!_lastMe || !_lastMe.email) return;
+  try {
+    const res = await fetch(API + '/api/auth/forgot', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: _lastMe.email, lang: currentLang}),
+    });
+    note.textContent = res.status === 429 ? waitText(res) : t('set-password-sent');
+  } catch (e) {
+    note.textContent = currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.';
+  }
+}
+
+function toggleLang() { setLang(currentLang === 'en' ? 'ru' : 'en'); }
 
 (function initLang() {
   const saved = localStorage.getItem('sov_lang') || 'ru';
@@ -2695,21 +2959,7 @@ function leaveVerify() {
 
 
 // ── THEME ─────────────────────────────────────────
-function toggleTheme() {
-  const body = document.body;
-  const btn = document.getElementById('theme-btn');
-  if (body.classList.contains('light')) {
-    body.classList.remove('light');
-    localStorage.setItem('sov_theme', 'dark');
-    btn.textContent = '◐';
-    updateMapImage();
-  } else {
-    body.classList.add('light');
-    localStorage.setItem('sov_theme', 'light');
-    btn.textContent = '◑';
-    updateMapImage();
-  }
-}
+function toggleTheme() { setTheme(document.body.classList.contains('light') ? 'dark' : 'light'); }
 
 (function initTheme() {
   const saved = localStorage.getItem('sov_theme');
@@ -3737,13 +3987,102 @@ function renderMe(d) {
   const planEl = document.getElementById('cur-plan');
   const statEl = document.getElementById('cur-status');
   const expEl = document.getElementById('cur-expires');
-  if (planEl) planEl.textContent = active ? planLabel(d.plan) : t('sub-none');
+  const onTrial = !active && d.trial && d.trial.state === 'active';
+  if (planEl) planEl.textContent = active ? planLabel(d.plan) : (onTrial ? t('trial-plan') : t('sub-none'));
   if (statEl) {
-    statEl.textContent = active ? t('sub-active') : t('sub-inactive');
-    statEl.className = 'metric-value ' + (active ? 'green' : 'red');
+    statEl.textContent = (active || onTrial) ? t('sub-active') : t('sub-inactive');
+    statEl.className = 'metric-value ' + ((active || onTrial) ? 'green' : 'red');
   }
-  if (expEl) expEl.textContent = fmtDate(d.subscribed_until) || '—';
+  if (expEl) expEl.textContent = fmtDate(onTrial ? d.trial.until : d.subscribed_until) || '—';
   renderVerifyBanner(d);
+  renderSettingsAccount(d);
+  renderTrial(d);
+}
+
+// "18.10, 14:30" in the viewer's own time.
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const loc = currentLang === 'ru' ? 'ru-RU' : 'en-GB';
+  return d.toLocaleDateString(loc, {day: '2-digit', month: '2-digit'}) + ', ' +
+         d.toLocaleTimeString(loc, {hour: '2-digit', minute: '2-digit'});
+}
+
+function _trialDaysLabel(n) {
+  if (currentLang !== 'ru') return t('trial-badge').replace('{n}', n);
+  const a = n % 100, b = n % 10;
+  const w = (a > 10 && a < 20) ? 'дней' : b === 1 ? 'день' : (b >= 2 && b <= 4) ? 'дня' : 'дней';
+  return t('trial-badge').replace('{n}', n + ' ' + w);
+}
+
+// The trial card shows only with nothing paid and a trial on offer; the strip
+// only while a trial runs. Older servers send no `trial`: show neither.
+let _trialDays = 3;
+function renderTrial(d) {
+  const tr = (d && d.trial) || {};
+  const paid = (typeof d.active === 'boolean') ? d.active : !!d.is_subscribed;
+  const card = document.getElementById('trial-card');
+  const strip = document.getElementById('trial-strip');
+  if (!card || !strip) return;
+
+  const offer = !paid && (tr.state === 'available' || tr.state === 'needs_verify');
+  card.classList.toggle('show', offer);
+  if (offer) {
+    document.getElementById('trial-badge').textContent = _trialDaysLabel(_trialDays);
+    const btn = document.getElementById('trial-btn');
+    const note = document.getElementById('trial-note');
+    btn.disabled = tr.state === 'needs_verify';
+    if (tr.state === 'needs_verify') { note.className = 'trial-note'; note.textContent = t('trial-need-verify'); }
+    else if (note.textContent === t('trial-need-verify')) note.textContent = '';
+  }
+
+  const running = !paid && tr.state === 'active' && tr.until;
+  strip.classList.toggle('show', !!running);
+  if (running) {
+    const ms = new Date(tr.until) - Date.now();
+    const hours = Math.max(0, Math.ceil(ms / 3600000));
+    const left = hours >= 24
+      ? t('trial-left-d').replace('{n}', Math.ceil(hours / 24))
+      : t('trial-left-h').replace('{n}', hours);
+    document.getElementById('trial-strip-text').textContent =
+      t('trial-until').replace('{d}', fmtDateTime(tr.until)).replace('{left}', left);
+  }
+}
+
+const TRIAL_ERRORS = {
+  email_not_verified: 'trial-need-verify', trial_used: 'trial-err-used', trial_active: 'trial-started',
+  trial_off: 'trial-err-off', trial_unavailable: 'trial-err-unavailable', trial_busy: 'trial-err-busy',
+};
+
+async function startTrial() {
+  const btn = document.getElementById('trial-btn');
+  const note = document.getElementById('trial-note');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  note.className = 'trial-note';
+  note.textContent = t('trial-starting');
+  try {
+    const res = await fetch(`${API}/api/client/trial`, {method: 'POST', headers: hdrs()});
+    if (res.status === 401) { doLogout(); return; }
+    if (res.status === 429) { note.className = 'trial-note bad'; note.textContent = waitText(res); btn.disabled = false; return; }
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) {
+      note.className = 'trial-note good';
+      note.textContent = t('trial-started');
+      await loadClientMe();
+      await loadClientConfigPage();
+      return;
+    }
+    note.className = 'trial-note bad';
+    note.textContent = t(TRIAL_ERRORS[d.detail] || 'dev-err-generic');
+    // A refusal that will not change on a second click keeps the button off.
+    btn.disabled = ['trial_used', 'trial_off', 'trial_unavailable', 'email_not_verified'].includes(d.detail);
+    if (d.detail === 'trial_used' || d.detail === 'trial_active') loadClientMe();
+  } catch (e) {
+    note.className = 'trial-note bad';
+    note.textContent = currentLang === 'ru' ? 'Ошибка сети. Попробуйте позже.' : 'Network error. Try again later.';
+    btn.disabled = false;
+  }
 }
 
 // Older servers do not send email_verified: show nothing rather than a
@@ -3953,7 +4292,28 @@ window.addEventListener('pageshow', (e) => {
 });
 
 // ── INIT ──────────────────────────────────────────
+// /app?trial=1 is the landing page's "Активировать". Signed in, the account
+// opens on "My config", where the trial card is. Signed out, registration
+// opens instead of sign-in, with a line saying what happens next.
+function takeTrialIntent() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('trial') !== '1') return false;
+  params.delete('trial');
+  const q = params.toString();
+  history.replaceState(null, '', window.location.pathname + (q ? '?' + q : ''));
+  return true;
+}
+
+fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && d.days) _trialDays = d.days; if (_lastMe) renderTrial(_lastMe); })
+  .catch(() => {});
+
 (function init() {
+  const trialIntent = takeTrialIntent();
+  if (!token && trialIntent) {
+    showView('register');
+    document.getElementById('reg-intent').classList.add('show');
+  }
   if (token) {
     const user = localStorage.getItem('sov_user') || '';
     if (user === 'admin') {

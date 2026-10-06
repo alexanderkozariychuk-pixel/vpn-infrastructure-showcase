@@ -84,6 +84,7 @@ def test_the_page_names_the_plan_instead_of_printing_its_key():
 
 def test_switching_language_redraws_the_plan_block():
     html = INDEX.read_text(encoding="utf-8")
-    body = html[html.index("function toggleLang("):]
+    # The language is chosen in Settings now (setLang); toggleLang delegates.
+    body = html[html.index("function setLang("):]
     body = body[:body.index("\n}\n")]
     assert "renderMe(_lastMe)" in body
