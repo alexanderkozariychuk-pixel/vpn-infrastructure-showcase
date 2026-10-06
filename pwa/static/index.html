@@ -664,6 +664,54 @@
     }
     .settings-btn:hover, .settings-btn.on { border-color: var(--accent-dim); color: var(--accent); }
     .settings-btn svg { width: 18px; height: 18px; }
+    /* In the account the corner holds the bell; settings are in the menu. */
+    body[data-view="dashboard"] #settings-btn { display: none; }
+    body:not([data-view="dashboard"]) .notif-btn,
+    body:not([data-view="dashboard"]) .notif-panel { display: none !important; }
+
+    /* NOTIFICATIONS (bell) */
+    .notif-btn { position: fixed; top: 16px; right: 16px; z-index: 300; }
+    .notif-badge {
+      position: absolute; top: -6px; right: -6px;
+      min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+      background: var(--accent); color: var(--bg);
+      font: 600 11px/18px var(--font-body); text-align: center;
+      display: none;
+    }
+    .notif-badge.show { display: block; }
+    .notif-panel {
+      position: fixed; top: 60px; right: 16px; z-index: 310;
+      width: 380px; max-height: min(70vh, 560px); overflow-y: auto;
+      background: var(--bg-2); border: 1px solid var(--border);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+      display: none;
+    }
+    .notif-panel.open { display: block; }
+    .notif-head {
+      position: sticky; top: 0; background: var(--bg-2);
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+    }
+    .notif-item {
+      display: block; width: 100%; text-align: left;
+      background: transparent; border: 0; border-bottom: 1px solid var(--border);
+      padding: 14px 16px 14px 30px; position: relative;
+      font-family: var(--font-body); color: var(--text); cursor: default;
+    }
+    .notif-item:last-child { border-bottom: 0; }
+    .notif-item.has-link { cursor: pointer; }
+    .notif-item.has-link:hover { background: var(--bg-3); }
+    .notif-item.unread::before {
+      content: ''; position: absolute; left: 13px; top: 20px;
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+    }
+    .notif-title { font-size: 15px; color: var(--text-bright); margin-bottom: 4px; }
+    .notif-body { font-size: 14px; color: var(--text-dim); line-height: 1.45; }
+    .notif-time { font-size: 12px; color: var(--text-dim); margin-top: 6px; opacity: 0.8; }
+    .notif-empty { padding: 28px 20px; font-size: 14px; color: var(--text-dim); line-height: 1.5; text-align: center; }
+    @media (max-width: 600px) {
+      .notif-panel { left: 16px; right: 16px; width: auto; }
+    }
 
     .set-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -1368,6 +1416,15 @@
 <button class="settings-btn" id="settings-btn" onclick="openSettings()" aria-label="Settings" title="Settings">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 </button>
+
+<button class="settings-btn notif-btn" id="notif-btn" onclick="toggleNotifications()" aria-label="Notifications" data-i18n-title="notif-title" title="Notifications" aria-expanded="false" aria-controls="notif-panel">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span class="notif-badge" id="notif-badge"></span>
+</button>
+<div class="notif-panel" id="notif-panel" role="dialog" aria-labelledby="notif-head">
+  <div class="notif-head" id="notif-head" data-i18n="notif-title">Notifications</div>
+  <div id="notif-list"></div>
+</div>
 
 <!-- ═══════════════════════════════════════════
      LOGIN
@@ -2077,6 +2134,22 @@
           <div class="card-title">Active Clients</div>
           <div id="adm-active-list" class="loading">Fetching</div>
         </div>
+        <div class="card">
+          <div class="card-title" data-i18n="bc-title">Message to all clients</div>
+          <div class="sup-field">
+            <label class="sup-label" for="bc-head" data-i18n="bc-head">Heading</label>
+            <input class="sup-input" id="bc-head" maxlength="120">
+          </div>
+          <div class="sup-field">
+            <label class="sup-label" for="bc-body" data-i18n="bc-body">Text</label>
+            <textarea class="sup-textarea" id="bc-body" rows="3" maxlength="1000"></textarea>
+            <div class="sup-hint" data-i18n="bc-hint">Appears under the bell in every active account. Not sent by email.</div>
+          </div>
+          <div class="actions">
+            <button class="btn-sm" id="bc-send" onclick="sendBroadcast()" data-i18n="bc-send">Send</button>
+            <span class="sup-hint" id="bc-note" role="status"></span>
+          </div>
+        </div>
       </div>
 
       <!-- CLIENTS -->
@@ -2189,6 +2262,13 @@ const translations = {
     'auth-err-wait': 'Too many attempts. Try again in {m} min.',
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
     'set-title': 'Settings', 'set-sub': 'Language, theme and account',
+    'notif-title': 'Notifications',
+    'notif-empty': 'Payments, reminders before your subscription ends and news about the service will appear here.',
+    'notif-now': 'just now', 'notif-min': '{n} min ago', 'notif-hr': '{n} h ago',
+    'bc-title': 'Message to all clients', 'bc-head': 'Heading', 'bc-body': 'Text',
+    'bc-hint': 'Appears under the bell in every active account. Not sent by email.',
+    'bc-send': 'Send', 'bc-confirm': 'Send this message to every active account?',
+    'bc-sent': 'Sent to {n} accounts.', 'bc-empty': 'Fill in the heading and the text.', 'bc-fail': 'Could not send.',
     'trial-badge': '{n} days free', 'trial-title': 'Try it free first',
     'trial-p1': 'One device for the whole trial — phone or computer',
     'trial-p2': 'The same multi-node route as the paid plans',
@@ -2511,6 +2591,13 @@ const translations = {
     'auth-err-wait': 'Слишком много попыток. Попробуйте через {m} мин.',
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
     'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
+    'notif-title': 'Уведомления',
+    'notif-empty': 'Здесь появятся сообщения об оплате, напоминания перед окончанием подписки и новости сервиса.',
+    'notif-now': 'только что', 'notif-min': '{n} мин назад', 'notif-hr': '{n} ч назад',
+    'bc-title': 'Сообщение всем клиентам', 'bc-head': 'Заголовок', 'bc-body': 'Текст',
+    'bc-hint': 'Появится под колокольчиком в каждом активном аккаунте. На почту не отправляется.',
+    'bc-send': 'Отправить', 'bc-confirm': 'Отправить это сообщение всем активным аккаунтам?',
+    'bc-sent': 'Отправлено: {n}.', 'bc-empty': 'Заполните заголовок и текст.', 'bc-fail': 'Не удалось отправить.',
     'trial-badge': '{n} бесплатно', 'trial-title': 'Сначала попробуйте бесплатно',
     'trial-p1': 'Одно устройство на весь пробный период — телефон или компьютер',
     'trial-p2': 'Тот же маршрут через несколько узлов, что и в тарифах',
@@ -2825,6 +2912,10 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  try { renderNotifBadge(); } catch (e) {}
   syncSettings();
 }
 
@@ -3568,6 +3659,8 @@ function checkResetToken() {
 function showView(view, mode) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
+  document.body.dataset.view = view;
+  if (view === 'dashboard') startNotifications(); else stopNotifications();
   if (view === 'login') { document.getElementById('login-error') && (document.getElementById('login-error').textContent = ''); }
   if (view === 'register') { document.getElementById('reg-error') && (document.getElementById('reg-error').textContent = ''); document.getElementById('reg-success') && (document.getElementById('reg-success').textContent = ''); }
   if (mode) loginMode = mode;
@@ -4262,6 +4355,150 @@ function startAutoRefresh() {
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── NOTIFICATIONS (the bell) ─────────────────────
+// The feed comes from /api/client/notifications; what goes into it is decided
+// on the server (services/notify.py). Polled once a minute while the account
+// is open and the tab is visible; opening the panel marks everything read.
+let _notif = {items: [], unread: 0}, _notifTimer = null, _notifSeen = new Set();
+
+function startNotifications() {
+  loadNotifications();
+  if (_notifTimer) return;
+  _notifTimer = setInterval(() => { if (!document.hidden) loadNotifications(); }, 60000);
+}
+
+function stopNotifications() {
+  if (_notifTimer) { clearInterval(_notifTimer); _notifTimer = null; }
+  closeNotifications();
+  _notif = {items: [], unread: 0};
+  _notifSeen = new Set();
+  renderNotifBadge();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && _notifTimer) loadNotifications();
+});
+
+async function loadNotifications() {
+  if (!token) return;
+  try {
+    const res = await fetch(`${API}/api/client/notifications`, {headers: hdrs()});
+    if (!res.ok) return;
+    _notif = await res.json();
+    renderNotifBadge();
+    if (document.getElementById('notif-panel').classList.contains('open')) renderNotifList();
+  } catch (e) {}
+}
+
+function renderNotifBadge() {
+  const b = document.getElementById('notif-badge');
+  const n = _notif.unread || 0;
+  b.textContent = n > 9 ? '9+' : String(n);
+  b.classList.toggle('show', n > 0);
+  const label = t('notif-title') + (n ? ` (${n})` : '');
+  document.getElementById('notif-btn').setAttribute('aria-label', label);
+}
+
+function _notifAgo(iso) {
+  // The server's times are UTC; one without an offset must not be read as local.
+  if (iso && !/(Z|[+-]\d\d:?\d\d)$/.test(iso)) iso += 'Z';
+  const d = new Date(iso);
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return t('notif-now');
+  if (s < 3600) return t('notif-min').replace('{n}', Math.floor(s / 60));
+  if (s < 86400) return t('notif-hr').replace('{n}', Math.floor(s / 3600));
+  return fmtDateTime(iso);
+}
+
+function renderNotifList() {
+  const list = document.getElementById('notif-list');
+  if (!_notif.items.length) {
+    list.innerHTML = `<div class="notif-empty">${escHtml(t('notif-empty'))}</div>`;
+    return;
+  }
+  list.innerHTML = _notif.items.map(n => {
+    // Unread as of opening: the dot stays until the panel is closed, so the
+    // reader can see which ones are new even though they are now marked read.
+    const unread = !n.read || _notifSeen.has(n.id);
+    const cls = 'notif-item' + (unread ? ' unread' : '') + (n.link ? ' has-link' : '');
+    const attrs = n.link ? ` data-link="${escHtml(n.link)}"` : ' tabindex="-1"';
+    return `<button class="${cls}"${attrs}>
+      <div class="notif-title">${escHtml(n.title)}</div>
+      <div class="notif-body">${escHtml(n.body)}</div>
+      <div class="notif-time">${escHtml(_notifAgo(n.created_at))}</div>
+    </button>`;
+  }).join('');
+}
+
+document.getElementById('notif-list').addEventListener('click', e => {
+  const item = e.target.closest('.notif-item[data-link]');
+  if (!item) return;
+  const page = item.dataset.link;
+  closeNotifications();
+  if (['config', 'payment', 'connect', 'support', 'settings'].includes(page)) showPage('client', page);
+});
+
+async function toggleNotifications() {
+  const panel = document.getElementById('notif-panel');
+  if (panel.classList.contains('open')) { closeNotifications(); return; }
+  panel.classList.add('open');
+  document.getElementById('notif-btn').classList.add('on');
+  document.getElementById('notif-btn').setAttribute('aria-expanded', 'true');
+  renderNotifList();
+  await loadNotifications();
+  const fresh = _notif.items.filter(n => !n.read);
+  if (!fresh.length) return;
+  fresh.forEach(n => _notifSeen.add(n.id));
+  try {
+    const res = await fetch(`${API}/api/client/notifications/read`, {
+      method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'}, body: '{}',
+    });
+    if (res.ok) {
+      _notif.items.forEach(n => { n.read = true; });
+      _notif.unread = 0;
+      renderNotifBadge();
+    }
+  } catch (e) {}
+}
+
+function closeNotifications() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel.classList.contains('open')) return;
+  panel.classList.remove('open');
+  document.getElementById('notif-btn').classList.remove('on');
+  document.getElementById('notif-btn').setAttribute('aria-expanded', 'false');
+  _notifSeen = new Set();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#notif-panel, #notif-btn')) closeNotifications();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNotifications(); });
+
+async function sendBroadcast() {
+  const head = document.getElementById('bc-head'), body = document.getElementById('bc-body');
+  const note = document.getElementById('bc-note'), btn = document.getElementById('bc-send');
+  const title = head.value.trim(), text = body.value.trim();
+  if (!title || !text) { note.textContent = t('bc-empty'); return; }
+  if (!confirm(t('bc-confirm'))) return;
+  btn.disabled = true;
+  note.textContent = '';
+  try {
+    const res = await fetch(`${API}/api/admin/notifications/broadcast`, {
+      method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
+      body: JSON.stringify({title, body: text}),
+    });
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    note.textContent = t('bc-sent').replace('{n}', d.sent);
+    head.value = ''; body.value = '';
+  } catch (e) {
+    note.textContent = t('bc-fail');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // Platega sends the customer back to /app?paid=1 (finished on its page) or

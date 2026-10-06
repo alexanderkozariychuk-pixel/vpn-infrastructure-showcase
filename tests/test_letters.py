@@ -26,6 +26,8 @@ def _letters(lang):
         "receipt": (mailer.payment_email("ivan_1", "basic", 30, 350, "RUB", NOW + timedelta(days=30), True, lang),
                     f"{mailer.SITE_URL}/app"),
         "reset": (mailer.password_reset_email(RESET, lang), RESET),
+        **{kind: (mailer.reminder_email(kind, "ivan_1", NOW + timedelta(days=2), lang), f"{mailer.SITE_URL}/app")
+           for kind in ("sub_ends_3d", "sub_ended", "trial_ends_1d")},
     }
 
 
@@ -83,3 +85,14 @@ def test_the_welcome_letter_offers_the_trial_only_while_it_is_on(monkeypatch):
 @pytest.mark.parametrize("n,word", [(1, "1 день"), (3, "3 дня"), (5, "5 дней"), (11, "11 дней"), (21, "21 день")])
 def test_days_are_declined(n, word):
     assert mailer._days_ru(n) == word
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_a_username_in_a_reminder_is_escaped(lang):
+    _, html, _ = mailer.reminder_email("sub_ends_3d", "<b>x</b>", NOW, lang)
+    assert "<b>x</b>" not in html and "&lt;b&gt;x&lt;/b&gt;" in html
+
+
+def test_reminders_are_only_for_the_ends_that_cost_a_connection():
+    with pytest.raises(ValueError):
+        mailer.reminder_email("sub_ends_1d", "ivan_1", NOW)

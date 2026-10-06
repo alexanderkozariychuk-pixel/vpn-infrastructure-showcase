@@ -97,6 +97,11 @@ Components: `_wrap`, `_eyebrow`, `_h`, `_p`, `_button`, `_callout`,
 | Confirmation again | «отправить ещё раз» | confirm email |
 | Receipt | payment activated | open account |
 | Password reset | «забыли пароль» / settings | set a new password |
+| Subscription ends in 3 days | hourly job | renew |
+| Subscription ended | expiry sweep | choose a plan |
+| Trial ends within a day | hourly job | choose a plan |
 
-Planned with in-portal notifications: period ending in 3 days / 1 day /
-ended, for both subscriptions and trials.
+Everything else — payment, trial started, 1 day left of a subscription, trial
+ended, operator messages — goes only to the bell in the portal
+(`services/notify.py` has the full table). A letter is sent only where
+missing it costs the customer their connection.

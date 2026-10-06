@@ -430,6 +430,77 @@ def payment_email(
     return subject, _wrap(inner, pre, lang, reason), text
 
 
+def reminder_email(kind: str, username: str, until: datetime, lang: str = "ru") -> tuple[str, str, str]:
+    """
+    Letters about an end: a paid period in 3 days, a paid period that has
+    ended, a trial with under a day left. The same message is in the bell;
+    these are the three where missing it costs the customer their connection.
+    """
+    name = escape(username)
+    d = until.astimezone(_MSK)
+    date, time = d.strftime("%d.%m.%Y"), d.strftime("%H:%M")
+    portal = f"{SITE_URL}/app"
+    host = escape(SITE_URL.split("://", 1)[-1])
+    en = lang == "en"
+    if kind == "sub_ends_3d":
+        subject = "Your subscription ends in 3 days — Sovereign" if en else "Подписка заканчивается через 3 дня — Sovereign"
+        inner = (
+            _eyebrow("Subscription" if en else "Подписка")
+            + _h(f"{name}, your subscription ends on {date}" if en else f"{name}, подписка заканчивается {date}")
+            + _p("Renew before then and nothing stops: the days you have left are kept, and the new period "
+                 "is added after them." if en else
+                 "Продлите заранее, и ничего не прервётся: оставшиеся дни сохранятся, а новый период "
+                 "добавится после них.")
+            + _facts([("Active until" if en else "Действует до", f"{date}, {time}")])
+            + _button(portal, "Renew" if en else "Продлить подписку")
+            + _fallback_link(portal, lang)
+            + _p("Subscriptions never renew on their own — this is the only reminder by email." if en else
+                 "Подписка не продлевается сама — это единственное напоминание на почту.", dim=True, last=True)
+        )
+        text_lines = (f"Your Sovereign subscription ends on {date}, {time}. Renew: {portal}" if en else
+                      f"Подписка Sovereign заканчивается {date} в {time}. Продлить: {portal}")
+        pre = "Renew early — the days left are kept." if en else "Продлите заранее — оставшиеся дни сохранятся."
+    elif kind == "sub_ended":
+        subject = "Your subscription has ended — Sovereign" if en else "Подписка закончилась — Sovereign"
+        inner = (
+            _eyebrow("Subscription" if en else "Подписка")
+            + _h("Your subscription has ended" if en else "Подписка закончилась")
+            + _p(f"It was active until {date}. Your devices are switched off." if en else
+                 f"Она действовала до {date}. Устройства отключены.")
+            + _p("Renew whenever you like: a new device file appears in your account right after payment." if en else
+                 "Продлить можно в любой момент: сразу после оплаты в личном кабинете появится новый файл устройства.")
+            + _button(portal, "Choose a plan" if en else "Выбрать тариф")
+            + _fallback_link(portal, lang)
+            + _p("We will not write about this again." if en else "Больше писать об этом не будем.",
+                 dim=True, last=True)
+        )
+        text_lines = (f"Your Sovereign subscription ended on {date}. Renew: {portal}" if en else
+                      f"Подписка Sovereign закончилась {date}. Продлить: {portal}")
+        pre = "A new device file appears right after payment." if en else "После оплаты сразу появится новый файл устройства."
+    elif kind == "trial_ends_1d":
+        subject = "Your trial ends tomorrow — Sovereign" if en else "Пробный период заканчивается — Sovereign"
+        inner = (
+            _eyebrow("Free trial" if en else "Пробный период")
+            + _h(f"{name}, your trial ends {date} at {time}" if en else f"{name}, пробный период закончится {date} в {time}")
+            + _p("To carry on without a break, choose a plan: paying issues a new device at full speed, "
+                 "and the trial device is switched off." if en else
+                 "Чтобы продолжить без перерыва, выберите тариф: при оплате выдаётся новое устройство "
+                 "с полной скоростью, а пробное отключается.")
+            + _button(portal, "Choose a plan" if en else "Выбрать тариф")
+            + _fallback_link(portal, lang)
+            + _p("Nothing is charged automatically." if en else "Ничего не списывается автоматически.",
+                 dim=True, last=True)
+        )
+        text_lines = (f"Your Sovereign trial ends {date} at {time}. Choose a plan: {portal}" if en else
+                      f"Пробный период Sovereign закончится {date} в {time}. Выбрать тариф: {portal}")
+        pre = "Choose a plan to carry on without a break." if en else "Выберите тариф, чтобы продолжить без перерыва."
+    else:
+        raise ValueError(kind)
+    reason = (f"You received this because you have an account at {host}." if en else
+              f"Вы получили это письмо, потому что у вас есть аккаунт на {host}.")
+    return subject, _wrap(inner, pre, lang, reason), text_lines
+
+
 def password_reset_email(reset_url: str, lang: str = "ru") -> tuple[str, str, str]:
     """Returns (subject, body_html, body_text) for a password reset."""
     host = escape(SITE_URL.split("://", 1)[-1])

@@ -36,6 +36,11 @@ async def main() -> int:
     async with SessionLocal() as db:
         stats = await expire_due_subscriptions(db)
         stats.update(await expire_due_trials(db))
+        from services.notify import remind_due
+        stats.update(await remind_due(db))
+    # Letters scheduled by the sweeps (endings, reminders) go out before exit.
+    from services import mailer
+    await mailer.drain()
 
     elapsed = (datetime.now(timezone.utc) - started).total_seconds()
     logger.info(
@@ -46,6 +51,7 @@ async def main() -> int:
         stats["peers_removed"],
         stats["failures"],
     )
+    logger.info("reminders sent: %d", stats["reminders"])
     logger.info(
         "trials: %d due, %d peers removed, %d failures",
         stats["trials_due"], stats["trial_peers_removed"], stats["trial_failures"],

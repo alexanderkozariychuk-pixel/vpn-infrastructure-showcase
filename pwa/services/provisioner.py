@@ -393,6 +393,11 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     except IntegrityError:
         logger.warning("Referral reward for payment %s was already recorded", payment.id)
 
+    from services import notify
+    await notify.notify(db, user, "paid",
+                        plan=mailer.plan_title(info["tier"], info["days"], user.lang or "ru"),
+                        date=user.subscribed_until.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y"))
+
     # The purchase ends the trial. The date is closed in this transaction;
     # the trial peer is taken off the node after the commit, below.
     if user.trial_until is not None and _aware(user.trial_until) > now:

@@ -26,7 +26,7 @@ from db.base import get_db
 from db.models import TrialGrant, User
 from services import ratelimit
 from services.net import resolve_source_ip
-from services import provisioner
+from services import notify, provisioner
 from services.trial import (
     TRIAL_DAILY_CAP, TRIAL_DAYS, is_disposable, normalise_email, trial_active, trial_enabled, trial_end,
 )
@@ -99,6 +99,7 @@ async def start_trial(
         await db.rollback()
         raise HTTPException(status_code=503, detail="trial_busy")
 
+    await notify.notify(db, user, "trial_started", until=notify._when(user.trial_until, user.lang or "ru"))
     await db.commit()
     logger.info("Trial started for %s until %s (%s)", user.username, user.trial_until, config.peer_ip)
     return {

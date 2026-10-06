@@ -31,6 +31,8 @@ SERVED = sorted(STATIC.glob("*.html")) + [STATIC / "icons" / "manifest.json"]
 # moderator who signs up to test the site reads them. Their templates live in
 # the mailer module, so its whole source is held to the same vocabulary.
 SERVED.append(STATIC.parent / "services" / "mailer.py")
+# The bell's messages are public text too.
+SERVED.append(STATIC.parent / "services" / "notify.py")
 
 # Case-insensitive. Deliberately narrow: "заблокировать промокод" in the terms
 # is ordinary language, and "VPN" is what the phone's own permission prompt
