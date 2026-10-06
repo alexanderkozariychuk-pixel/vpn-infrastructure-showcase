@@ -125,6 +125,10 @@ VERIFY_PER_IP = Limiter(limit=20, window=60 * 60)
 VERIFY_RESEND = Limiter(limit=3, window=60 * 60)
 VERIFY_RESEND_PER_IP = Limiter(limit=10, window=60 * 60)
 
+# Trials started from one address in 24 hours. Not 1: mobile networks put
+# many subscribers behind one address, and a family on one Wi-Fi is normal.
+TRIAL_PER_IP = Limiter(limit=3, window=24 * 60 * 60)
+
 ALL = (LOGIN_PER_IP, LOGIN_FAILS, REGISTER_PER_IP,
        FORGOT_PER_IP, FORGOT_PER_EMAIL, RESET_PER_IP, SUPPORT_PER_IP,
-       VERIFY_PER_IP, VERIFY_RESEND, VERIFY_RESEND_PER_IP)
+       VERIFY_PER_IP, VERIFY_RESEND, VERIFY_RESEND_PER_IP, TRIAL_PER_IP)

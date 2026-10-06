@@ -28,7 +28,7 @@ from services.provisioner import (
     issue_config,
     render_config,
 )
-from services.subscriptions import has_active_subscription
+from services.subscriptions import has_access, has_active_subscription
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -52,7 +52,7 @@ async def client_config(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not has_active_subscription(user):
+    if not has_access(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     conf = await get_client_config(user, db)
@@ -73,7 +73,7 @@ async def client_config_raw(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not has_active_subscription(user):
+    if not has_access(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     conf = await get_client_config(user, db)
@@ -110,6 +110,7 @@ def _describe(config: Config) -> dict:
         "name": config.name,
         "peer_ip": config.peer_ip,
         "created_at": config.created_at,
+        "kind": config.kind,
     }
 
 
@@ -119,11 +120,12 @@ async def list_configs(
     payload: dict = Depends(require_auth),
 ):
     user = await _current_user(db, payload)
-    if not has_active_subscription(user):
+    if not has_access(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     configs = await active_configs(user, db)
-    limit = config_limit(user.plan)
+    # During a trial alone, the trial device is the whole allowance.
+    limit = config_limit(user.plan) if has_active_subscription(user) else 1
     return {
         "ok": True,
         "plan": user.plan,
@@ -141,10 +143,12 @@ async def add_config(
 ):
     """Add a device, provided the plan has room for it."""
     user = await _current_user(db, payload)
+    # Paid only. A trial is one device in the trial subnet; a device added
+    # here would come from the paid pool, outside the trial's ceiling.
     if not has_active_subscription(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
-    configs = await active_configs(user, db)
+    configs = [c for c in await active_configs(user, db) if c.kind != "trial"]
     limit = config_limit(user.plan)
     if len(configs) >= limit:
         raise HTTPException(
@@ -170,7 +174,7 @@ async def config_raw(
     payload: dict = Depends(require_auth),
 ):
     user = await _current_user(db, payload)
-    if not has_active_subscription(user):
+    if not has_access(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
     # Scoped to the caller: a config id from someone else's account must read
@@ -253,6 +257,10 @@ async def delete_config(
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Config not found")
+    if config.kind == "trial":
+        # It cannot be replaced (adding is paid-only), so deleting it would
+        # only end the trial early by mistake. It goes when the trial ends.
+        raise HTTPException(status_code=409, detail="trial_device")
 
     ok, reason = await asyncio.get_event_loop().run_in_executor(
         None, _remove_peer_from_bridge, config.public_key

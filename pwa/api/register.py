@@ -13,6 +13,7 @@ from auth.jwt import hash_password, require_auth, require_admin
 from services.mailer import send_email, welcome_email
 from api.email_verify import issue_token, verify_url
 from services.subscriptions import has_active_subscription
+from services.trial import trial_state
 from services import ratelimit
 from services.net import resolve_source_ip
 import logging
@@ -196,6 +197,11 @@ async def get_me(
         "active": has_active_subscription(user),
         "peer_ip": user.peer_ip,
         "subscribed_until": user.subscribed_until,
+        # What the portal offers on "My config" when there is no paid period.
+        "trial": {
+            "state": trial_state(user, has_paid=user.subscribed_until is not None),
+            "until": user.trial_until,
+        },
     }
 
 

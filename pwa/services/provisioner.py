@@ -56,6 +56,14 @@ AWG_PARAMS = {
 # checked, so they are excluded whether or not they appear in this database.
 CLIENT_POOL = ("10.88.88", 42, 199)
 
+# Trial devices: their own /24 on the same awg0, which the entry node routes
+# through the same split but under one shared bandwidth ceiling and a kill
+# switch (infrastructure/trial/sovrn-trial-net). The address is what puts a
+# device under those rules, so a trial peer must never be issued from
+# CLIENT_POOL, nor a paid one from here. .1 is the node; .2-.9 are left for
+# hand-made test peers.
+TRIAL_POOL = ("10.88.89", 10, 250)
+
 # Fernet key for encrypting private keys in DB
 _fernet_key = os.getenv("FERNET_KEY")
 if not _fernet_key:
@@ -141,6 +149,11 @@ def _bridge_used_ips() -> set[str]:
                     used.add(addr)
     return used
 
+def _aware(dt: datetime) -> datetime:
+    """SQLite returns naive datetimes; everything here is UTC."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 def _encrypt(plain: str) -> str:
     return _fernet.encrypt(plain.encode()).decode()
 
@@ -150,9 +163,11 @@ def _decrypt(cipher: str) -> str:
 
 # ── find free IP ───────────────────────────────────────────────────────
 
-async def _find_free_ip(db: AsyncSession, exclude: set[str] | None = None) -> str | None:
-    """Return the next free address in the client pool."""
-    prefix, start, end = CLIENT_POOL
+async def _find_free_ip(
+    db: AsyncSession, exclude: set[str] | None = None, pool: tuple = CLIENT_POOL,
+) -> str | None:
+    """Return the next free address in `pool`."""
+    prefix, start, end = pool
     # Only active rows hold an address. A revoked config's peer is off the node,
     # so keeping its address reserved would leak the pool one expiry at a time.
     # The node's own list arrives separately in `exclude` and remains the
@@ -242,7 +257,9 @@ def _build_conf(priv: str, psk: str, peer_ip: str) -> str:
 
 # ── main entry point ──────────────────────────────────────────────────
 
-async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Config | None:
+async def issue_config(
+    user: User, db: AsyncSession, name: str = "device", kind: str = "paid",
+) -> Config | None:
     """
     Create one peer for a user: keys → free address → node → Config row.
 
@@ -254,7 +271,11 @@ async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Co
 
     The row is added to the session but not committed: the caller decides what
     else belongs in the same transaction.
+
+    `kind` picks the address pool: "trial" issues from TRIAL_POOL, which is
+    what puts the device under the trial subnet's ceiling on the node.
     """
+    pool = TRIAL_POOL if kind == "trial" else CLIENT_POOL
     try:
         priv = _awg_genkey()
         pub  = _awg_pubkey(priv)
@@ -263,7 +284,9 @@ async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Co
         logger.error("Key generation failed: %s", e)
         return None
 
-    client_name = f"auto-{user.username}"
+    # The node's peer label. pwa-add-peer takes [A-Za-z0-9_-]{1,32}; usernames
+    # are at most 27 characters, which "auto-" fits and "trial-" may not.
+    client_name = (f"trial-{user.username}" if kind == "trial" else f"auto-{user.username}")[:32]
     loop = asyncio.get_event_loop()
 
     # Seed from the node's live state, not from the local mirror.
@@ -272,7 +295,7 @@ async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Co
 
     peer_ip = None
     for _ in range(10):
-        peer_ip = await _find_free_ip(db, exclude=tried_ips)
+        peer_ip = await _find_free_ip(db, exclude=tried_ips, pool=pool)
         if not peer_ip:
             logger.error("No free addresses left in the client pool")
             return None
@@ -298,6 +321,7 @@ async def issue_config(user: User, db: AsyncSession, name: str = "device") -> Co
         public_key=pub,
         preshared_key=_encrypt(psk),
         is_active=True,
+        kind=kind,
     )
     db.add(config)
     logger.info("Issued config '%s' for %s → %s", name, user.username, peer_ip)
@@ -322,11 +346,16 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
         logger.error("Unknown plan %r on payment %s — not activating", payment.plan, payment.id)
         return False
 
-    existing = (
+    held = (
         await db.execute(
             select(Config).where(Config.user_id == user.id, Config.is_active.is_(True))
         )
     ).scalars().all()
+    # A trial device is not a reason to treat this as a renewal: it sits in the
+    # trial subnet, under the trial ceiling, and ends with the trial. A first
+    # purchase after a trial is still a first purchase and gets a paid device.
+    existing = [c for c in held if c.kind != "trial"]
+    trial_devices = [c for c in held if c.kind == "trial"]
 
     if not existing:
         config = await issue_config(user, db, name="device-1")
@@ -364,12 +393,34 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     except IntegrityError:
         logger.warning("Referral reward for payment %s was already recorded", payment.id)
 
+    # The purchase ends the trial. The date is closed in this transaction;
+    # the trial peer is taken off the node after the commit, below.
+    if user.trial_until is not None and _aware(user.trial_until) > now:
+        user.trial_until = now
+
     await db.commit()
     logger.info(
         "Activated %s for %s until %s (%s)",
         payment.plan, user.username, user.subscribed_until.date(),
         "renewal" if existing else "first purchase",
     )
+
+    # Take the trial peer off the node. Best effort: a failure leaves the row
+    # active with an ended trial_until, and the hourly sweep (expire_due_trials)
+    # retries — the customer is never left without the paid device for it.
+    for c in trial_devices:
+        try:
+            ok, reason = await asyncio.get_event_loop().run_in_executor(
+                None, _remove_peer_from_bridge, c.public_key
+            )
+            if ok:
+                c.is_active = False
+            else:
+                logger.error("Trial peer %s for %s not removed: %s", c.peer_ip, user.username, reason)
+        except Exception as e:
+            logger.error("Trial peer %s for %s not removed: %s", c.peer_ip, user.username, e)
+    if trial_devices:
+        await db.commit()
 
     # The receipt. After the commit, so a letter never announces an
     # activation that was rolled back; scheduled rather than awaited, so the

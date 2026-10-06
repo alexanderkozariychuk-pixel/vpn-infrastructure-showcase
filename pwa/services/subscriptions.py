@@ -56,6 +56,54 @@ def has_active_subscription(user: User, now: datetime | None = None) -> bool:
     return until > (now or datetime.now(timezone.utc))
 
 
+def has_access(user: User, now: datetime | None = None) -> bool:
+    """
+    May this account download and use its devices: a paid period, or a
+    running trial. Adding devices stays a paid-only action (api/config.py).
+    """
+    from services.trial import trial_active
+    return has_active_subscription(user, now) or trial_active(user, now)
+
+
+async def expire_due_trials(db: AsyncSession, now: datetime | None = None) -> dict:
+    """
+    Take ended trials' devices off the node.
+
+    Also catches a trial ended early by a purchase whose peer could not be
+    removed at the time (provisioner.activate_payment). As with paid expiry,
+    a row is marked inactive only once the node confirms the peer is gone.
+    """
+    now = now or datetime.now(timezone.utc)
+    rows = (
+        await db.execute(
+            select(Config, User)
+            .join(User, User.id == Config.user_id)
+            .where(
+                Config.kind == "trial",
+                Config.is_active.is_(True),
+                User.trial_until.is_not(None),
+                User.trial_until <= now,
+            )
+        )
+    ).all()
+
+    stats = {"trials_due": len(rows), "trial_peers_removed": 0, "trial_failures": 0}
+    for config, user in rows:
+        ok, reason = await asyncio.get_event_loop().run_in_executor(
+            None, _remove_peer_from_bridge, config.public_key
+        )
+        if ok:
+            config.is_active = False
+            stats["trial_peers_removed"] += 1
+            logger.info("Trial ended for %s (%s removed)", user.username, config.peer_ip)
+        else:
+            stats["trial_failures"] += 1
+            logger.error("Could not remove trial peer %s for %s: %s",
+                         config.peer_ip, user.username, reason)
+    await db.commit()
+    return stats
+
+
 async def expire_due_subscriptions(db: AsyncSession, now: datetime | None = None) -> dict:
     """
     Revoke every subscription whose paid period has ended.

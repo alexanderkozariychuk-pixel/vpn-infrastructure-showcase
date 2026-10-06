@@ -332,6 +332,33 @@
   .devices { margin-top: 5px; font-size: 13px; color: var(--text-dim); }
   .permo { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
   .pay-ways { margin-top: 26px; font-size: 15px; color: var(--text-dim); }
+
+  /* Trial. Hidden until the portal says trials are on (see the script at the
+     end): an offer that turns out to be switched off is worse than none. */
+  #trial[hidden] { display: none; }
+  .trial-panel {
+    position: relative; overflow: hidden;
+    border: 1px solid var(--accent-dim); border-radius: 14px;
+    padding: 30px 28px;
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgba(0, 212, 255, .10), transparent 55%),
+      rgba(13, 19, 24, .72);
+  }
+  .trial-badge {
+    display: inline-block; margin-bottom: 16px;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 20px; padding: 5px 12px;
+  }
+  .trial-panel h2 { margin-bottom: 14px; }
+  .trial-panel p { color: var(--text-dim); font-size: 16px; max-width: 56ch; }
+  .trial-list { list-style: none; margin: 22px 0 28px; display: grid; gap: 10px; }
+  .trial-list li { position: relative; padding-left: 22px; color: var(--text); font-size: 15px; }
+  .trial-list li::before {
+    content: ""; position: absolute; left: 2px; top: .62em;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  }
+  .trial-fine { margin-top: 16px; font-size: 13px; color: var(--text-dim); }
+  @media (max-width: 720px) { .trial-panel { padding: 24px 20px; } .trial-panel .cta { width: 100%; justify-content: center; } }
   .pay-ways b { color: var(--text); font-weight: 600; }
   @media (max-width: 560px) {
     .tariffs, .tariffs thead, .tariffs tbody, .tariffs tr, .tariffs th, .tariffs td { display: block; }
@@ -444,6 +471,24 @@
     </ol>
   </section>
 
+  <section id="trial" hidden>
+    <div class="trial-panel">
+      <span class="trial-badge"><span data-trial-days>3</span>&nbsp;<span data-trial-word>дня</span> бесплатно</span>
+      <h2>Пробный период</h2>
+      <p>Попробуйте сервис до оплаты: одно устройство, та же схема подключения,
+         что и в тарифах. Карта не нужна.</p>
+      <ul class="trial-list">
+        <li>Одна конфигурация на <span data-trial-days>3</span>&nbsp;<span data-trial-word>дня</span> — для телефона или компьютера</li>
+        <li>Маршрут через несколько узлов, как в платных тарифах</li>
+        <li>Скорость на пробном периоде ограничена — полная скорость в тарифах</li>
+        <li>Один пробный период на один адрес почты</li>
+      </ul>
+      <a class="cta" href="/app?trial=1">Активировать <span aria-hidden="true">→</span></a>
+      <div class="trial-fine">Нужна регистрация и подтверждённая почта. После пробного периода
+        подписка не оформляется сама — тариф выбираете вы.</div>
+    </div>
+  </section>
+
   <section id="tariffs">
     <h2>Тарифы</h2>
 
@@ -487,7 +532,7 @@
     <h2>Что входит</h2>
     <dl class="facts">
       <dt>Безлимитный трафик</dt>
-      <dd>Без ограничений по скорости и объёму передаваемых данных.</dd>
+      <dd>На платных тарифах — без ограничений по скорости и объёму передаваемых данных.</dd>
 
       <dt>Стабильная работа сервисов</dt>
       <dd>Повседневные приложения и онлайн-сервисы продолжают работать в привычном режиме без необходимости постоянно менять настройки подключения.</dd>
@@ -526,6 +571,23 @@
 
 </div>
 
+<script>
+  // Show the trial offer only while trials are on. Fails closed: if the
+  // portal cannot be asked, the section stays hidden.
+  (function () {
+    var sec = document.getElementById('trial');
+    if (!sec || !window.fetch) return;
+    fetch('/api/public/trial').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d || !d.enabled) return;
+      var days = String(d.days || 3);
+      [].forEach.call(sec.querySelectorAll('[data-trial-days]'), function (n) { n.textContent = days; });
+      var n = d.days % 100, m = n % 10;
+      var word = (n > 10 && n < 20) ? 'дней' : m === 1 ? 'день' : (m >= 2 && m <= 4) ? 'дня' : 'дней';
+      [].forEach.call(sec.querySelectorAll('[data-trial-word]'), function (w) { w.textContent = word; });
+      sec.hidden = false;
+    }).catch(function () {});
+  })();
+</script>
 <script>
   // ── Background network ────────────────────────────────────────────────
   // Generated rather than shipped as an image: a few KB instead of hundreds,

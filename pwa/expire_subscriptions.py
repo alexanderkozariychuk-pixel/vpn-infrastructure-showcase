@@ -30,11 +30,12 @@ logger = logging.getLogger("expiry")
 
 async def main() -> int:
     from db.base import SessionLocal
-    from services.subscriptions import expire_due_subscriptions
+    from services.subscriptions import expire_due_subscriptions, expire_due_trials
 
     started = datetime.now(timezone.utc)
     async with SessionLocal() as db:
         stats = await expire_due_subscriptions(db)
+        stats.update(await expire_due_trials(db))
 
     elapsed = (datetime.now(timezone.utc) - started).total_seconds()
     logger.info(
@@ -44,6 +45,10 @@ async def main() -> int:
         stats["users_revoked"],
         stats["peers_removed"],
         stats["failures"],
+    )
+    logger.info(
+        "trials: %d due, %d peers removed, %d failures",
+        stats["trials_due"], stats["trial_peers_removed"], stats["trial_failures"],
     )
 
     # A failure here is not a reason to exit non-zero: the row stays active and

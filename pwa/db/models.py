@@ -28,6 +28,9 @@ class User(Base):
     # Language the account was created in, so letters sent later — a payment
     # receipt from a gateway callback, with no browser behind it — match it.
     lang: Mapped[str] = mapped_column(String(2), default="ru", server_default="ru")
+    # End of the free trial; set once, when the trial is granted, and never
+    # cleared — a past date is how "already used" is told from "never had".
+    trial_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     configs: Mapped[list["Config"]] = relationship("Config", back_populates="user")
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
 
@@ -38,6 +41,10 @@ class Config(Base):
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     peer_ip: Mapped[str] = mapped_column(String(20), nullable=False)
+    # "paid" or "trial". A trial device lives in its own subnet (10.88.89.0/24)
+    # under its own bandwidth ceiling, so it cannot simply become a paid one:
+    # a purchase issues a paid device and removes the trial peer.
+    kind: Mapped[str] = mapped_column(String(8), default="paid", server_default="paid")
     private_key: Mapped[str] = mapped_column(String(255), nullable=False)
     public_key: Mapped[str] = mapped_column(String(255), nullable=False)
     preshared_key: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -148,3 +155,24 @@ class CreditEntry(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class TrialGrant(Base):
+    """
+    One free trial per mailbox, recorded for good.
+
+    Keyed on the normalised address (services/trial.normalise_email), not the
+    account: deleting an account and registering again with the same inbox —
+    or the same Gmail with a dot moved — must not buy a second trial. The
+    unique constraints are what make that hold under two requests at once.
+    """
+    __tablename__ = "trial_grants"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email_norm: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    # Nulled, not cascaded, when the account is deleted: the grant is about
+    # the mailbox and must outlive the account.
+    user_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), unique=True, nullable=True)
+    source_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
