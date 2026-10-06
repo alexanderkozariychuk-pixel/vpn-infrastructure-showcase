@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# pwa-backup-pull — runs on the backup host (outside Russia), not on the portal.
+#
+# Pulls the portal's encrypted dumps over SSH as the portal's `pwabackup`
+# user, whose key is pinned to `rrsync -ro /var/backups/pwa`: it can list and
+# read that one directory and nothing else. The pull direction is the point —
+# the portal holds no credentials for this host, so whoever takes the portal
+# cannot delete or overwrite the copies here.
+#
+# Never deletes on the portal's say-so (no --delete): files age out here on
+# their own schedule, $KEEP_DAYS.
+
+set -euo pipefail
+umask 077
+
+SRC=${SRC:-pwabackup@159.194.232.158:}
+DEST=${DEST:-/srv/pwa-backups}
+KEY=${KEY:-/root/.ssh/pwa-backup}
+KEEP_DAYS=${KEEP_DAYS:-30}
+
+mkdir -p "$DEST"
+rsync -a --chmod=F600 -e "ssh -i $KEY -o BatchMode=yes -o IdentitiesOnly=yes" \
+    --include='vpn-*.dump.age' --include='LAST_OK' --exclude='*' "$SRC" "$DEST/"
+
+find "$DEST" -name 'vpn-*.dump.age' -mtime +"$KEEP_DAYS" -delete
+
+# Names carry a UTC stamp, so the last in glob order is the newest.
+shopt -s nullglob
+dumps=("$DEST"/vpn-*.dump.age)
+((${#dumps[@]})) || { echo "no dumps in $DEST after pull" >&2; exit 1; }
+echo "$(date -u +%FT%TZ) ok newest=$(basename "${dumps[-1]}") count=${#dumps[@]}"

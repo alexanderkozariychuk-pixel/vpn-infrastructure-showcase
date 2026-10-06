@@ -1,0 +1,3 @@
+# /etc/cron.d/pwa-backup-pull on the backup host: an hour after the portal's
+# dump (00:17 UTC), so the night's file is there to take.
+23 1 * * * root /usr/local/sbin/pwa-backup-pull >> /var/log/pwa-backup-pull.log 2>&1

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# pwa-db-backup — nightly dump of the portal database, encrypted.
+#
+# Installed on the portal host as /usr/local/sbin/pwa-db-backup and run by
+# /etc/cron.d/pwa-db-backup. Writes /var/backups/pwa/vpn-<UTC stamp>.dump.age
+# and keeps the newest $KEEP; the backup host pulls them from there
+# (pwa-backup-pull, through a read-only rrsync key), so the portal can
+# neither reach nor erase the off-site copies.
+#
+# Encrypted with age to the public key in $RECIPIENT_FILE. The private key is
+# not on any server: it lives with the operator, next to the portal's .env.
+# Restoring needs both — the dump holds the device keys encrypted with
+# FERNET_KEY from .env.
+#
+# A dump is kept only if pg_restore can read its table of contents; a truncated
+# or empty dump would otherwise replace a good one and look like success.
+# LAST_OK is touched on success, for the freshness alert.
+
+set -euo pipefail
+umask 077
+
+COMPOSE=${COMPOSE:-"docker compose -f /opt/pwa/vpn-infrastructure-showcase/pwa/docker-compose.yml"}
+DIR=${DIR:-/var/backups/pwa}
+KEEP=${KEEP:-14}
+RECIPIENT_FILE=${RECIPIENT_FILE:-/etc/pwa-backup/recipient.txt}
+GROUP=${GROUP:-pwabackup}
+
+[[ -s "$RECIPIENT_FILE" ]] || { echo "no age recipient in $RECIPIENT_FILE" >&2; exit 1; }
+mkdir -p "$DIR"
+stamp=$(date -u +%Y%m%d-%H%M)
+tmp=$(mktemp "$DIR/.dump.XXXXXX")
+trap 'rm -f "$tmp" "$tmp.age"' EXIT
+
+# Credentials come from the container's own environment, not from here.
+# shellcheck disable=SC2016  # expanded inside the container, on purpose
+$COMPOSE exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$tmp"
+
+tables=$($COMPOSE exec -T postgres pg_restore --list < "$tmp" | grep -c ' TABLE ' || true)
+if [[ "$tables" -lt 1 ]]; then
+    echo "dump unreadable or empty ($(stat -c %s "$tmp") bytes, $tables table entries); kept nothing" >&2
+    exit 1
+fi
+
+age -R "$RECIPIENT_FILE" -o "$tmp.age" "$tmp"
+out="$DIR/vpn-$stamp.dump.age"
+mv "$tmp.age" "$out"
+if getent group "$GROUP" >/dev/null; then
+    chgrp "$GROUP" "$out" && chmod 640 "$out"
+fi
+
+# Keep the newest $KEEP. Names carry a UTC stamp, so glob order is age order.
+shopt -s nullglob
+dumps=("$DIR"/vpn-*.dump.age)
+if ((${#dumps[@]} > KEEP)); then
+    rm -f -- "${dumps[@]:0:${#dumps[@]}-KEEP}"
+fi
+
+date -u +%s > "$DIR/LAST_OK"
+echo "$(date -u +%FT%TZ) ok $out $(stat -c %s "$out") bytes, $tables table entries"

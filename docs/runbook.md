@@ -56,6 +56,7 @@ that it can be reproduced from disk.
 | Peers vanished after reboot | [5](#5-peers-vanished-after-reboot) |
 | Monitoring reports success, shows nothing | [6](#6-monitoring-reports-success-shows-nothing) |
 | Deploy succeeded, service wrong or 502 | [7](#7-deploy-succeeded-service-wrong-or-502) |
+| Portal database lost or damaged | [8](#8-portal-database-lost-or-damaged) |
 
 ---
 
@@ -560,6 +561,77 @@ the code landed before concluding the change did not work:
 ```bash
 hostname; curl -s localhost:8000/health
 ```
+
+---
+
+## 8. Portal database lost or damaged
+
+A bad migration, a mistaken delete, a lost disk, or the portal host gone
+altogether.
+
+### Where the backups are
+
+| Copy | Where | Kept |
+|---|---|---|
+| Nightly dump, 00:17 UTC | portal host, `/var/backups/pwa/vpn-<stamp>.dump.age` | 14 newest |
+| Pulled copy, 01:23 UTC | backup host (am1, Armenia), `/srv/pwa-backups/` | 30 days |
+
+Written by `infrastructure/portal/pwa-db-backup`, pulled by
+`pwa-backup-pull`; logs in `/var/log/pwa/backup.log` and
+`/var/log/pwa-backup-pull.log`. The backup host pulls through a key pinned to
+`rrsync -ro /var/backups/pwa`, so a compromised portal cannot touch the
+copies there.
+
+### What a restore needs — and where it is not
+
+1. **A dump** — either location above.
+2. **The age private key** (`AGE-SECRET-KEY-1…`). Dumps are encrypted to its
+   public half (`/etc/pwa-backup/recipient.txt`). It is on no server; it is in
+   the operator's password manager.
+3. **The portal's `.env`**, from the same place. The dump stores device private
+   keys encrypted with `FERNET_KEY`: a database restored without the matching
+   `.env` has accounts and payments but no usable configs.
+
+Without 2 or 3 the backups are worth nothing; check both are there before an
+incident, not during one.
+
+### Restore
+
+Stop the app so nothing writes while the database is replaced, keep what is
+there now, restore, start:
+
+```bash
+cd /opt/pwa/vpn-infrastructure-showcase/pwa
+sudo docker compose stop pwa
+sudo docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > ~/pre-restore-$(date -u +%Y%m%d-%H%M).dump
+
+# key.txt: the AGE-SECRET-KEY line from the password manager; delete it after
+age -d -i key.txt /var/backups/pwa/vpn-<stamp>.dump.age \
+  | sudo docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner'
+shred -u key.txt
+
+sudo docker compose start pwa     # entrypoint runs alembic upgrade head
+sudo docker compose exec -T pwa alembic current
+```
+
+Then check what the restore cannot know about: peers issued on the entry node
+after the dump was taken exist there but not in the database. They show as
+"unknown" in the admin peer list.
+
+### Test a dump without touching production
+
+Once after setting backups up, and after any change to the scripts:
+
+```bash
+age -d -i key.txt vpn-<stamp>.dump.age > /tmp/t.dump
+sudo docker run -d --rm --name pgtest -e POSTGRES_PASSWORD=x postgres:16-alpine
+sleep 5
+sudo docker exec -i pgtest pg_restore -U postgres -d postgres --no-owner < /tmp/t.dump
+sudo docker exec pgtest psql -U postgres -Atc "select count(*) from users"
+sudo docker stop pgtest; shred -u /tmp/t.dump key.txt
+```
+
+The count should match `select count(*) from users` on production.
 
 ---
 
