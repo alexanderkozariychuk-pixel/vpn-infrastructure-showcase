@@ -28,6 +28,11 @@
 # awg0 is a bridge here rather than an AmneziaWG interface — the scripts only
 # care that it is a layer-3 interface called awg0 carrying 10.88.88.1/24.
 
+# `check && ok … || bad …` is used as if-then-else throughout. That is safe
+# here only because ok() always succeeds (its last command is echo), which is
+# exactly the case SC2015 warns about and cannot see.
+# shellcheck disable=SC2015
+
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"

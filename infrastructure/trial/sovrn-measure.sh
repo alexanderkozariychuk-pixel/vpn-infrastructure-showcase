@@ -20,7 +20,7 @@ if command -v awg >/dev/null; then
 fi
 
 declare -A prx ptx sumrx sumtx maxrx maxtx
-for i in "${IFS_LIST[@]}"; do read -r prx[$i] ptx[$i] < <(bytes "$i"); done
+for i in "${IFS_LIST[@]}"; do read -r "prx[$i]" "ptx[$i]" < <(bytes "$i"); done
 read -r ct ci cs cst < <(cpu)
 
 printf '\n%-8s' time; for i in "${IFS_LIST[@]}"; do printf '%18s' "$i rx/tx Mbit"; done; printf '%26s\n' "cpu busy/softirq/steal"

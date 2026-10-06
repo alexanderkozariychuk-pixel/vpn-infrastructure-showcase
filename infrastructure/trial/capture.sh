@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # capture.sh — sourced by snapshot.sh and rollback.sh. Both must capture the
 # same things in the same way, or the comparison after a rollback means
 # nothing.

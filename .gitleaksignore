@@ -19,3 +19,9 @@
 # two files; the surrounding code was removed from the tree long before.
 1b9d4dd89a83de82f4812443b8484d6aea177438:scripts/providers/fourvps/create_vps.py:generic-api-key:34
 1b9d4dd89a83de82f4812443b8484d6aea177438:scripts/providers/fourvps/discover.py:generic-api-key:4
+#
+# Not secrets: made-up tokens in the letter preview tool's example links,
+# random-looking enough for generic-api-key. Replaced with plain placeholders
+# on 2026-10-06; these entries cover the commit that added them.
+1d22a318ed9a87fc889f07be2a364d5845e17172:tools/preview_emails.py:generic-api-key:29
+1d22a318ed9a87fc889f07be2a364d5845e17172:tools/preview_emails.py:generic-api-key:30

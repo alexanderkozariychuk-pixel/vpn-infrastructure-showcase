@@ -1,0 +1,4 @@
+# Follow `. capture.sh` and friends: the scripts say where with
+# "# shellcheck source=…", relative to the script's own directory.
+external-sources=true
+source-path=SCRIPTDIR

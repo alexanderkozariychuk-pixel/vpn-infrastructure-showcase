@@ -50,6 +50,8 @@ if command -v awg >/dev/null 2>&1; then
     if [[ -n "$trial_keys" ]]; then
         if [[ "$remove_peers" -eq 0 ]]; then
             echo "trial peers are still on $IFACE:" >&2
+            # Indent every line; ${var//} cannot anchor to each line start.
+            # shellcheck disable=SC2001
             echo "$trial_keys" | sed 's/^/  /' >&2
             echo "re-run with --remove-trial-peers, or remove them with pwa-del-peer first" >&2
             exit 1

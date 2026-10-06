@@ -9,6 +9,11 @@
 # infrastructure/trial/README.md for how the suite was shown to fail when the
 # wrapper is broken.
 
+# `check && ok … || bad …` is used as if-then-else throughout. That is safe
+# here only because ok() always succeeds (its last command is echo), which is
+# exactly the case SC2015 warns about and cannot see.
+# shellcheck disable=SC2015
+
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"

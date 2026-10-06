@@ -26,8 +26,8 @@ out = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/sovrn-letters")
 out.mkdir(parents=True, exist_ok=True)
 icon = (ROOT / "pwa" / "static" / "icons" / "icon-192.png").as_uri()
 now = datetime.now(timezone.utc)
-verify = f"{mailer.SITE_URL}/verify?token=Xk3fP0aQ9zLmN2vR7tYbC1dE4gH6jK8sU5wZ0oI2pA"
-reset = f"{mailer.SITE_URL}/reset?token=Qm8Lr2Zt5Vb7Nc1Xd4Fh6Jk9Pw0Sy3Ua"
+verify = f"{mailer.SITE_URL}/verify?token=example-verify-token"
+reset = f"{mailer.SITE_URL}/reset?token=example-reset-token"
 
 
 def letters(lang):
