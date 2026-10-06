@@ -25,15 +25,45 @@ async def _names_from_db(db: AsyncSession) -> dict:
     return {pk[:12]: name for pk, name in rows}
 
 
+_UNITS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400, "week": 604800}
+
+
+def handshake_age(handshake: str) -> int | None:
+    """
+    Seconds since the last handshake, from `awg show`'s wording:
+    "Now", "45 seconds ago", "1 day, 2 hours, 3 minutes, 4 seconds ago".
+    None for "never" or anything unreadable.
+    """
+    text = handshake.strip().lower()
+    if text == "now":
+        return 0
+    total, found = 0, False
+    for part in text.removesuffix(" ago").split(","):
+        bits = part.split()
+        if len(bits) != 2 or not bits[0].isdigit():
+            continue
+        unit = _UNITS.get(bits[1].rstrip("s"))
+        if unit:
+            total += int(bits[0]) * unit
+            found = True
+    return total if found else None
+
+
 def _classify_handshake(handshake: str) -> str:
-    if handshake == "never":
+    """
+    active    handshake within 3 minutes — a live tunnel renews it every two
+    idle      older than that: configured, not in use right now
+    inactive  never connected
+
+    The first version matched words: anything containing "second" or
+    "minute" was active — which is every age, since `awg show` always ends
+    in seconds ("3 days, … 4 seconds ago") — and "Now", which has neither,
+    fell through to idle.
+    """
+    age = handshake_age(handshake)
+    if age is None:
         return "inactive"
-    if "second" in handshake or "minute" in handshake:
-        return "active"
-    if "hour" in handshake:
-        hours = int(handshake.split()[0])
-        return "active" if hours < 3 else "idle"
-    return "idle"
+    return "active" if age <= 180 else "idle"
 
 
 @router.get("/api/clients")
