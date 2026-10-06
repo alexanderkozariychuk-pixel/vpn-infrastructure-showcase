@@ -18,7 +18,7 @@
 set -e
 
 rsync -av \
-  --exclude='.env*' \
+  --exclude='venv' \
   --exclude='__pycache__' \
   --exclude='.git' \
   --exclude='.ruff_cache' \
