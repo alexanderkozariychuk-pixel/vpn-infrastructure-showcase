@@ -1,5 +1,8 @@
 venv/
 __pycache__/
 *.pyc
-.env
 .git
+# Any .env file — the live one and every backup of it — stays out of the
+# image. Only the example, which holds no secrets, goes in.
+.env*
+!.env.example

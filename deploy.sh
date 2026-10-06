@@ -18,11 +18,11 @@
 set -e
 
 rsync -av \
-  --exclude='venv' \
+  --exclude='.env*' \
   --exclude='__pycache__' \
   --exclude='.git' \
   --exclude='.ruff_cache' \
-  --exclude='.env' \
+  --exclude='.env*' \
   ~/Projects/vpn-infrastructure-showcase/pwa/ \
   -e "ssh" \
   sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/
