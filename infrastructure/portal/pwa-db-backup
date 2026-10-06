@@ -45,9 +45,6 @@ fi
 age -R "$RECIPIENT_FILE" -o "$tmp.age" "$tmp"
 out="$DIR/vpn-$stamp.dump.age"
 mv "$tmp.age" "$out"
-if getent group "$GROUP" >/dev/null; then
-    chgrp "$GROUP" "$out" && chmod 640 "$out"
-fi
 
 # Keep the newest $KEEP. Names carry a UTC stamp, so glob order is age order.
 shopt -s nullglob
@@ -57,4 +54,9 @@ if ((${#dumps[@]} > KEEP)); then
 fi
 
 date -u +%s > "$DIR/LAST_OK"
+# Readable by the pull user, and only by it: the dump and the stamp alike —
+# an unreadable LAST_OK fails the whole rsync on the backup host.
+if getent group "$GROUP" >/dev/null; then
+    chgrp "$GROUP" "$out" "$DIR/LAST_OK" && chmod 640 "$out" "$DIR/LAST_OK"
+fi
 echo "$(date -u +%FT%TZ) ok $out $(stat -c %s "$out") bytes, $tables table entries"
