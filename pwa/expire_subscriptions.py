@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Sweep expired subscriptions. Run from cron, inside the application container:
-
-    0 * * * * docker compose -f /opt/pwa/<app>/docker-compose.yml \
-        exec -T pwa python expire_subscriptions.py >> /var/log/pwa-expiry.log 2>&1
+Sweep expired subscriptions. Run hourly from cron, inside the application
+container: infrastructure/portal/pwa-expiry is the cron file, installed on the
+portal host as /etc/cron.d/pwa-expiry; it logs to /var/log/pwa/expiry.log.
 
 Hourly rather than daily on purpose: a day's granularity means a subscription
 that ends at 09:00 keeps carrying traffic until midnight, and six of those a

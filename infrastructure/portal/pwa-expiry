@@ -1,0 +1,11 @@
+# /etc/cron.d/pwa-expiry on the portal host — the hourly sweep
+# (pwa/expire_subscriptions.py): ends paid periods and trials, takes their
+# devices off the entry node, sends reminders before an end.
+#
+# Without it nothing ends: the portal keeps working and no error appears
+# anywhere, which is why this copy lives in the repository.
+#
+# Install: sudo install -m 644 infrastructure/portal/pwa-expiry /etc/cron.d/
+#          sudo mkdir -p /var/log/pwa
+# One copy only — two would run the sweep twice an hour.
+0 * * * * root cd /opt/pwa/vpn-infrastructure-showcase/pwa && /usr/bin/docker compose exec -T pwa python expire_subscriptions.py >> /var/log/pwa/expiry.log 2>&1
