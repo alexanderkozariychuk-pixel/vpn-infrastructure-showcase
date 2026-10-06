@@ -14,7 +14,7 @@ from services.mailer import send_email, welcome_email
 from api.email_verify import issue_token, verify_url
 from services.subscriptions import has_active_subscription
 from services.trial import trial_state
-from services import ratelimit
+from services import credit, ratelimit
 from services.net import resolve_source_ip
 import logging
 
@@ -40,6 +40,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
     lang: str = "ru"
+    # From a referral link (/?ref=CODE), kept by the page until registration.
+    ref: str | None = Field(default=None, max_length=32)
 
     @field_validator("username")
     @classmethod
@@ -106,6 +108,13 @@ async def register(
     )
     token = issue_token(user)
     db.add(user)
+    await db.flush()
+    # A code that does not resolve (mistyped link, expired campaign) is
+    # dropped without a word: registration is not the place to argue about it.
+    if req.ref:
+        promo, _ = await credit.resolve_code(db, req.ref, user)
+        if promo is not None:
+            user.referred_code = promo.code
     await db.commit()
     await db.refresh(user)
 

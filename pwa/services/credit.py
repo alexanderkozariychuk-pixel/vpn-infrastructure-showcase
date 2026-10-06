@@ -33,7 +33,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import plan_info
@@ -278,6 +278,19 @@ REFUSAL_TEXT = {
 
 # ── pricing an order ────────────────────────────────────────────────────────
 
+async def is_first_purchase(db: AsyncSession, user: User) -> bool:
+    """No paid order yet. Access opened from the admin panel (provider
+    "manual") is not a purchase and does not use up the first one."""
+    paid = await db.execute(
+        select(func.count()).select_from(Payment).where(
+            Payment.user_id == user.id,
+            Payment.status.in_(("paid", "paid_over")),
+            or_(Payment.provider.is_(None), Payment.provider != "manual"),
+        )
+    )
+    return int(paid.scalar_one()) == 0
+
+
 def discounted_price(plan_key: str, promo: PromoCode | None) -> int:
     """Plan price less any percentage discount, rounded to whole rubles."""
     info = plan_info(plan_key)
@@ -312,6 +325,15 @@ async def price_order(
     """
     promo, refusal = await resolve_code(db, code, user, now=now)
 
+    # A customer who came by a referral link gets that code on their first
+    # purchase without typing it. A code typed at the checkout wins; a link
+    # code that no longer resolves is simply not applied — the customer never
+    # typed it, so there is nothing to tell them was refused.
+    auto = False
+    if not code and user.referred_code and await is_first_purchase(db, user):
+        promo, _ = await resolve_code(db, user.referred_code, user, now=now)
+        auto = promo is not None
+
     base = int(plan_info(plan_key)["amount"])
     after_discount = discounted_price(plan_key, promo)
 
@@ -323,6 +345,7 @@ async def price_order(
         "base_price": base,
         "discount": base - after_discount,
         "promo_code": promo.code if promo else None,
+        "promo_auto": auto,
         # The token is what the portal translates; the text is the fallback.
         "promo_refused": refusal,
         "promo_refused_text": REFUSAL_TEXT.get(refusal) if refusal else None,

@@ -1399,6 +1399,7 @@
       background: var(--bg); border: 1px dashed var(--border-bright, var(--border));
       border-radius: 8px; padding: 16px 18px;
     }
+    .ref-link-value { font-size: 14px !important; letter-spacing: 0 !important; word-break: break-all; }
     .ref-code-value {
       font-size: 22px; letter-spacing: 4px; font-weight: 600; color: var(--accent);
       word-break: break-all;
@@ -1529,6 +1530,7 @@
       <div class="login-title"><span class="plain" data-i18n="reg-title-1">Create</span><span data-i18n="reg-title-2"> account</span></div>
     </div>
     <div class="reg-intent" id="reg-intent" data-i18n="trial-reg-intent">Create an account and confirm your email — the trial starts from your account.</div>
+    <div class="reg-intent" id="reg-ref" data-i18n="ref-invited">You were invited: the discount applies to your first payment by itself.</div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
       <input type="text" id="reg-user" placeholder="username" autocomplete="username"
@@ -2387,6 +2389,10 @@ const translations = {
     'ref-rules': '1 point = 1 ₽. Points can cover up to half of an order, and expire six months after they become available.',
     'ref-code-title': 'Your referral code',
     'ref-copy': 'Copy',
+    'ref-copy-link': 'Copy link', 'ref-copied': 'Copied',
+    'ref-link-explain': 'Send the link: whoever registers through it gets the discount on their first payment without typing anything. The code below works too, typed at checkout.',
+    'ref-invited': 'You were invited: the discount applies to your first payment by itself.',
+    'promo-invited': 'Invitation discount:',
     'ref-create': 'Get my code',
     'ref-uses': 'Purchases made with your code:',
     'ref-explain': 'A friend gets {discount}% off their first purchase. When they buy more than one month, you get {reward} points — available to spend 14 days later.',
@@ -2724,6 +2730,10 @@ const translations = {
     'ref-rules': '1 балл = 1 ₽. Баллами можно оплатить до половины заказа. Баллы сгорают через полгода после того, как станут доступны.',
     'ref-code-title': 'Ваш промокод',
     'ref-copy': 'Копировать',
+    'ref-copy-link': 'Копировать ссылку', 'ref-copied': 'Скопировано',
+    'ref-link-explain': 'Отправьте ссылку: кто зарегистрируется по ней, получит скидку на первую оплату без ввода кода. Код ниже тоже работает — его вводят при оплате.',
+    'ref-invited': 'Вы пришли по приглашению: скидка применится к первой оплате сама.',
+    'promo-invited': 'Скидка по приглашению:',
     'ref-create': 'Получить промокод',
     'ref-uses': 'Покупок по вашему коду:',
     'ref-explain': 'Друг получает скидку {discount}% на первую покупку. Когда он оплатит больше месяца, вам начисляется {reward} баллов — они станут доступны через 14 дней.',
@@ -3375,6 +3385,13 @@ async function refreshQuote() {
       const key = 'promo-no-' + q.promo_refused.replace(/_/g, '-');
       msg.textContent = translations[currentLang][key] || q.promo_refused_text || q.promo_refused;
       checkoutCode = null;
+    } else if (q.promo_code && q.promo_auto) {
+      // From the link the customer registered through: shown in the field so
+      // they can see where the discount came from.
+      msg.className = 'promo-msg ok';
+      msg.textContent = `${t('promo-invited')} −${q.discount} ₽`;
+      const input = document.getElementById('promo-input');
+      if (input && !input.value) input.value = q.promo_code;
     } else if (q.promo_code) {
       msg.className = 'promo-msg ok';
       msg.textContent = `${t('promo-applied')} −${q.discount} ₽`;
@@ -3567,8 +3584,13 @@ async function loadReferral() {
   } else if (ref.code) {
     codeEl.innerHTML = `
       <div class="ref-code">
-        <div class="ref-code-value" id="ref-code-value">${ref.code}</div>
-        <button class="promo-btn" onclick="copyReferralCode()">${t('ref-copy')}</button>
+        <div class="ref-code-value ref-link-value" id="ref-link-value">${escHtml(referralLink(ref.code))}</div>
+        <button class="promo-btn" onclick="copyReferral('ref-link-value', this)">${t('ref-copy-link')}</button>
+      </div>
+      <div class="checkout-note">${t('ref-link-explain')}</div>
+      <div class="ref-code" style="margin-top:14px">
+        <div class="ref-code-value" id="ref-code-value">${escHtml(ref.code)}</div>
+        <button class="promo-btn" onclick="copyReferral('ref-code-value', this)">${t('ref-copy')}</button>
       </div>
       <div class="checkout-note">
         ${t('ref-explain').replace('{reward}', ref.reward).replace('{discount}', ref.discount_percent)}
@@ -3599,10 +3621,19 @@ async function createReferralCode() {
   } catch (e) { /* the panel stays as it was */ }
 }
 
-function copyReferralCode() {
-  const el = document.getElementById('ref-code-value');
+function referralLink(code) {
+  return `${location.origin}/?ref=${encodeURIComponent(code)}`;
+}
+
+async function copyReferral(id, btn) {
+  const el = document.getElementById(id);
   if (!el || !navigator.clipboard) return;
-  navigator.clipboard.writeText(el.textContent.trim());
+  try {
+    await navigator.clipboard.writeText(el.textContent.trim());
+    const was = btn.textContent;
+    btn.textContent = t('ref-copied');
+    setTimeout(() => { btn.textContent = was; }, 1500);
+  } catch (e) {}
 }
 
 function toggleSidebar() {
@@ -3701,6 +3732,7 @@ function showView(view, mode) {
   document.body.dataset.view = view;
   if (view === 'dashboard') startNotifications(); else stopNotifications();
   if (view === 'login') { document.getElementById('login-error') && (document.getElementById('login-error').textContent = ''); }
+  if (view === 'register') { document.getElementById('reg-ref')?.classList.toggle('show', !!referralCode()); }
   if (view === 'register') { document.getElementById('reg-error') && (document.getElementById('reg-error').textContent = ''); document.getElementById('reg-success') && (document.getElementById('reg-success').textContent = ''); }
   if (mode) loginMode = mode;
 }
@@ -3763,10 +3795,11 @@ async function doRegister() {
     const res = await fetch(`${API}/api/client/register`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, email, password, lang: currentLang})
+      body: JSON.stringify({username, email, password, lang: currentLang, ref: referralCode()})
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 201) {
+      try { localStorage.removeItem('sov_ref'); } catch (e) {}
       ok.textContent = t('reg-sent').replace('{e}', email);
       setTimeout(() => {
         document.getElementById('inp-user').value = username;
@@ -4662,6 +4695,30 @@ window.addEventListener('pageshow', (e) => {
 });
 
 // ── INIT ──────────────────────────────────────────
+// Referral link (/?ref=CODE or /app?ref=CODE): remembered in this browser
+// for 30 days and sent with the registration, so a code nobody types still
+// counts. The newest link wins. Same snippet on the landing page and the portal.
+try {
+  var _rp = new URLSearchParams(location.search), _rc = (_rp.get('ref') || '').trim().toUpperCase();
+  if (/^[A-Z0-9][A-Z0-9-]{2,31}$/.test(_rc)) {
+    localStorage.setItem('sov_ref', JSON.stringify({c: _rc, t: Date.now()}));
+  }
+  if (_rp.has('ref')) {
+    _rp.delete('ref');
+    var _rq = _rp.toString();
+    history.replaceState(null, '', location.pathname + (_rq ? '?' + _rq : '') + location.hash);
+  }
+} catch (e) {}
+
+// The remembered referral code, if still fresh.
+function referralCode() {
+  try {
+    const r = JSON.parse(localStorage.getItem('sov_ref') || 'null');
+    if (r && r.c && Date.now() - r.t < 30 * 86400000) return r.c;
+  } catch (e) {}
+  return null;
+}
+
 // /app?trial=1 is the landing page's "Активировать". Signed in, the account
 // opens on "My config", where the trial card is. Signed out, registration
 // opens instead of sign-in, with a line saying what happens next.

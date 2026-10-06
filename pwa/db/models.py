@@ -31,6 +31,10 @@ class User(Base):
     # End of the free trial; set once, when the trial is granted, and never
     # cleared — a past date is how "already used" is told from "never had".
     trial_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The code from the referral link this account was registered through
+    # (/?ref=CODE). Applied by itself to the first purchase only — see
+    # credit.price_order — so a link nobody remembers to type still counts.
+    referred_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     configs: Mapped[list["Config"]] = relationship("Config", back_populates="user")
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
 
