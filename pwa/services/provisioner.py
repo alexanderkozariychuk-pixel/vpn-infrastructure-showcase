@@ -342,6 +342,10 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     the plan's limit, are requested from the portal.
     """
     info = plan_info(payment.plan)
+    # Access opened from the admin panel (api/admin_grant.py): the same path as
+    # a purchase, so devices, limits and expiry behave identically, but the
+    # customer is told "access is open" rather than "payment received".
+    gift = payment.provider == "manual"
     if not info:
         logger.error("Unknown plan %r on payment %s — not activating", payment.plan, payment.id)
         return False
@@ -394,7 +398,7 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
         logger.warning("Referral reward for payment %s was already recorded", payment.id)
 
     from services import notify
-    await notify.notify(db, user, "paid",
+    await notify.notify(db, user, "granted" if gift else "paid",
                         plan=mailer.plan_title(info["tier"], info["days"], user.lang or "ru"),
                         date=user.subscribed_until.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y"))
 
@@ -433,11 +437,17 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     # Only this path sends it, and it runs once per payment: both callbacks
     # return early for a payment already marked paid.
     try:
-        subject, html, text = mailer.payment_email(
-            user.username, info["tier"], info["days"], int(payment.amount),
-            payment.currency or "RUB", user.subscribed_until,
-            first=not existing, lang=user.lang or "ru",
-        )
+        if gift:
+            subject, html, text = mailer.granted_email(
+                user.username, info["tier"], info["days"], user.subscribed_until,
+                first=not existing, lang=user.lang or "ru",
+            )
+        else:
+            subject, html, text = mailer.payment_email(
+                user.username, info["tier"], info["days"], int(payment.amount),
+                payment.currency or "RUB", user.subscribed_until,
+                first=not existing, lang=user.lang or "ru",
+            )
         mailer.send_later(user.email, subject, html, text)
     except Exception as e:
         logger.error("Receipt for payment %s not sent: %s", payment.id, e)

@@ -2135,6 +2135,24 @@
           <div id="adm-active-list" class="loading">Fetching</div>
         </div>
         <div class="card">
+          <div class="card-title" data-i18n="grant-title">Open access</div>
+          <div class="grid-2">
+            <div class="sup-field">
+              <label class="sup-label" for="grant-user" data-i18n="grant-user">Username</label>
+              <input class="sup-input" id="grant-user" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="sup-field">
+              <label class="sup-label" for="grant-plan" data-i18n="grant-plan">Plan</label>
+              <select class="sup-select" id="grant-plan">              </select>
+            </div>
+          </div>
+          <div class="sup-hint" data-i18n="grant-hint"></div>
+          <div class="actions">
+            <button class="btn-sm" id="grant-send" onclick="grantAccess()" data-i18n="grant-send">Open access</button>
+            <span class="sup-hint" id="grant-note" role="status"></span>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-title" data-i18n="bc-title">Message to all clients</div>
           <div class="sup-field">
             <label class="sup-label" for="bc-head" data-i18n="bc-head">Heading</label>
@@ -2262,6 +2280,12 @@ const translations = {
     'auth-err-wait': 'Too many attempts. Try again in {m} min.',
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
     'set-title': 'Settings', 'set-sub': 'Language, theme and account',
+    'hist-granted': 'Gift',
+    'grant-title': 'Open access', 'grant-user': 'Username', 'grant-plan': 'Plan',
+    'grant-hint': 'No payment: a gift, or moving a customer over. Issues the first device if there is none, adds the period after any days left, and sends an "access is open" letter.',
+    'grant-send': 'Open access', 'grant-confirm': 'Open {plan} for {user}?',
+    'grant-done': '{user}: active until {date}, up to {n} devices.', 'grant-empty': 'Enter a username.',
+    'grant-404': 'No such user.', 'grant-fail': 'Could not open access.',
     'notif-title': 'Notifications',
     'notif-empty': 'Payments, reminders before your subscription ends and news about the service will appear here.',
     'notif-now': 'just now', 'notif-min': '{n} min ago', 'notif-hr': '{n} h ago',
@@ -2591,6 +2615,12 @@ const translations = {
     'auth-err-wait': 'Слишком много попыток. Попробуйте через {m} мин.',
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
     'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
+    'hist-granted': 'Подарок',
+    'grant-title': 'Выдать доступ', 'grant-user': 'Логин', 'grant-plan': 'Тариф',
+    'grant-hint': 'Без оплаты: подарок или перенос клиента. Выдаёт первое устройство, если его нет, добавляет период после оставшихся дней и отправляет письмо «Доступ открыт».',
+    'grant-send': 'Выдать', 'grant-confirm': 'Выдать {plan} пользователю {user}?',
+    'grant-done': '{user}: до {date}, устройств до {n}.', 'grant-empty': 'Введите логин.',
+    'grant-404': 'Такого пользователя нет.', 'grant-fail': 'Не удалось выдать доступ.',
     'notif-title': 'Уведомления',
     'notif-empty': 'Здесь появятся сообщения об оплате, напоминания перед окончанием подписки и новости сервиса.',
     'notif-now': 'только что', 'notif-min': '{n} мин назад', 'notif-hr': '{n} ч назад',
@@ -3202,7 +3232,7 @@ async function loadPaymentHistory() {
       return `<tr>
         <td style="color:var(--text-dim)">${date}</td>
         <td>${p.plan || '—'}</td>
-        <td>${p.amount} ${p.currency || ''}</td>
+        <td>${p.granted ? t('hist-granted') : `${p.amount} ${p.currency || ''}`}</td>
         <td><span class="metric-value ${cls}">${stTxt}</span></td>
       </tr>`;
     }).join('');
@@ -4477,6 +4507,43 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNotifications(); });
 
+// The plan list is the page's own PLANS, which tests hold equal to config.PLANS.
+function fillGrantPlans() {
+  const sel = document.getElementById('grant-plan');
+  if (!sel || sel.options.length) return;
+  for (const [key, p] of Object.entries(PLANS)) {
+    sel.add(new Option(`${key} · ${p.configs} · ${p.days}`, key));
+  }
+  sel.value = 'ext-6m';
+}
+
+async function grantAccess() {
+  const user = document.getElementById('grant-user').value.trim();
+  const plan = document.getElementById('grant-plan').value;
+  const note = document.getElementById('grant-note'), btn = document.getElementById('grant-send');
+  if (!user) { note.textContent = t('grant-empty'); return; }
+  if (!confirm(t('grant-confirm').replace('{plan}', plan).replace('{user}', user))) return;
+  btn.disabled = true;
+  note.textContent = '';
+  try {
+    const res = await fetch(`${API}/api/admin/grant`, {
+      method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
+      body: JSON.stringify({username: user, plan}),
+    });
+    if (res.status === 404) { note.textContent = t('grant-404'); return; }
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    note.textContent = t('grant-done').replace('{user}', d.username)
+      .replace('{date}', new Date(d.subscribed_until).toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-GB'))
+      .replace('{n}', d.devices);
+    document.getElementById('grant-user').value = '';
+  } catch (e) {
+    note.textContent = t('grant-fail');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function sendBroadcast() {
   const head = document.getElementById('bc-head'), body = document.getElementById('bc-body');
   const note = document.getElementById('bc-note'), btn = document.getElementById('bc-send');
@@ -4574,6 +4641,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   }
   applyTranslations();
   renderPlans();
+  fillGrantPlans();
   updateMapImage();
 })();
 </script>

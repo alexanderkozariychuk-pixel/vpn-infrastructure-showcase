@@ -30,6 +30,7 @@ from api.admin_promo import router as admin_promo_router
 from api.email_verify import router as email_verify_router
 from api.trial import router as trial_router
 from api.notifications import router as notifications_router
+from api.admin_grant import router as admin_grant_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
 app.add_middleware(
@@ -53,6 +54,7 @@ app.include_router(admin_promo_router)
 app.include_router(email_verify_router)
 app.include_router(trial_router)
 app.include_router(notifications_router)
+app.include_router(admin_grant_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 

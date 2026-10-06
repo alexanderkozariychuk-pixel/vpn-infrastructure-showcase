@@ -430,6 +430,56 @@ def payment_email(
     return subject, _wrap(inner, pre, lang, reason), text
 
 
+def granted_email(
+    username: str, tier: str, days: int, until: datetime, first: bool, lang: str = "ru",
+) -> tuple[str, str, str]:
+    """Access opened by the operator (a gift, or moving a customer over from
+    before the portal). Like the receipt, without the money."""
+    name = escape(username)
+    plan = escape(plan_title(tier, days, lang))
+    date = until.astimezone(_MSK).strftime("%d.%m.%Y")
+    portal = f"{SITE_URL}/app"
+    host = escape(SITE_URL.split("://", 1)[-1])
+    if lang == "en":
+        subject = "Your access is open — Sovereign"
+        next_line = ("Your first device has been created. Download its file in your account and import it into AmneziaWG."
+                     if first else "The days you had left are kept: the new period is added after them.")
+        inner = (
+            _eyebrow("Access")
+            + _h(f"{name}, your access is open")
+            + _p("Your subscription is active. There is nothing to pay.")
+            + _facts([("Plan", plan), ("Active until", date)])
+            + _p(next_line)
+            + _button(portal, "Open your account")
+            + _fallback_link(portal, lang)
+            + _p("Renewing later works the same as for everyone: from the account, whenever you like.",
+                 dim=True, last=True)
+        )
+        reason = f"You received this because access was opened for your account at {host}."
+        text = (f"Your Sovereign access is open, {username}.\nPlan: {plan_title(tier, days, lang)}\n"
+                f"Active until: {date}\n\n{next_line}\n{portal}")
+        pre = f"Active until {date}."
+    else:
+        subject = "Доступ открыт — Sovereign"
+        next_line = ("Первое устройство уже создано — скачайте его файл в личном кабинете и импортируйте в AmneziaWG."
+                     if first else "Оставшиеся дни сохранены: новый период добавлен после них.")
+        inner = (
+            _eyebrow("Доступ")
+            + _h(f"{name}, доступ открыт")
+            + _p("Подписка активна, оплачивать ничего не нужно.")
+            + _facts([("Тариф", plan), ("Действует до", date)])
+            + _p(next_line)
+            + _button(portal, "Открыть личный кабинет")
+            + _fallback_link(portal, lang)
+            + _p("Продлить потом можно как обычно — в личном кабинете, когда удобно.", dim=True, last=True)
+        )
+        reason = f"Вы получили это письмо, потому что для вашего аккаунта на {host} открыт доступ."
+        text = (f"Доступ Sovereign открыт, {username}.\nТариф: {plan_title(tier, days, lang)}\n"
+                f"Действует до: {date}\n\n{next_line}\n{portal}")
+        pre = f"Подписка действует до {date}."
+    return subject, _wrap(inner, pre, lang, reason), text
+
+
 def reminder_email(kind: str, username: str, until: datetime, lang: str = "ru") -> tuple[str, str, str]:
     """
     Letters about an end: a paid period in 3 days, a paid period that has

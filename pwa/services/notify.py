@@ -5,6 +5,7 @@ Events and their channels:
 
     kind              bell   letter   when
     paid              yes    (the receipt is sent by the activation itself)
+    granted           yes    (so is the access letter: admin grant)
     trial_started     yes    —        a trial is granted
     trial_ends_1d     yes    yes      under 24 hours left of a trial
     trial_ended       yes    —        the trial's device was taken off
@@ -57,6 +58,10 @@ TEXTS = {
         "ru": ("Оплата получена", "{plan} — подписка действует до {date}."),
         "en": ("Payment received", "{plan} — active until {date}."),
     },
+    "granted": {
+        "ru": ("Доступ открыт", "{plan} — подписка действует до {date}."),
+        "en": ("Your access is open", "{plan} — active until {date}."),
+    },
     "trial_started": {
         "ru": ("Пробный период начался", "Устройство готово в «Мой конфиг». Пробный период действует до {until}."),
         "en": ("Your trial has started", "Your device is ready in My config. The trial runs until {until}."),
@@ -89,7 +94,7 @@ TEXTS = {
 }
 
 LINKS = {
-    "paid": "config", "trial_started": "config", "trial_ends_1d": "payment", "trial_ended": "payment",
+    "paid": "config", "granted": "config", "trial_started": "config", "trial_ends_1d": "payment", "trial_ended": "payment",
     "sub_ends_3d": "payment", "sub_ends_1d": "payment", "sub_ended": "payment",
 }
 
