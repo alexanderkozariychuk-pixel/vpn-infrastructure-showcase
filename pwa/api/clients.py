@@ -1,12 +1,30 @@
-from fastapi import APIRouter, Depends
+"""
+api/clients.py — the admin's list of peers on the entry node.
+
+Each peer is named from what we know about it:
+
+    portal    issued by the portal: "<username> · <device>", from configs
+    trial     the same, for a trial device
+    manual    not from the portal, named by the operator (peer_labels)
+    unknown   on the node and nowhere else — the first 12 characters of its key
+
+"unknown" is the list to work through when moving customers to the portal:
+each such peer is either labelled (it is someone's) or removed.
+"""
+import asyncio
+import base64
+import binascii
+from concurrent.futures import ThreadPoolExecutor
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from concurrent.futures import ThreadPoolExecutor
-import asyncio
+
 from auth.jwt import require_admin
-from services.net_manager import get_bridge_status_data
 from db.base import get_db
-from db.models import Config
+from db.models import Config, PeerLabel, User
+from services.net_manager import get_bridge_status_data
 
 router = APIRouter()
 executor = ThreadPoolExecutor()
@@ -17,12 +35,41 @@ async def run_sync(func, *args):
     return await loop.run_in_executor(executor, func, *args)
 
 
-async def _names_from_db(db: AsyncSession) -> dict:
-    """Map public_key[:12] -> client name from our own DB. The PWA writes
-    these rows at provisioning time, so there's no reason to SSH the node to
-    re-read them — and reading the config over SSH is no longer permitted."""
-    rows = (await db.execute(select(Config.public_key, Config.name))).all()
-    return {pk[:12]: name for pk, name in rows}
+async def _known(db: AsyncSession) -> tuple[dict, dict]:
+    """(portal configs by public key, operator labels by public key)."""
+    rows = (await db.execute(
+        select(Config.public_key, Config.name, Config.kind, Config.is_active, User.username)
+        .join(User, User.id == Config.user_id)
+    )).all()
+    configs = {}
+    for pk, name, kind, active, username in rows:
+        # A key reissued after a revoke cannot happen (keys are generated per
+        # config), but prefer the active row if it ever does.
+        if pk not in configs or active:
+            configs[pk] = {"name": f"{username} · {name}", "kind": kind}
+    labels = dict((await db.execute(select(PeerLabel.public_key, PeerLabel.label))).all())
+    return configs, labels
+
+
+def _describe(peer, configs: dict, labels: dict) -> dict:
+    key = peer.public_key
+    if key in configs:
+        c = configs[key]
+        name, source = c["name"], ("trial" if c["kind"] == "trial" else "portal")
+    elif key in labels:
+        name, source = labels[key], "manual"
+    else:
+        name, source = key[:12], "unknown"
+    return {
+        "name": name,
+        "source": source,
+        "key": key,
+        "public_key": key[:12] + "...",
+        "status": _classify_handshake(peer.handshake),
+        "handshake": peer.handshake,
+        "transfer": peer.transfer,
+        "endpoint": peer.endpoint,
+    }
 
 
 _UNITS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400, "week": 604800}
@@ -72,30 +119,22 @@ async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depen
     if err:
         return {"ok": False, "error": err}
 
-    client_names = await _names_from_db(db)
-
-    clients = []
-    for peer in (peers or []):
-        key_short = peer.public_key[:12]
-        status = _classify_handshake(peer.handshake)
-        clients.append({
-            "name": client_names.get(key_short, key_short),
-            "public_key": key_short + "...",
-            "status": status,
-            "handshake": peer.handshake,
-            "transfer": peer.transfer,
-            "endpoint": peer.endpoint,
-        })
+    configs, labels = await _known(db)
+    clients = [_describe(p, configs, labels) for p in (peers or [])]
 
     order = {"active": 0, "idle": 1, "inactive": 2}
-    clients.sort(key=lambda c: order[c["status"]])
+    clients.sort(key=lambda c: (order[c["status"]], c["name"].lower()))
+
+    def count(field, value):
+        return sum(1 for c in clients if c[field] == value)
 
     return {
         "ok": True,
         "total": len(clients),
-        "active": sum(1 for c in clients if c["status"] == "active"),
-        "idle": sum(1 for c in clients if c["status"] == "idle"),
-        "inactive": sum(1 for c in clients if c["status"] == "inactive"),
+        "active": count("status", "active"),
+        "idle": count("status", "idle"),
+        "inactive": count("status", "inactive"),
+        "sources": {s: count("source", s) for s in ("portal", "trial", "manual", "unknown")},
         "clients": clients,
     }
 
@@ -106,20 +145,44 @@ async def get_client(name: str, _: dict = Depends(require_admin), db: AsyncSessi
     if err:
         return {"ok": False, "error": err}
 
-    client_names = await _names_from_db(db)
-
+    configs, labels = await _known(db)
     for peer in (peers or []):
-        key_short = peer.public_key[:12]
-        client_name = client_names.get(key_short, key_short)
-        if client_name == name:
-            return {
-                "ok": True,
-                "name": client_name,
-                "public_key": key_short + "...",
-                "status": _classify_handshake(peer.handshake),
-                "handshake": peer.handshake,
-                "transfer": peer.transfer,
-                "endpoint": peer.endpoint,
-            }
+        c = _describe(peer, configs, labels)
+        if c["name"] == name:
+            return {"ok": True, **c}
 
     return {"ok": False, "error": f"Client '{name}' not found"}
+
+
+class LabelRequest(BaseModel):
+    public_key: str
+    label: str = Field(max_length=60)
+
+
+def _valid_key(key: str) -> bool:
+    try:
+        return len(base64.b64decode(key, validate=True)) == 32
+    except (binascii.Error, ValueError):
+        return False
+
+
+@router.post("/api/admin/peer-label")
+async def set_label(req: LabelRequest, _: dict = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Name a peer the portal did not issue. An empty label removes the name."""
+    key, label = req.public_key.strip(), req.label.strip()
+    if not _valid_key(key):
+        raise HTTPException(status_code=422, detail="Not a public key")
+    if (await db.execute(select(Config.id).where(Config.public_key == key))).first():
+        raise HTTPException(status_code=409, detail="This peer belongs to a portal account")
+    row = await db.get(PeerLabel, key)
+    if not label:
+        if row:
+            await db.delete(row)
+            await db.commit()
+        return {"ok": True, "label": None}
+    if row:
+        row.label = label
+    else:
+        db.add(PeerLabel(public_key=key, label=label))
+    await db.commit()
+    return {"ok": True, "label": label}

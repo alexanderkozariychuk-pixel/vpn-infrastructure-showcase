@@ -212,3 +212,22 @@ class Notification(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
         server_default=func.now(), index=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PeerLabel(Base):
+    """
+    The operator's name for a peer the portal did not issue — configs handed
+    out by hand before the portal, the operator's own devices. Portal-issued
+    peers are named from their configs row and never need one.
+
+    Keyed by the full public key, which is what the node reports. A label
+    outlives the peer on purpose: a removed peer's label costs nothing, and
+    a re-added one comes back named.
+    """
+    __tablename__ = "peer_labels"
+
+    public_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(60), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), server_default=func.now())

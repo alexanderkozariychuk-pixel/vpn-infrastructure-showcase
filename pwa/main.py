@@ -14,6 +14,7 @@ logging.basicConfig(
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import hashlib
 from fastapi.responses import FileResponse
 from api.status import router as status_router
 from api.clients import router as clients_router
@@ -58,36 +59,57 @@ app.include_router(admin_grant_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# Pages are revalidated on every load. Without a Cache-Control header a
+# browser may reuse a page for a while on its own heuristics — Safari does,
+# including for an icon on the home screen — and a deploy would reach some
+# customers hours late. With no-cache the check is cheap: an unchanged page
+# answers 304 by its ETag.
+def _page(path: str) -> FileResponse:
+    return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
+
+# The portal's build, for the page to notice a deploy while it stays open
+# (a home-screen app can sit in memory for days). Read once at start: a
+# deploy restarts the container.
+from pathlib import Path
+APP_VERSION = hashlib.sha256((Path(__file__).parent / "static" / "index.html").read_bytes()).hexdigest()[:12]
+
+
+@app.get("/api/version")
+async def app_version():
+    return {"version": APP_VERSION}
+
+
 @app.get("/")
 async def landing():
-    return FileResponse("static/landing.html")
+    return _page("static/landing.html")
 
 @app.get("/offer")
 async def offer_page():
-    return FileResponse("static/offer.html")
+    return _page("static/offer.html")
     
 @app.get("/about")
 async def about_page():
-    return FileResponse("static/about.html")
+    return _page("static/about.html")
 
 @app.get("/privacy")
 async def privacy_page():
-    return FileResponse("static/privacy.html")
+    return _page("static/privacy.html")
 
 @app.get("/app")
 async def app_page():
-    return FileResponse("static/index.html")
+    return _page("static/index.html")
 
 @app.get("/reset")
 async def reset_page():
     # serves the same SPA; frontend reads ?token= and shows the reset form
-    return FileResponse("static/index.html")
+    return _page("static/index.html")
 
 @app.get("/verify")
 async def verify_page():
     # The confirmation link from the welcome letter. The page posts the token
     # to /api/auth/verify-email; nothing is confirmed by the GET itself.
-    return FileResponse("static/index.html")
+    return _page("static/index.html")
 
 # Both must answer from the site root — a crawler looks for /robots.txt and
 # nowhere else, and a sitemap under /static would not be trusted for URLs

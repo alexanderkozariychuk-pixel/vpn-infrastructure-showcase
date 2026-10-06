@@ -145,7 +145,7 @@ CLIENT_PREFIXES = ("/api/client", "/api/auth", "/api/payment", "/api/register",
 # silently skipped: /api is the latency ping the portal measures against;
 # /api/public/trial says whether the landing page shows the trial offer
 # (a flag and a number of days, nothing about any account).
-PUBLIC_ROUTES = {"/api", "/api/public/trial"}
+PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/version"}
 
 
 def test_every_non_client_route_is_behind_the_admin_guard():

@@ -475,6 +475,11 @@
 
     .badge-active { background: rgba(0,255,136,0.1); color: var(--green); }
     .badge-idle { background: rgba(255,208,77,0.1); color: var(--yellow); }
+    .badge-src-portal { color: var(--accent); border: 1px solid var(--border); }
+    .badge-src-trial { color: var(--text-dim); border: 1px solid var(--border); }
+    .badge-src-manual { color: var(--text); border: 1px solid var(--border); }
+    .badge-src-unknown { color: var(--red); border: 1px solid var(--border); }
+    .peer-label-btn { padding: 2px 8px; margin-left: 6px; font-size: 12px; }
     .badge-inactive { background: rgba(255,77,106,0.1); color: var(--red); }
 
     /* CONFIG BLOCK */
@@ -2281,6 +2286,8 @@ const translations = {
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
     'set-title': 'Settings', 'set-sub': 'Language, theme and account',
     'hist-granted': 'Gift',
+    'src-col': 'Source', 'src-portal': 'portal', 'src-trial': 'trial', 'src-manual': 'by hand', 'src-unknown': 'unknown',
+    'src-rename': 'Name this peer', 'src-prompt': 'Name for this peer (empty to clear):', 'src-fail': 'Could not save the name.',
     'grant-title': 'Open access', 'grant-user': 'Username', 'grant-plan': 'Plan',
     'grant-hint': 'No payment: a gift, or moving a customer over. Issues the first device if there is none, adds the period after any days left, and sends an "access is open" letter.',
     'grant-send': 'Open access', 'grant-confirm': 'Open {plan} for {user}?',
@@ -2616,6 +2623,8 @@ const translations = {
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
     'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
     'hist-granted': 'Подарок',
+    'src-col': 'Источник', 'src-portal': 'портал', 'src-trial': 'пробный', 'src-manual': 'вручную', 'src-unknown': 'неизвестно',
+    'src-rename': 'Назвать пир', 'src-prompt': 'Имя для этого пира (пусто — убрать):', 'src-fail': 'Не удалось сохранить имя.',
     'grant-title': 'Выдать доступ', 'grant-user': 'Логин', 'grant-plan': 'Тариф',
     'grant-hint': 'Без оплаты: подарок или перенос клиента. Выдаёт первое устройство, если его нет, добавляет период после оставшихся дней и отправляет письмо «Доступ открыт».',
     'grant-send': 'Выдать', 'grant-confirm': 'Выдать {plan} пользователю {user}?',
@@ -4324,6 +4333,8 @@ async function loadAdminDash() {
   }).catch(() => {});
 }
 
+const PEER_SOURCE = {portal: 'src-portal', trial: 'src-trial', manual: 'src-manual', unknown: 'src-unknown'};
+
 async function loadAdminClients() {
   const el = document.getElementById('adm-clients-table');
   el.innerHTML = '<span class="loading">Fetching</span>';
@@ -4331,23 +4342,49 @@ async function loadAdminClients() {
     const res = await fetch(`${API}/api/clients`, {headers: hdrs()});
     const d = await res.json();
     if (!d.ok) { el.textContent = 'Error'; return; }
+    const src = d.sources || {};
+    const summary = ['portal', 'trial', 'manual', 'unknown']
+      .map(k => `${escHtml(t(PEER_SOURCE[k]))}: ${src[k] || 0}`).join(' · ');
     el.innerHTML = `
+      <div class="sup-hint" style="margin:0 0 12px">${summary}</div>
       <table class="table">
         <thead><tr>
-          <th>Name</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
+          <th>Name</th><th data-i18n="src-col">${escHtml(t('src-col'))}</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
         </tr></thead>
         <tbody>
-          ${d.clients.map(c => `<tr>
-            <td>${c.name}</td>
+          ${d.clients.map(c => {
+            const editable = c.source === 'manual' || c.source === 'unknown';
+            const edit = editable
+              ? ` <button class="btn-sm peer-label-btn" data-key="${escHtml(c.key)}" data-label="${escHtml(c.source === 'manual' ? c.name : '')}" title="${escHtml(t('src-rename'))}">✎</button>`
+              : '';
+            return `<tr>
+            <td>${escHtml(c.name)}${edit}</td>
+            <td><span class="badge badge-src-${c.source}">${escHtml(t(PEER_SOURCE[c.source] || c.source))}</span></td>
             <td><span class="badge badge-${c.status}">${c.status}</span></td>
-            <td>${c.handshake}</td>
-            <td style="color:var(--text-dim)">${c.transfer || '—'}</td>
-            <td style="color:var(--text-dim)">${c.endpoint || '—'}</td>
-          </tr>`).join('')}
+            <td>${escHtml(c.handshake)}</td>
+            <td style="color:var(--text-dim)">${escHtml(c.transfer || '—')}</td>
+            <td style="color:var(--text-dim)">${escHtml(c.endpoint || '—')}</td>
+          </tr>`;
+          }).join('')}
         </tbody>
       </table>`;
   } catch(e) { el.textContent = 'Error loading clients'; }
 }
+
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.peer-label-btn');
+  if (!btn) return;
+  const label = prompt(t('src-prompt'), btn.dataset.label || '');
+  if (label === null) return;
+  try {
+    const res = await fetch(`${API}/api/admin/peer-label`, {
+      method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
+      body: JSON.stringify({public_key: btn.dataset.key, label: label.slice(0, 60)}),
+    });
+    if (!res.ok) throw new Error(res.status);
+    loadAdminClients();
+  } catch (err) { alert(t('src-fail')); }
+});
 
 async function loadLogs(service = 'awg') {
   const el = document.getElementById('adm-logs');
@@ -4386,6 +4423,29 @@ function startAutoRefresh() {
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ── UPDATES ──────────────────────────────────────
+// A page added to the home screen can stay in memory for days. When it comes
+// back to the foreground, ask which build the server runs; if a deploy
+// happened since this page loaded, reload. Nothing typed is lost in practice:
+// a deploy rarely lands while someone is mid-form, and checks are only made
+// on return to the app, not while it is in use.
+let _appVersion = null, _versionCheckedAt = 0;
+async function checkAppVersion() {
+  try {
+    const res = await fetch(`${API}/api/version`, {cache: 'no-store'});
+    if (!res.ok) return;
+    const {version} = await res.json();
+    if (_appVersion === null) { _appVersion = version; return; }
+    if (version !== _appVersion) location.reload();
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (Date.now() - _versionCheckedAt < 60000) return;
+  _versionCheckedAt = Date.now();
+  checkAppVersion();
+});
 
 // ── NOTIFICATIONS (the bell) ─────────────────────
 // The feed comes from /api/client/notifications; what goes into it is decided
@@ -4643,6 +4703,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   renderPlans();
   fillGrantPlans();
   updateMapImage();
+  checkAppVersion();
 })();
 </script>
 </body>
