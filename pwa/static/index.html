@@ -707,6 +707,8 @@
     .trial-card .btn-full:disabled { opacity: .45; cursor: not-allowed; }
     .trial-note { margin-top: 12px; font-size: 13px; color: var(--text-dim); }
     .trial-note:empty { display: none; }
+    .trial-terms { margin-top: 12px; font-size: 12px; color: var(--text-dim); }
+    .trial-terms a { color: var(--text-dim); }
     .trial-note.bad { color: var(--red); }
     .trial-note.good { color: var(--green); }
     .trial-strip {
@@ -1566,6 +1568,8 @@
             </ul>
             <button class="btn-full" id="trial-btn" onclick="startTrial()" data-i18n="trial-btn">Start free trial</button>
             <div class="trial-note" id="trial-note" role="status"></div>
+            <div class="trial-terms"><span data-i18n="trial-terms">By starting the trial you accept the</span>
+              <a href="/offer" target="_blank" rel="noopener" data-i18n="trial-terms-link">terms of service</a></div>
           </div>
           <div class="wip-banner">
             <span class="wip-code">—</span>
@@ -2200,6 +2204,7 @@ const translations = {
     'trial-until': 'Trial until {d} ({left}). One device, speed capped.',
     'trial-left-d': '{n} d left', 'trial-left-h': '{n} h left',
     'trial-plan': 'Free trial',
+    'trial-terms': 'By starting the trial you accept the', 'trial-terms-link': 'terms of service',
     'trial-reg-intent': 'Create an account and confirm your email — the trial starts from your account.',
     'set-appearance': 'Appearance', 'set-lang': 'Language', 'set-theme': 'Theme',
     'set-dark': 'Dark', 'set-light': 'Light', 'set-account': 'Account',
@@ -2521,6 +2526,7 @@ const translations = {
     'trial-until': 'Пробный период до {d} ({left}). Одно устройство, скорость ограничена.',
     'trial-left-d': 'осталось {n} дн.', 'trial-left-h': 'осталось {n} ч',
     'trial-plan': 'Пробный период',
+    'trial-terms': 'Активируя пробный период, вы принимаете', 'trial-terms-link': 'пользовательское соглашение',
     'trial-reg-intent': 'Зарегистрируйтесь и подтвердите почту — пробный период активируется в личном кабинете.',
     'set-appearance': 'Оформление', 'set-lang': 'Язык', 'set-theme': 'Тема',
     'set-dark': 'Тёмная', 'set-light': 'Светлая', 'set-account': 'Аккаунт',
