@@ -1,0 +1,52 @@
+# /etc/sov-monitor/monitor.ini on am1 (mode 600). Secrets are not here:
+# the bot token is in its own file, and neither is committed anywhere.
+
+[telegram]
+token_file = /etc/sov-monitor/telegram.token
+chat_id = REPLACE_WITH_CHAT_ID
+
+[deadman]
+# healthchecks.io check: period 5 min, grace 10 min. Empty = off.
+url =
+
+[digest]
+# Daily summary at this hour, Moscow time. -1 = off.
+hour_msk = 9
+
+[ssh]
+key = /root/.ssh/sov-monitor
+
+[web]
+urls = https://sov3r3ign.com/ https://sov3r3ign.com/api/version
+cert_hosts = sov3r3ign.com
+
+[limits]
+disk_pct = 85
+mem_avail_pct = 10
+load_per_cpu = 2.0
+link_stale_s = 300
+cert_min_days = 14
+confirm_runs = 2
+remind_h = 6
+
+# One section per host. `links` = AmneziaWG interfaces between nodes (one peer,
+# its handshake must stay fresh); `clients` = interfaces that must exist.
+# Fill them from `sudo awg show interfaces` and sov-probe's output on each node.
+
+[host:portal]
+ssh = sovmon@159.194.232.158
+backup_max_h = 26
+expiry_max_h = 2
+
+[host:entry]
+ssh = sovmon@212.67.14.85
+clients = awg0
+links =
+
+[host:exit]
+ssh = sovmon@45.134.217.122
+links =
+
+[host:am1]
+ssh = local
+pulled_backup_max_h = 27

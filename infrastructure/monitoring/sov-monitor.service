@@ -1,0 +1,10 @@
+[Unit]
+Description=Sovereign health check (one run)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sov-monitor
+TimeoutStartSec=170
+Nice=10

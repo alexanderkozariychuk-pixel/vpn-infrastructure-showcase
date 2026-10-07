@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#
+# sov-probe — one host's health as key=value lines, read by sov-monitor on am1.
+#
+# Runs on every server (portal, entry, exit, am1). It only reads; it opens no
+# port and holds no credentials. On the three remote hosts sov-monitor reaches
+# it over SSH as the `sovmon` user, whose key is pinned to this one command:
+#
+#   /home/sovmon/.ssh/authorized_keys:
+#     command="sudo -n /usr/local/sbin/sov-probe",from="2.56.204.199",restrict ssh-ed25519 AAAA… sov-monitor@am1
+#   /etc/sudoers.d/sov-probe:
+#     sovmon ALL=(root) NOPASSWD: /usr/local/sbin/sov-probe
+#
+# root is needed for `awg show` and the portal's logs. The script takes no
+# arguments and reads no input, so the sudo rule grants nothing beyond it.
+#
+# Install: sudo install -m 755 -o root -g root infrastructure/monitoring/sov-probe /usr/local/sbin/
+#
+# Output (anything missing on a host is simply not printed):
+#   host load1 ncpu mem_avail_pct disk_root_pct uptime_s
+#   failed_units  failed_unit_names
+#   awg.<if>.peers  awg.<if>.fresh      (seconds since the newest handshake, -1 = none yet)
+#   backup_age                           portal: seconds since the last good dump
+#   pulled_backup_age                    am1: seconds since the last pulled LAST_OK
+#   expiry_age expiry_failures           portal: the hourly sweep's last run
+#   containers_up containers_expected    portal: docker compose services running
+
+set -uo pipefail
+export LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+now=$(date -u +%s)
+kv() { printf '%s=%s\n' "$1" "$2"; }
+
+kv host "$(hostname -s)"
+kv load1 "$(cut -d' ' -f1 /proc/loadavg)"
+kv ncpu "$(nproc)"
+kv mem_avail_pct "$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{printf "%d", a*100/t}' /proc/meminfo)"
+kv disk_root_pct "$(df --output=pcent / | tail -1 | tr -dc 0-9)"
+kv uptime_s "$(cut -d. -f1 /proc/uptime)"
+
+failed=$(systemctl list-units --state=failed --no-legend --plain 2>/dev/null | awk 'NF{print $1}')
+kv failed_units "$(printf '%s' "$failed" | grep -c .)"
+[[ -n $failed ]] && kv failed_unit_names "$(paste -sd, - <<<"$failed")"
+
+# AmneziaWG: per interface, how many peers and how fresh the newest handshake.
+# For a link between nodes (one peer) a stale handshake means the link is down.
+if command -v awg >/dev/null 2>&1; then
+    hs=$(awg show all latest-handshakes 2>/dev/null) || hs=""
+    while read -r ifname; do
+        [[ -n $ifname ]] || continue
+        printf '%s\n' "$hs" | awk -v ifn="$ifname" -v now="$now" '
+            $1 == ifn { n++; if ($3 > newest) newest = $3 }
+            END {
+                printf "awg.%s.peers=%d\n", ifn, n
+                printf "awg.%s.fresh=%d\n", ifn, (newest > 0 ? now - newest : -1)
+            }'
+    done < <(awg show interfaces 2>/dev/null | tr ' ' '\n')
+fi
+
+# Portal: nightly dump, hourly sweep, containers.
+if [[ -r /var/backups/pwa/LAST_OK ]]; then
+    kv backup_age $(( now - $(tr -dc 0-9 < /var/backups/pwa/LAST_OK) ))
+fi
+if [[ -r /var/log/pwa/expiry.log ]]; then
+    # The last "sweep finished" line: its time and its failure count.
+    line=$(grep -a 'sweep finished' /var/log/pwa/expiry.log | tail -1)
+    if [[ -n $line ]]; then
+        ts=$(date -u -d "$(cut -d' ' -f1,2 <<<"$line" | cut -d, -f1)" +%s 2>/dev/null || echo 0)
+        kv expiry_age $(( now - ts ))
+        kv expiry_failures "$(grep -o '[0-9]* failures' <<<"$line" | tr -dc 0-9)"
+    fi
+fi
+compose_dir=/opt/pwa/vpn-infrastructure-showcase/pwa
+if [[ -f $compose_dir/docker-compose.yml ]] && command -v docker >/dev/null 2>&1; then
+    kv containers_expected "$(cd "$compose_dir" && docker compose config --services 2>/dev/null | wc -l)"
+    kv containers_up "$(cd "$compose_dir" && docker compose ps --status running --services 2>/dev/null | wc -l)"
+fi
+
+# Backup host: the copy pulled from the portal.
+if [[ -r /srv/pwa-backups/LAST_OK ]]; then
+    kv pulled_backup_age $(( now - $(tr -dc 0-9 < /srv/pwa-backups/LAST_OK) ))
+fi
+exit 0
