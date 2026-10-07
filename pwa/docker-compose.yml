@@ -23,8 +23,11 @@ services:
     container_name: sovereign-pwa
     restart: unless-stopped
     env_file: .env
+    environment:
+      PWA_SSH_DIR: /home/app/.ssh
+    # Must be owned by uid 10001 on the host: chown -R 10001:10001 /opt/pwa/ssh_keys
     volumes:
-      - /opt/pwa/ssh_keys:/root/.ssh:ro
+      - /opt/pwa/ssh_keys:/home/app/.ssh:ro
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

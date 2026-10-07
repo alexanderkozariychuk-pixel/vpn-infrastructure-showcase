@@ -6,7 +6,8 @@ import subprocess
 # The PWA reaches both nodes as the restricted `pwa-provisioner` user, using a
 # dedicated key (never the personal key), and can only run the sudo wrappers
 # whitelisted on each node — no arbitrary commands, no root.
-PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", "/root/.ssh/pwa-provisioner")
+PWA_SSH_DIR = os.getenv("PWA_SSH_DIR", "/root/.ssh")
+PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", f"{PWA_SSH_DIR}/pwa-provisioner")
 PWA_SSH_USER = "pwa-provisioner"
 from dataclasses import dataclass
 
@@ -45,7 +46,9 @@ def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
         [
             "ssh",
             "-i", PWA_SSH_KEY,
-            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "StrictHostKeyChecking=yes",
+            "-o", f"UserKnownHostsFile={PWA_SSH_DIR}/known_hosts",
+            "-o", "UpdateHostKeys=no",
             "-o", "ConnectTimeout=5",
             f"{PWA_SSH_USER}@{EXIT_IP}",
             cmd,
@@ -60,7 +63,9 @@ def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
         [
             "ssh",
             "-i", PWA_SSH_KEY,
-            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "StrictHostKeyChecking=yes",
+            "-o", f"UserKnownHostsFile={PWA_SSH_DIR}/known_hosts",
+            "-o", "UpdateHostKeys=no",
             "-o", "ConnectTimeout=5",
             f"{PWA_SSH_USER}@{BRIDGE_IP}",
             cmd,

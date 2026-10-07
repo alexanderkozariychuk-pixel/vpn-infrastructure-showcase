@@ -103,7 +103,8 @@ def _awg_genpsk() -> str:
 # Reaches the entry node as the restricted pwa-provisioner user with a
 # dedicated key. The only write it can perform is the validated pwa-add-peer
 # wrapper — no `awg set`, no `tee`, no arbitrary sudo.
-PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", "/root/.ssh/pwa-provisioner")
+PWA_SSH_DIR = os.getenv("PWA_SSH_DIR", "/root/.ssh")
+PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", f"{PWA_SSH_DIR}/pwa-provisioner")
 PWA_SSH_USER = "pwa-provisioner"
 
 
@@ -112,7 +113,9 @@ def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
         ["ssh",
          "-i", PWA_SSH_KEY,
           "-o", "StrictHostKeyChecking=yes",
-         "-o", "UserKnownHostsFile=/root/.ssh/known_hosts",
+         "-o", f"UserKnownHostsFile={PWA_SSH_DIR}/known_hosts",
+         # The key directory is mounted read-only; don't try to rewrite it.
+         "-o", "UpdateHostKeys=no",
          "-o", "ConnectTimeout=5",
          f"{PWA_SSH_USER}@{BRIDGE_IP}",
          cmd],

@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 # ── Logging: surface app-module logs (mailer, etc.) in container stdout ──
@@ -34,9 +35,14 @@ from api.notifications import router as notifications_router
 from api.admin_grant import router as admin_grant_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
+# Only the site itself calls the API from a browser; the Android app is not
+# a browser and is not subject to CORS. "*" let any page on the internet read
+# responses for whoever was signed in — harmless only while every request
+# needs a token from localStorage, and not worth keeping on that bet.
+_ORIGINS = sorted({o.rstrip("/") for o in (os.getenv("SITE_URL", ""), os.getenv("PORTAL_BASE_URL", "")) if o})
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -13,6 +13,9 @@ if not SECRET_KEY:
     )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+# The admin token grants access, broadcasts to every customer and reads the
+# nodes. A stolen one should be worth an afternoon, not a day.
+ADMIN_TOKEN_EXPIRE_MINUTES = int(os.getenv("ADMIN_TOKEN_EXPIRE_MINUTES", "120"))
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 bearer_scheme = HTTPBearer()
@@ -26,9 +29,11 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 
-def create_token(data: dict) -> str:
+def create_token(data: dict, minutes: int | None = None) -> str:
     payload = data.copy()
-    payload["exp"] = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    if minutes is None:
+        minutes = ADMIN_TOKEN_EXPIRE_MINUTES if data.get("role") == "admin" else ACCESS_TOKEN_EXPIRE_MINUTES
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 

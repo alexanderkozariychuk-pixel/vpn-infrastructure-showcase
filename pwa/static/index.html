@@ -4326,7 +4326,7 @@ async function loadAdminDash() {
     'Last updated: ' + new Date().toLocaleTimeString();
 
   // Status
-  fetch(`${API}/api/status`, {headers: hdrs()}).then(r => r.json()).then(d => {
+  adminFetch(`${API}/api/status`, {headers: hdrs()}).then(r => r.json()).then(d => {
     if (!d.ok) return;
     document.getElementById('adm-active').textContent = d.active_peers;
     document.getElementById('adm-total').textContent = `of ${d.total_peers} total`;
@@ -4342,7 +4342,7 @@ async function loadAdminDash() {
   }).catch(() => {});
 
   // Health
-  fetch(`${API}/api/health`, {headers: hdrs()}).then(r => r.json()).then(d => {
+  adminFetch(`${API}/api/health`, {headers: hdrs()}).then(r => r.json()).then(d => {
     if (!d.ok) return;
     const b = d.bulgaria || {};
     const m = d.moldova || {};
@@ -4372,7 +4372,7 @@ async function loadAdminClients() {
   const el = document.getElementById('adm-clients-table');
   el.innerHTML = '<span class="loading">Fetching</span>';
   try {
-    const res = await fetch(`${API}/api/clients`, {headers: hdrs()});
+    const res = await adminFetch(`${API}/api/clients`, {headers: hdrs()});
     const d = await res.json();
     if (!d.ok) { el.textContent = 'Error'; return; }
     const src = d.sources || {};
@@ -4410,7 +4410,7 @@ document.addEventListener('click', async e => {
   const label = prompt(t('src-prompt'), btn.dataset.label || '');
   if (label === null) return;
   try {
-    const res = await fetch(`${API}/api/admin/peer-label`, {
+    const res = await adminFetch(`${API}/api/admin/peer-label`, {
       method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
       body: JSON.stringify({public_key: btn.dataset.key, label: label.slice(0, 60)}),
     });
@@ -4423,7 +4423,7 @@ async function loadLogs(service = 'awg') {
   const el = document.getElementById('adm-logs');
   el.innerHTML = '<span class="loading">Fetching</span>';
   try {
-    const res = await fetch(`${API}/api/logs/${service}`, {headers: hdrs()});
+    const res = await adminFetch(`${API}/api/logs/${service}`, {headers: hdrs()});
     const d = await res.json();
     if (!d.ok) { el.textContent = 'Error'; return; }
     el.innerHTML = (d.lines || []).map(l =>
@@ -4438,7 +4438,7 @@ async function runAnalyze() {
   out.textContent = 'Analyzing infrastructure...';
   btn.disabled = true;
   try {
-    const res = await fetch(`${API}/api/analyze`, {method:'POST', headers: hdrs()});
+    const res = await adminFetch(`${API}/api/analyze`, {method:'POST', headers: hdrs()});
     const d = await res.json();
     out.textContent = d.analysis || 'No response';
   } catch(e) { out.textContent = 'Error running analysis'; }
@@ -4454,7 +4454,16 @@ function startAutoRefresh() {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Admin calls. The admin token is short-lived (two hours); when it runs out
+// the panel signs out instead of filling with errors.
+async function adminFetch(url, opts) {
+  const res = await fetch(url, opts);
+  if (res.status === 401) { doLogout(); throw new Error('session expired'); }
+  return res;
 }
 
 // ── UPDATES ──────────────────────────────────────
@@ -4619,7 +4628,7 @@ async function grantAccess() {
   btn.disabled = true;
   note.textContent = '';
   try {
-    const res = await fetch(`${API}/api/admin/grant`, {
+    const res = await adminFetch(`${API}/api/admin/grant`, {
       method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
       body: JSON.stringify({username: user, plan}),
     });
@@ -4646,7 +4655,7 @@ async function sendBroadcast() {
   btn.disabled = true;
   note.textContent = '';
   try {
-    const res = await fetch(`${API}/api/admin/notifications/broadcast`, {
+    const res = await adminFetch(`${API}/api/admin/notifications/broadcast`, {
       method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'},
       body: JSON.stringify({title, body: text}),
     });
