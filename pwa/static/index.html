@@ -2148,36 +2148,6 @@
             <div id="mon-hist" class="mon-hist" style="margin-top:8px"></div>
           </details>
         </div>
-        <div class="grid-3" style="margin-bottom:16px">
-          <div class="stat">
-            <div class="stat-label">Active Peers</div>
-            <div class="stat-value green" id="adm-active">—</div>
-            <div class="stat-sub" id="adm-total">of — total</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label" data-i18n="stat-exit">Exit Node</div>
-            <div class="stat-value accent" style="font-size: 16px;padding-top:8px">Germany</div>
-            <div class="stat-sub" id="adm-exit-ip">—</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Backbone</div>
-            <div class="stat-value" id="adm-tunnel" style="font-size: 16px;padding-top:8px">—</div>
-          </div>
-        </div>
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-title">Bridge Node</div>
-            <div id="adm-bridge" class="loading">Fetching</div>
-          </div>
-          <div class="card">
-            <div class="card-title">Moldova Node</div>
-            <div id="adm-moldova" class="loading">Fetching</div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Active Clients</div>
-          <div id="adm-active-list" class="loading">Fetching</div>
-        </div>
         <div class="card">
           <div class="card-title" data-i18n="grant-title">Open access</div>
           <div class="grid-2">
@@ -4334,29 +4304,6 @@ async function loadClientMe() {
   } catch(e) {}
 }
 
-async function loadClientOverview() {
-  // Node status (placeholder backed by /api/status; per-node health scaffolded)
-  const stk = document.getElementById('st-stockholm');
-  const chi = document.getElementById('st-chisinau');
-  try {
-    const res = await fetch(`${API}/api/status`, {headers: hdrs()});
-    if (res.status === 401) { doLogout(); return; }
-    const d = await res.json();
-    const online = d && d.ok;
-    if (stk) { stk.textContent = t(online ? 'status-online' : 'status-offline'); stk.className = 'metric-value ' + (online ? 'green' : 'red'); }
-    if (chi) { chi.textContent = t(online ? 'status-online' : 'status-offline'); chi.className = 'metric-value ' + (online ? 'green' : 'red'); }
-  } catch(e) {
-    if (stk) { stk.textContent = t('status-offline'); stk.className = 'metric-value red'; }
-    if (chi) { chi.textContent = t('status-offline'); chi.className = 'metric-value red'; }
-  }
-
-  // Load real config from API
-  await loadClientConfigPage();
-}
-
-
-
-
 // ── ADMIN DATA ────────────────────────────────────
 // The monitor's report from the backup host, already in words
 // (pwa/services/monitor_view.py); this only lays it out. Rows that were open
@@ -4405,48 +4352,8 @@ async function loadMonitor() {
 
 async function loadAdminDash() {
   document.getElementById('admin-last-update').textContent =
-    'Last updated: ' + new Date().toLocaleTimeString();
+    'Обновлено: ' + new Date().toLocaleTimeString('ru-RU');
   loadMonitor();
-
-  // Status
-  adminFetch(`${API}/api/status`, {headers: hdrs()}).then(r => r.json()).then(d => {
-    if (!d.ok) return;
-    document.getElementById('adm-active').textContent = d.active_peers;
-    document.getElementById('adm-total').textContent = `of ${d.total_peers} total`;
-
-    const activeList = d.peers.filter(p => p.handshake !== 'never');
-    document.getElementById('adm-active-list').innerHTML = activeList.length
-      ? activeList.map(p => `
-          <div class="metric">
-            <span class="metric-label">${p.public_key}</span>
-            <span class="metric-value green">${p.handshake}</span>
-          </div>`).join('')
-      : '<div style="color:var(--text-dim);font-size: 15px">No active peers</div>';
-  }).catch(() => {});
-
-  // Health
-  adminFetch(`${API}/api/health`, {headers: hdrs()}).then(r => r.json()).then(d => {
-    if (!d.ok) return;
-    const b = d.bulgaria || {};
-    const m = d.moldova || {};
-    const t = d.tunnel || {};
-
-    document.getElementById('adm-bridge').innerHTML = `
-      <div class="metric"><span class="metric-label">CPU</span><span class="metric-value">${b.cpu || '—'}</span></div>
-      <div class="metric"><span class="metric-label">RAM</span><span class="metric-value">${b.ram || '—'}</span></div>
-      <div class="metric"><span class="metric-label">Disk</span><span class="metric-value">${b.disk || '—'}</span></div>
-    `;
-    document.getElementById('adm-moldova').innerHTML = `
-      <div class="metric"><span class="metric-label">CPU</span><span class="metric-value">${m.cpu || '—'}</span></div>
-      <div class="metric"><span class="metric-label">RAM</span><span class="metric-value">${m.ram || '—'}</span></div>
-      <div class="metric"><span class="metric-label">Disk</span><span class="metric-value">${m.disk || '—'}</span></div>
-    `;
-
-    const loss = t.loss || '0%';
-    const lossNum = parseFloat(loss);
-    document.getElementById('adm-tunnel').textContent = lossNum === 0 ? '✓ Healthy' : `⚠ Loss ${loss}`;
-    document.getElementById('adm-tunnel').style.color = lossNum === 0 ? 'var(--green)' : 'var(--yellow)';
-  }).catch(() => {});
 }
 
 const PEER_SOURCE = {portal: 'src-portal', trial: 'src-trial', manual: 'src-manual', unknown: 'src-unknown'};
