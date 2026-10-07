@@ -4781,3 +4781,116 @@ A71 before the next.
 - Before the redesign: move the order of operations out of `AccountScreen`
   into a shared state holder, so pages do not each carry a copy.
 - Stage 3: release signing key, the APK from the site.
+
+## 2026-10-07
+
+Pre-launch audit, worked through in order: backups, then the servers, then
+the code, then monitoring. Plan items still ahead are under Next.
+
+### ✅ Backups that have been restored, not just written
+`pg_dump -Fc` nightly at 00:17 UTC on the portal, checked with
+`pg_restore --list`, encrypted with `age` to a recipient whose private key is
+not on any server, 14 kept. The backup host (am1, outside Russia) pulls them
+at 01:23 UTC as `pwabackup`, whose key is pinned to `rrsync -ro` on the one
+directory: the portal holds no credential for the backup host, so taking the
+portal does not reach the copies. 30 days kept there. `LAST_OK` is stamped on
+success for the freshness alert.
+
+The point was the restore: a pulled copy decrypted and restored into a
+scratch Postgres matched production row for row (users, configs, payments).
+Runbook section 8 has the procedure — and the reminder that a restore also
+needs the portal's `.env`, because configs are encrypted with `FERNET_KEY`.
+
+Two fixes on the way: `LAST_OK` was unreadable by the pull user, which failed
+the whole rsync; pulled files now belong to root on the backup host.
+
+### 🔒 Servers
+- **Provisioner key** on entry and exit is now `from=<portal>,restrict`.
+- **Exit accepted passwords.** `PasswordAuthentication no` was in a drop-in
+  that sorted after `50-cloud-init.conf`, and sshd takes the first value it
+  reads. Renamed to `00-hardening.conf`, cloud-init's file set to `no` too.
+  `sshd -T` is the check, not the file.
+- **Firewall leftovers.** Rules opening node-exporter to the old Aeza
+  monitoring host removed on entry and exit.
+- **The backup host ran a VPN.** xray and `awg-quick@awg0` from its previous
+  life disabled; its firewall allows SSH only.
+- **The old portal was still up on the entry node** — v0.8.0, reachable on
+  port 80, scanners in its logs. Stopped, nginx disabled, the rule closed,
+  its `.env` shredded. Its database volume is kept two weeks; its dump (6
+  users) is archived on the backup host.
+- **A copy of a workstation SSH key** (passphrase-protected) sat in the old
+  portal's key directory on the entry node. Shredded; rotation is scheduled.
+- **Old `.env` backups** on the portal shredded. Secrets in the old `.env`
+  were compared to current ones by hash only: all rotated since, except two
+  external keys to revoke at the provider.
+- **nginx**: HSTS, `nosniff`, `X-Frame-Options DENY`, a referrer policy, a
+  permissions policy and a frame-ancestors CSP, set at `http` level and kept
+  in `infrastructure/portal/nginx-security-headers.conf`; `server_tokens off`.
+- Every project credential now lives in one password-manager folder; none of
+  it was pasted into a chat to get there.
+
+### 🔒 Code
+- The app container runs as uid 10001, not root; the provisioner key is
+  mounted read-only into its home. `StrictHostKeyChecking=yes`,
+  `UpdateHostKeys=no` on every SSH call.
+- Admin tokens last 2 hours (customers keep 24).
+- CORS is the site's own origins, not `*`; checked with a foreign origin
+  getting no `Access-Control-Allow-Origin`.
+- A partial CSP only: the portal's inline scripts rule out a strict one for
+  now.
+
+### 🛠 Monitoring: one place to look
+`sov-probe` on every server prints its health as `key=value` — disk, memory,
+load, failed units, AmneziaWG peers, active devices (handshake in the last 3
+minutes) and the newest handshake per interface; on the portal also the
+dump, the hourly sweep and the containers; on the backup host the pulled
+copy. It only reads and opens no port.
+
+`sov-monitor` on the backup host runs every 2 minutes from a systemd timer,
+standard library only. It reaches the three other servers as `sovmon`, whose
+key runs nothing but the probe and only from the backup host's address; their
+host keys were added only after matching fingerprints taken separately. It
+checks the site and its certificate from outside Russia. A problem counts
+after two bad runs in a row, so a dropped connection stays quiet.
+
+The numbers are not read by a person. The monitor posts its report to the
+portal (`/api/monitor/report`, `MONITOR_TOKEN`, constant-time compare, 503
+while unset), and the admin dashboard's "Состояние" card says it in words:
+one row per server, the entry↔exit link on its own row, the site, each
+green, yellow or red; raw numbers one click deeper; a history of what broke,
+when, and for how long. If reports stop for 10 minutes the card says the
+monitor has gone quiet instead of showing an old picture as current. Telegram
+alerts and a dead man's switch are written and waiting for a bot.
+
+First real run found `openipmi.service` failed on the entry node (no IPMI on
+a VPS), and an interface on the exit node with no handshake for 94 days — a
+link from the old layout, left out of the watched list.
+
+### 🐛 Deploy is `deploy.sh`, not `git pull`
+A `git pull` on the portal refused: the checkout there is months behind, with
+the deployed files rsynced over it. Nothing changed and the rebuild came from
+cache. Deploys go through `deploy.sh` from the workstation; the server's git
+copy is not a source.
+
+### 🧹 Dashboard
+The old widgets — "Active Peers 2 of 2" against 52 devices on the entry,
+"Germany", "Bridge Node" all N/A, "Moldova Node" — read the exit node and
+described a layout that no longer exists. Removed with `/api/status`,
+`/api/health` and a client-side loader nothing called. The dashboard is now
+Состояние, Open access and Message to all.
+
+556 tests.
+
+### 📋 Next
+- Rotate the workstation SSH key; non-root admin users on the portal and the
+  backup host, root login off there; review the provider's access key on the
+  portal.
+- Telegram bot for alerts (BotFather was down), revoke the old monitoring
+  bot's token, healthchecks.io as the dead man's switch.
+- Disable `openipmi` on the entry; remove the dead exit interface; a stale
+  firewall rule for the old WireGuard port on the exit.
+- Decide on the Logs and AI Analyze pages (old layout, an external key).
+- Remove the old portal's volume and directory on the entry node after two
+  weeks.
+- Remaining audit items: payments end to end, capacity, peer reconcile and
+  cleanup, refresh tokens, SPF/DKIM/DMARC, disaster recovery, hosting risk.
