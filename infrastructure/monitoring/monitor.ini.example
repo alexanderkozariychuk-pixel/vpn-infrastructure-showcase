@@ -1,9 +1,17 @@
 # /etc/sov-monitor/monitor.ini on am1 (mode 600). Secrets are not here:
-# the bot token is in its own file, and neither is committed anywhere.
+# each token is in its own file, and none is committed anywhere.
 
-[telegram]
-token_file = /etc/sov-monitor/telegram.token
-chat_id = REPLACE_WITH_CHAT_ID
+# The admin panel's "Состояние" card. The token is MONITOR_TOKEN from the
+# portal's .env.
+[portal]
+report_url = https://sov3r3ign.com/api/monitor/report
+token_file = /etc/sov-monitor/portal.token
+
+# Alerts to the phone. Leave the section out (or the token file missing) and
+# the monitor still runs and still reports to the panel.
+#[telegram]
+#token_file = /etc/sov-monitor/telegram.token
+#chat_id = REPLACE_WITH_CHAT_ID
 
 [deadman]
 # healthchecks.io check: period 5 min, grace 10 min. Empty = off.
@@ -41,11 +49,12 @@ expiry_max_h = 2
 [host:entry]
 ssh = sovmon@212.67.14.85
 clients = awg0
-links =
+links = awg1
 
+# awg-de is a leftover link with no handshake for months: not watched.
 [host:exit]
 ssh = sovmon@45.134.217.122
-links =
+links = awg0
 
 [host:am1]
 ssh = local

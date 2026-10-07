@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime, Integer, UniqueConstraint, func, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, Integer, Text, UniqueConstraint, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base
 
@@ -235,3 +235,32 @@ class PeerLabel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc), server_default=func.now())
+
+
+class MonitorReport(Base):
+    """
+    The latest report from sov-monitor on the backup host: one row, replaced
+    every two minutes. The payload is the monitor's own JSON (probes, open
+    problems, outside checks); services/monitor_view.py turns it into words.
+    """
+    __tablename__ = "monitor_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class MonitorEvent(Base):
+    """
+    What broke and when it was fixed, as the admin page's history. Opened when
+    a report first carries a problem, closed by the first report without it.
+    A one-off notice (a reboot) is born closed.
+    """
+    __tablename__ = "monitor_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    text: Mapped[str] = mapped_column(String(300), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

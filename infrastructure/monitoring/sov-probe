@@ -19,7 +19,8 @@
 # Output (anything missing on a host is simply not printed):
 #   host load1 ncpu mem_avail_pct disk_root_pct uptime_s
 #   failed_units  failed_unit_names
-#   awg.<if>.peers  awg.<if>.fresh      (seconds since the newest handshake, -1 = none yet)
+#   awg.<if>.peers  awg.<if>.active     (handshake in the last 3 min)
+#   awg.<if>.fresh                      (seconds since the newest handshake, -1 = none yet)
 #   backup_age                           portal: seconds since the last good dump
 #   pulled_backup_age                    am1: seconds since the last pulled LAST_OK
 #   expiry_age expiry_failures           portal: the hourly sweep's last run
@@ -49,9 +50,10 @@ if command -v awg >/dev/null 2>&1; then
     while read -r ifname; do
         [[ -n $ifname ]] || continue
         printf '%s\n' "$hs" | awk -v ifn="$ifname" -v now="$now" '
-            $1 == ifn { n++; if ($3 > newest) newest = $3 }
+            $1 == ifn { n++; if ($3 > newest) newest = $3; if ($3 > 0 && now - $3 <= 180) act++ }
             END {
                 printf "awg.%s.peers=%d\n", ifn, n
+                printf "awg.%s.active=%d\n", ifn, act
                 printf "awg.%s.fresh=%d\n", ifn, (newest > 0 ? now - newest : -1)
             }'
     done < <(awg show interfaces 2>/dev/null | tr ' ' '\n')

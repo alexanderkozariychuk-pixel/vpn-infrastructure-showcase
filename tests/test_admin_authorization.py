@@ -144,8 +144,10 @@ CLIENT_PREFIXES = ("/api/client", "/api/auth", "/api/payment", "/api/register",
 # Deliberately unauthenticated, and each one justified here rather than
 # silently skipped: /api is the latency ping the portal measures against;
 # /api/public/trial says whether the landing page shows the trial offer
-# (a flag and a number of days, nothing about any account).
-PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/version"}
+# (a flag and a number of days, nothing about any account). /api/monitor/report
+# is not a person's route: sov-monitor posts to it with MONITOR_TOKEN, checked
+# in the handler (tests/test_monitor_panel.py).
+PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/version", "/api/monitor/report"}
 
 
 def test_every_non_client_route_is_behind_the_admin_guard():

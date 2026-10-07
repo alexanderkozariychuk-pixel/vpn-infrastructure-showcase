@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-sov-monitor — checks the whole service from am1 (outside Russia) and writes to
-Telegram when something breaks, when it is fixed, and once a day with a summary.
+sov-monitor — checks the whole service from am1 (outside Russia), shows it on
+the admin panel's "Состояние" card, and writes to Telegram when something
+breaks, when it is fixed, and once a day with a summary.
 
 Runs every 2 minutes from a systemd timer (sov-monitor.timer). Python standard
 library only: nothing to install on am1, nothing listening there.
@@ -15,6 +16,11 @@ What it looks at:
     named as links in the config;
   - the portal's own jobs: tonight's dump, the hourly expiry sweep and its
     failures, the containers; and the copy pulled to am1.
+
+After every run the report (numbers + confirmed problems) is posted to the
+portal, /api/monitor/report, with MONITOR_TOKEN; the portal says it in words
+(pwa/services/monitor_view.py). Telegram is optional: without it the panel is
+the only view.
 
 A problem is reported after it has been seen on `confirm_runs` runs in a row,
 so a single dropped SSH connection stays quiet; then every `remind_h` hours
@@ -31,6 +37,7 @@ Install on am1:
   sudo install -m 755 infrastructure/monitoring/sov-probe /usr/local/sbin/
   sudo install -d -m 700 /etc/sov-monitor /var/lib/sov-monitor
   sudo install -m 600 infrastructure/monitoring/monitor.ini.example /etc/sov-monitor/monitor.ini
+  (the tokens: sudo sh -c 'umask 077; cat > /etc/sov-monitor/portal.token', paste, Ctrl-D)
   sudo install -m 644 infrastructure/monitoring/sov-monitor.service infrastructure/monitoring/sov-monitor.timer /etc/systemd/system/
   sudo systemctl daemon-reload && sudo systemctl enable --now sov-monitor.timer
 
@@ -190,23 +197,38 @@ def host_problems(name: str, section, limits, probe: dict | None, why: str) -> d
     return p
 
 
-def web_problems(cfg, limits) -> dict:
-    p = {}
+def web_checks(cfg, limits) -> tuple[dict, dict]:
+    """(problems, facts) for the site seen from outside."""
+    p, facts = {}, {"urls": {}, "certs": {}}
     if not cfg.has_section("web"):
-        return p
+        return p, facts
     for url in _list(cfg["web"].get("urls", "")):
         why = check_url(url)
+        facts["urls"][url] = why
         if why:
             p[f"web:{url}"] = f"сайт {url} не открывается: {why}"
     for host in _list(cfg["web"].get("cert_hosts", "")):
         try:
             days = cert_days_left(host)
         except Exception as e:  # noqa: BLE001
+            facts["certs"][host] = None
             p[f"cert:{host}"] = f"сертификат {host} не проверить: {type(e).__name__}"
             continue
+        facts["certs"][host] = round(days, 1)
         if days < float(limits["cert_min_days"]):
             p[f"cert:{host}"] = f"сертификат {host} истекает через {days:.0f} дн"
-    return p
+    return p, facts
+
+
+WARN_KINDS = ("disk", "mem", "load", "units")
+
+
+def level(key: str) -> str:
+    """'warn' = something to do soon, 'bad' = broken now."""
+    if key.startswith("cert:"):
+        return "warn"
+    _, _, kind = key.partition(":")
+    return "warn" if kind in WARN_KINDS else "bad"
 
 
 # ── remembering and telling ─────────────────────────────────────────────
@@ -240,7 +262,7 @@ def step(state: dict, problems: dict, now: float, confirm: int, remind_s: float)
 def reboots(state: dict, probes: dict, now: float) -> tuple[list[str], dict]:
     """A host whose boot time moved has rebooted: one message, no 'resolved'."""
     boots = dict(state.get("boots", {}))
-    msgs = []
+    msgs, notices = [], []
     for name, probe in probes.items():
         if not probe or "uptime_s" not in probe:
             continue
@@ -248,9 +270,11 @@ def reboots(state: dict, probes: dict, now: float) -> tuple[list[str], dict]:
         last = boots.get(name)
         if last is not None and abs(boot - last) > 300:
             msgs.append(f"ℹ️ {name}: перезагрузился {_dur(probe['uptime_s'])} назад")
+            notices.append({"key": f"{name}:reboot", "text": f"{name}: перезагрузился", "at": boot})
         boots[name] = boot
     out = dict(state)
     out["boots"] = boots
+    out["notices"] = notices
     return msgs, out
 
 
@@ -271,9 +295,15 @@ def digest(probes: dict, problems: dict, now: float) -> str:
 
 
 def send_telegram(cfg, text: str) -> bool:
+    """True when sent — or when Telegram is not set up, so alerts do not pile up."""
+    if not cfg.has_section("telegram"):
+        return True
     tg = cfg["telegram"]
-    with open(tg["token_file"]) as f:
-        token = f.read().strip()
+    try:
+        with open(tg["token_file"]) as f:
+            token = f.read().strip()
+    except OSError:
+        return True
     data = urllib.parse.urlencode({"chat_id": tg["chat_id"], "text": text,
                                    "disable_web_page_preview": "true"}).encode()
     try:
@@ -281,6 +311,42 @@ def send_telegram(cfg, text: str) -> bool:
             return r.status == 200
     except Exception as e:  # noqa: BLE001
         print(f"telegram: {type(e).__name__}", file=sys.stderr)
+        return False
+
+
+def build_report(cfg, probes: dict, errors: dict, web: dict, state: dict, now: float, confirm: int) -> dict:
+    """What the admin panel gets: the numbers and the problems confirmed so far."""
+    hosts = [s for s in cfg.sections() if s.startswith("host:")]
+    return {
+        "sent_at": now,
+        "hosts": probes,
+        "errors": errors,
+        "links": {s[5:]: _list(cfg[s].get("links", "")) for s in hosts if _list(cfg[s].get("links", ""))},
+        "clients": {s[5:]: _list(cfg[s].get("clients", "")) for s in hosts if _list(cfg[s].get("clients", ""))},
+        "web": web,
+        "problems": [{"key": k, "text": v["text"], "level": level(k), "since": v["since"]}
+                     for k, v in state.get("problems", {}).items() if v["count"] >= confirm],
+        "notices": state.get("notices", []),
+    }
+
+
+def send_report(cfg, report: dict) -> bool:
+    if not cfg.has_section("portal"):
+        return True
+    url = cfg["portal"].get("report_url", "").strip()
+    if not url:
+        return True
+    try:
+        with open(cfg["portal"]["token_file"]) as f:
+            token = f.read().strip()
+        req = urllib.request.Request(url, json.dumps(report, ensure_ascii=False).encode(), method="POST",
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {token}",
+                                              "User-Agent": "sov-monitor"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status == 200
+    except Exception as e:  # noqa: BLE001
+        print(f"portal report: {type(e).__name__}: {e}", file=sys.stderr)
         return False
 
 
@@ -328,15 +394,18 @@ def main() -> int:
 
     now = time.time()
     key = cfg.get("ssh", "key", fallback="/root/.ssh/sov-monitor")
-    probes, problems = {}, {}
+    probes, problems, errors = {}, {}, {}
     for section in cfg.sections():
         if not section.startswith("host:"):
             continue
         name = section[5:]
         probe, why = run_probe(cfg[section].get("ssh", "local"), key)
         probes[name] = probe
+        if why:
+            errors[name] = why
         problems.update(host_problems(name, cfg[section], limits, probe, why))
-    problems.update(web_problems(cfg, limits))
+    web_p, web = web_checks(cfg, limits)
+    problems.update(web_p)
 
     state = load_state()
     # A host that does not answer tells nothing about its disk or links: keep
@@ -356,14 +425,18 @@ def main() -> int:
         msgs.append(digest(probes, problems, now))
         state["digest_day"] = today.strftime("%F")
 
+    report = build_report(cfg, probes, errors, web, state, now, int(limits["confirm_runs"]))
     if args.dry_run:
-        print(json.dumps(probes, ensure_ascii=False, indent=1))
+        print(json.dumps(report, ensure_ascii=False, indent=1))
         print("\n".join(msgs) or "(nothing to send)")
         return 0
 
     sent = not msgs or send_telegram(cfg, "\n".join(msgs))
     if sent:
         save_state(state)
+    # The panel is a second view of the same state; a failed post does not
+    # hold back Telegram, and the next run posts a fresh report anyway.
+    send_report(cfg, report)
     ping_deadman(cfg, sent)
     return 0 if sent else 1
 

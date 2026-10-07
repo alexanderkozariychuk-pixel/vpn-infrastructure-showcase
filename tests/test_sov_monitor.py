@@ -130,3 +130,41 @@ def test_the_probe_runs_anywhere_and_prints_the_basics():
     v = mon.parse_probe(out.stdout)
     for key in ("host", "load1", "ncpu", "mem_avail_pct", "disk_root_pct", "uptime_s", "failed_units"):
         assert key in v, key
+
+
+# ── the report for the admin panel ──────────────────────────────────────
+
+@pytest.mark.parametrize("key,lvl", [("entry:disk", "warn"), ("entry:units", "warn"), ("cert:x", "warn"),
+                                     ("exit:down", "bad"), ("entry:link:awg1", "bad"), ("web:u", "bad"),
+                                     ("portal:backup", "bad")])
+def test_levels(key, lvl):
+    assert mon.level(key) == lvl
+
+
+def test_the_report_carries_only_confirmed_problems_and_the_layout():
+    cfg = configparser.ConfigParser()
+    cfg.read_string("[host:entry]\nssh = x\nlinks = awg1\nclients = awg0\n[host:am1]\nssh = local\n")
+    st = {}
+    _, st = mon.step(st, {"exit:down": "exit: не отвечает"}, 0, 2, 3600)
+    r = mon.build_report(cfg, {"entry": HEALTHY, "am1": None}, {"am1": "x"}, {}, st, 0, 2)
+    assert r["problems"] == [] and r["links"] == {"entry": ["awg1"]} and r["clients"] == {"entry": ["awg0"]}
+    _, st = mon.step(st, {"exit:down": "exit: не отвечает"}, 120, 2, 3600)
+    r = mon.build_report(cfg, {}, {}, {}, st, 120, 2)
+    assert r["problems"] == [{"key": "exit:down", "text": "exit: не отвечает", "level": "bad", "since": 0}]
+
+
+def test_the_report_matches_what_the_portal_accepts():
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "pwa"))
+    from api.monitor import Report
+    cfg = configparser.ConfigParser()
+    cfg.read_string("[host:entry]\nssh = x\nlinks = awg1\n")
+    _, st = mon.reboots({"boots": {"entry": 0}}, {"entry": {"uptime_s": 60}}, 100000)
+    for t in (0, 120):
+        _, st = mon.step(st, {"entry:disk": "entry: диск"}, t, 2, 3600)
+    Report(**mon.build_report(cfg, {"entry": HEALTHY}, {}, {"urls": {}, "certs": {}}, st, 120, 2))
+
+
+def test_without_telegram_set_up_the_monitor_still_runs():
+    cfg = configparser.ConfigParser()
+    assert mon.send_telegram(cfg, "x") is True and mon.send_report(cfg, {}) is True

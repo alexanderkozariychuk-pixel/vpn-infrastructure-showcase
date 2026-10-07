@@ -382,6 +382,35 @@
       margin-bottom: 16px;
     }
 
+    /* Monitor ("Состояние"): one row per server, coloured by its state. */
+    .mon-summary { display: flex; align-items: center; gap: 10px; font-size: 15px; margin-bottom: 14px; }
+    .mon-summary .mon-sub { color: var(--text-dim); font-size: 13px; margin-left: auto; }
+    .mon-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; }
+    .mon-ok .mon-dot, .mon-dot.mon-ok { background: var(--green); }
+    .mon-warn .mon-dot, .mon-dot.mon-warn { background: var(--yellow); }
+    .mon-bad .mon-dot, .mon-dot.mon-bad { background: var(--red); }
+    .mon-unknown .mon-dot, .mon-dot.mon-unknown { background: var(--text-dim); }
+    .mon-row { border-top: 1px solid var(--border); padding: 10px 0; }
+    .mon-row > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+    .mon-row > summary::-webkit-details-marker { display: none; }
+    .mon-name { font-weight: 600; min-width: 170px; }
+    .mon-first { color: var(--text-dim); font-size: 13px; overflow-wrap: anywhere; }
+    .mon-problem { font-size: 13px; margin: 6px 0 0 20px; }
+    .mon-bad .mon-problem { color: var(--red); }
+    .mon-warn .mon-problem { color: var(--yellow); }
+    .mon-lines { margin: 6px 0 0 20px; font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+    .mon-raw { margin: 8px 0 0 20px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+               white-space: pre-wrap; overflow-wrap: anywhere; }
+    .mon-stale { color: var(--yellow); font-size: 13px; margin-bottom: 10px; }
+    .mon-hist { font-size: 13px; line-height: 1.8; }
+    .mon-hist .mon-when { color: var(--text-dim); display: inline-block; min-width: 120px; }
+    @media (max-width: 600px) {
+      .mon-row > summary { flex-wrap: wrap; }
+      .mon-name { min-width: 0; }
+      .mon-summary { flex-wrap: wrap; }
+      .mon-summary .mon-sub { margin-left: 0; width: 100%; }
+    }
+
     .card-title {
       font-size: 13px;
       letter-spacing: 2px;
@@ -2110,6 +2139,14 @@
         <div class="page-header">
           <div class="page-title" data-i18n="page-dash">Dashboard</div>
           <div class="page-sub" id="admin-last-update">Loading...</div>
+        </div>
+        <div class="card" id="mon-card">
+          <div class="card-title">Состояние</div>
+          <div id="mon-body" class="loading">Fetching</div>
+          <details id="mon-hist-wrap" style="margin-top:10px" hidden>
+            <summary class="sup-hint" style="cursor:pointer">История</summary>
+            <div id="mon-hist" class="mon-hist" style="margin-top:8px"></div>
+          </details>
         </div>
         <div class="grid-3" style="margin-bottom:16px">
           <div class="stat">
@@ -4321,9 +4358,55 @@ async function loadClientOverview() {
 
 
 // ── ADMIN DATA ────────────────────────────────────
+// The monitor's report from the backup host, already in words
+// (pwa/services/monitor_view.py); this only lays it out. Rows that were open
+// stay open across the 30-second refresh.
+async function loadMonitor() {
+  const body = document.getElementById('mon-body');
+  if (!body) return;
+  let d;
+  try {
+    const res = await adminFetch(`${API}/api/admin/monitor`, {headers: hdrs()});
+    if (!res.ok) throw new Error(res.status);
+    d = await res.json();
+  } catch (e) {
+    body.innerHTML = '<div class="mon-stale">Не удалось получить состояние</div>';
+    return;
+  }
+  const open = new Set([...body.querySelectorAll('details.mon-row[open]')].map(x => x.dataset.id));
+  const cards = d.cards || [];
+  const head = `<div class="mon-summary mon-${escHtml(d.status)}"><span class="mon-dot"></span>
+      <span>${escHtml(d.summary || '')}</span>
+      ${d.checked ? `<span class="mon-sub">отчёт ${escHtml(d.checked)}</span>` : ''}</div>`;
+  const rows = cards.map(c => {
+    const first = (c.problems && c.problems.length) ? '' : escHtml(c.lines[0] || '');
+    const probs = (c.problems || []).map(p => `<div class="mon-problem">${escHtml(p)}</div>`).join('');
+    const lines = (c.lines || []).map(l => escHtml(l)).join('<br>');
+    const raw = Object.keys(c.raw || {}).length
+      ? `<details class="mon-raw-wrap"><summary class="sup-hint" style="cursor:pointer;margin:8px 0 0 20px">цифры</summary><div class="mon-raw">${escHtml(JSON.stringify(c.raw, null, 1))}</div></details>` : '';
+    return `<details class="mon-row mon-${escHtml(c.status)}" data-id="${escHtml(c.id)}"${open.has(c.id) ? ' open' : ''}>
+        <summary><span class="mon-dot"></span><span class="mon-name">${escHtml(c.title)}</span>
+          <span class="mon-first">${first}</span></summary>
+        ${probs}<div class="mon-lines">${lines}</div>${raw}
+      </details>`;
+  }).join('');
+  body.classList.remove('loading');
+  body.innerHTML = head + rows;
+
+  const hist = d.history || [];
+  const wrap = document.getElementById('mon-hist-wrap');
+  wrap.hidden = !hist.length;
+  document.getElementById('mon-hist').innerHTML = hist.map(e => {
+    const lvl = e.level === 'info' ? 'unknown' : (e.open ? e.level : 'ok');
+    const tail = e.level === 'info' ? '' : (e.open ? ` — идёт ${escHtml(e.duration)}` : ` — прошло (${escHtml(e.duration)})`);
+    return `<div><span class="mon-when">${escHtml(e.at)}</span><span class="mon-dot mon-${lvl}"></span> ${escHtml(e.text)}${tail}</div>`;
+  }).join('');
+}
+
 async function loadAdminDash() {
   document.getElementById('admin-last-update').textContent =
     'Last updated: ' + new Date().toLocaleTimeString();
+  loadMonitor();
 
   // Status
   adminFetch(`${API}/api/status`, {headers: hdrs()}).then(r => r.json()).then(d => {
