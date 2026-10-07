@@ -20,7 +20,7 @@ KEY=${KEY:-/root/.ssh/pwa-backup}
 KEEP_DAYS=${KEEP_DAYS:-30}
 
 mkdir -p "$DEST"
-rsync -a --chmod=F600 -e "ssh -i $KEY -o BatchMode=yes -o IdentitiesOnly=yes" \
+rsync -a --no-owner --no-group --chmod=F600 -e "ssh -i $KEY -o BatchMode=yes -o IdentitiesOnly=yes" \
     --include='vpn-*.dump.age' --include='LAST_OK' --exclude='*' "$SRC" "$DEST/"
 
 find "$DEST" -name 'vpn-*.dump.age' -mtime +"$KEEP_DAYS" -delete
