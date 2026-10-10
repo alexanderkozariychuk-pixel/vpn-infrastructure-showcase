@@ -57,6 +57,7 @@ that it can be reproduced from disk.
 | Monitoring reports success, shows nothing | [6](#6-monitoring-reports-success-shows-nothing) |
 | Deploy succeeded, service wrong or 502 | [7](#7-deploy-succeeded-service-wrong-or-502) |
 | Portal database lost or damaged | [8](#8-portal-database-lost-or-damaged) |
+| Node peers and the database disagree | [9](#9-node-peers-and-the-database-disagree) |
 
 ---
 
@@ -632,6 +633,36 @@ sudo docker stop pgtest; shred -u /tmp/t.dump key.txt
 ```
 
 The count should match `select count(*) from users` on production.
+
+## 9. Node peers and the database disagree
+
+The entry node and the portal each keep a list of peers, and nothing forces
+them to agree: hand-issued peers that predate the portal, test peers, a
+removal the node refused while the database went ahead. `tools/peer_reconcile.py`
+compares the two and changes nothing.
+
+Collect, from the workstation. The node's dump carries each peer's PSK in its
+second column; it is cut on the node, so only public keys leave it:
+
+```bash
+ssh -t sov-entry "sudo awg show awg0 dump | awk 'NR>1{print \$1, \$4, \$5}' > /tmp/sov-node.txt"
+scp -q sov-entry:/tmp/sov-node.txt /tmp/ && ssh sov-entry 'rm /tmp/sov-node.txt'
+Q='docker exec -i sovereign-postgres psql -U sre_user -d vpn_sre -At -F"|"'
+echo "SELECT c.public_key, c.peer_ip, c.is_active, c.kind, u.username, c.name FROM configs c JOIN users u ON u.id = c.user_id;" \
+  | ssh sov-app "$Q" > /tmp/sov-db.txt
+echo "SELECT public_key, label FROM peer_labels;" | ssh sov-app "$Q" > /tmp/sov-labels.txt
+python3 tools/peer_reconcile.py /tmp/sov-node.txt /tmp/sov-db.txt /tmp/sov-labels.txt
+```
+
+| Section | Means | Usually |
+|---|---|---|
+| Active in the database, missing on the node | the customer holds a config that cannot connect | re-add the peer; find why the add failed |
+| Ended in the database, still on the node | free service | remove the peer (`pwa-del-peer`) |
+| Hand-made, labelled | known | keep, or retire with the person |
+| Unknown | nobody can say whose | label it from the admin panel, or remove after a week without a handshake |
+
+The pool lines at the end are the capacity check: the paid pool is .42–.199,
+158 addresses, not the whole /24.
 
 ---
 
