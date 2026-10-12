@@ -17,7 +17,10 @@
 #   rsync -avn --delete ~/Projects/vpn-infrastructure-showcase/pwa/ sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/
 set -e
 
+# The admin user is not root (root login is off on the app server), so the
+# receiving rsync runs under sudo to write into the root-owned app directory.
 rsync -av \
+  --rsync-path="sudo rsync" \
   --exclude='venv' \
   --exclude='__pycache__' \
   --exclude='.git' \
