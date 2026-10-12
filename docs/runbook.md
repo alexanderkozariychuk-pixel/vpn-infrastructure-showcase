@@ -524,7 +524,7 @@ container. `.env` changes *do* take effect on restart, because those are read
 at process start — which is what masks the problem.
 
 ```bash
-docker compose build && docker compose up -d --force-recreate
+sudo docker compose build && sudo docker compose up -d --force-recreate
 ```
 
 ### 502 immediately after deploy
@@ -534,7 +534,7 @@ the verification `curl` fires before uvicorn is listening. Not a failure — a
 race. Check the container log before diagnosing anything:
 
 ```bash
-docker compose logs --tail=50 pwa    # migrations applied? "startup complete"?
+sudo docker compose logs --tail=50 pwa    # migrations applied? "startup complete"?
 ```
 
 Add a readiness wait to the end of the deploy script rather than diagnosing
@@ -647,7 +647,7 @@ second column; it is cut on the node, so only public keys leave it:
 ```bash
 ssh -t sov-entry "sudo awg show awg0 dump | awk 'NR>1{print \$1, \$4, \$5}' > /tmp/sov-node.txt"
 scp -q sov-entry:/tmp/sov-node.txt /tmp/ && ssh sov-entry 'rm /tmp/sov-node.txt'
-Q='docker exec -i sovereign-postgres psql -U sre_user -d vpn_sre -At -F"|"'
+Q='sudo docker exec -i sovereign-postgres psql -U sre_user -d vpn_sre -At -F"|"'
 echo "SELECT c.public_key, c.peer_ip, c.is_active, c.kind, u.username, c.name FROM configs c JOIN users u ON u.id = c.user_id;" \
   | ssh sov-app "$Q" > /tmp/sov-db.txt
 echo "SELECT public_key, label FROM peer_labels;" | ssh sov-app "$Q" > /tmp/sov-labels.txt
@@ -663,6 +663,35 @@ python3 tools/peer_reconcile.py /tmp/sov-node.txt /tmp/sov-db.txt /tmp/sov-label
 
 The pool lines at the end are the capacity check: the paid pool is .42–.199,
 158 addresses, not the whole /24.
+
+---
+
+## Administrator access
+
+No server accepts root over SSH. Each has one named admin user with
+passwordless sudo and a single passphrase-protected key from the workstation:
+
+| Host | Admin user | Other SSH users (each pinned to one command) |
+|---|---|---|
+| portal | `sovadmin` | `pwabackup` (read-only rsync of the dumps), `sovmon` (health probe) |
+| entry | `vpnadmin` | `pwa-provisioner` (wrappers), `sovmon` |
+| exit | `sovadmin` | `pwa-provisioner`, `sovmon` |
+| backup host | `sovadmin` | — |
+
+So anything that used to run as root needs `sudo` — `docker`, `systemctl`,
+`journalctl`, reading `/root`. A redirect is not covered by it:
+`sudo wc -l < /root/file` opens the file as the admin user and fails; pass the
+path as an argument (`sudo wc -l /root/file`) or use `sudo tee`.
+
+`PermitRootLogin` lives in the `00-*hardening.conf` drop-in on every host,
+because sshd keeps the first value it reads and the drop-ins are included
+before the main file. Check the effective value with `sshd -T`, never by
+reading one file. Rotating the key: add the new one everywhere, log in with it
+using `ssh -F /dev/null -i <new key>` (the config and a ControlMaster socket
+would otherwise hand the old key back), switch `~/.ssh/config`, then delete the
+old line by its key material, not its comment.
+
+The provider consoles (VNC) are the way back in if all of this fails.
 
 ---
 
