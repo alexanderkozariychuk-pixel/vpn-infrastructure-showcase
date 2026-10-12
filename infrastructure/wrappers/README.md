@@ -21,10 +21,9 @@ before touching the runtime and undo the config if the runtime refuses.
 | `pwa-awg-show` | read tunnel state | read-only |
 | `pwa-logs` | read service logs | read-only |
 
-`pwa-add-peer` and `pwa-del-peer` are version-controlled here. The two
-read-only wrappers still live only on the nodes and should be brought in too —
-production code that exists in exactly one place, with no history, is one bad
-edit from being gone.
+All four are version-controlled here. The two read-only ones were brought in
+on 2026-10-12, copied from the entry node byte for byte (their sha256 matched
+the node's) — until then they existed in exactly one place, with no history.
 
 ## Installing
 

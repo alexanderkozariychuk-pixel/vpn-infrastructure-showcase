@@ -42,7 +42,7 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          find . -name "*.sh" -not -path "./.git/*" -not -path "./archive/*" \
+          find . -name "*.sh" -not -path "./.git/*" -not -path "./archive/*" -not -path "*/as-found-*" \
             -print -exec shellcheck {} +
 
   python:

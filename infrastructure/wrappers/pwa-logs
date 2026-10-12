@@ -1,0 +1,13 @@
+#!/bin/bash
+# Read-only journal access for a fixed set of units. No shell metachars reach journalctl.
+# Usage: pwa-logs <unit> <lines>
+set -euo pipefail
+unit="${1:-}"; n="${2:-30}"
+
+case "$unit" in
+  awg-quick@awg0|ssh|fail2ban) ;;
+  *) echo "unit not allowed: $unit" >&2; exit 2 ;;
+esac
+[[ "$n" =~ ^[0-9]{1,4}$ ]] && (( n >= 1 && n <= 1000 )) || { echo "bad line count" >&2; exit 2; }
+
+exec journalctl -u "$unit" -n "$n" --no-pager --output short-iso

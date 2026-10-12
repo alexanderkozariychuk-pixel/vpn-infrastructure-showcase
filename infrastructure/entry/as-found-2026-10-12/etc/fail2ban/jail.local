@@ -1,0 +1,7 @@
+[DEFAULT]
+bantime     = 600
+banaction   = iptables-ipset-proto6
+
+[sshd]
+enabled     = true
+maxretry    = 6

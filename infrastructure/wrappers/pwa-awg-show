@@ -1,0 +1,21 @@
+#!/bin/bash
+# Read-only awg status. No arbitrary args — a fixed whitelist of views.
+# Usage: pwa-awg-show [iface] [allowed-ips]
+set -euo pipefail
+iface="${1:-}"; view="${2:-}"
+
+# iface: empty (all) or a known interface name only
+case "$iface" in
+  ""|awg0|awg1) ;;
+  *) echo "bad interface" >&2; exit 2 ;;
+esac
+# view: empty or the literal 'allowed-ips'
+case "$view" in
+  ""|allowed-ips) ;;
+  *) echo "bad view" >&2; exit 2 ;;
+esac
+
+if [[ -z "$iface" ]]; then exec awg show
+elif [[ -z "$view" ]]; then exec awg show "$iface"
+else exec awg show "$iface" allowed-ips
+fi
