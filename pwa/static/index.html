@@ -2167,6 +2167,37 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-title" data-i18n="promo-title">Promo codes</div>
+          <div class="grid-2">
+            <div class="sup-field">
+              <label class="sup-label" for="promo-pct" data-i18n="promo-pct">Discount, %</label>
+              <input class="sup-input" id="promo-pct" type="number" min="1" max="60" value="10">
+            </div>
+            <div class="sup-field">
+              <label class="sup-label" for="promo-uses" data-i18n="promo-uses">Paid orders, max</label>
+              <input class="sup-input" id="promo-uses" type="number" min="1" placeholder="∞">
+            </div>
+            <div class="sup-field">
+              <label class="sup-label" for="promo-days" data-i18n="promo-days">Valid for, days</label>
+              <input class="sup-input" id="promo-days" type="number" min="1" placeholder="∞">
+            </div>
+            <div class="sup-field">
+              <label class="sup-label" for="promo-code" data-i18n="promo-code">Code (empty = random)</label>
+              <input class="sup-input" id="promo-code" maxlength="32" autocomplete="off" spellcheck="false" style="text-transform:uppercase">
+            </div>
+          </div>
+          <div class="sup-field">
+            <label class="sup-label" for="promo-note" data-i18n="promo-note">Note — who it is for</label>
+            <input class="sup-input" id="promo-note" maxlength="255">
+          </div>
+          <div class="sup-hint" data-i18n="promo-hint"></div>
+          <div class="actions">
+            <button class="btn-sm" id="promo-send" onclick="createPromo()" data-i18n="promo-send">Create</button>
+            <span class="sup-hint" id="promo-note-out" role="status"></span>
+          </div>
+          <div id="promo-list" style="margin-top:14px"></div>
+        </div>
+        <div class="card">
           <div class="card-title" data-i18n="bc-title">Message to all clients</div>
           <div class="sup-field">
             <label class="sup-label" for="bc-head" data-i18n="bc-head">Heading</label>
@@ -2301,7 +2332,17 @@ const translations = {
     'grant-hint': 'No payment: a gift, or moving a customer over. Issues the first device if there is none, adds the period after any days left, and sends an "access is open" letter.',
     'grant-send': 'Open access', 'grant-confirm': 'Open {plan} for {user}?',
     'grant-done': '{user}: active until {date}, up to {n} devices.', 'grant-empty': 'Enter a username.',
-    'grant-404': 'No such user.', 'grant-fail': 'Could not open access.',
+    'grant-404': 'No such user.', 'grant-fail': 'Could not open access.', 'grant-devices': 'up to {n} devices',
+    'promo-title': 'Promo codes', 'promo-pct': 'Discount, %', 'promo-uses': 'Paid orders, max',
+    'promo-days': 'Valid for, days', 'promo-code': 'Code (empty = random)', 'promo-note': 'Note — who it is for',
+    'promo-hint': 'Works on every plan. A use is a paid order: an abandoned checkout does not use it up. Up to 60%. Codes are switched off, never deleted.',
+    'promo-send': 'Create', 'promo-done': 'Code {code} created — tap it in the list to copy.',
+    'promo-bad': 'Discount 1–60%; code 3–32 characters: A–Z, 0–9 and dashes.', 'promo-taken': 'That code already exists.',
+    'promo-fail': 'Could not create the code.', 'promo-empty': 'No campaign codes yet.',
+    'promo-col-code': 'Code', 'promo-col-pct': '%', 'promo-col-uses': 'Used', 'promo-col-until': 'Until', 'promo-col-note': 'Note',
+    'promo-off': 'Switch off', 'promo-off-confirm': 'Switch off {code}? It cannot be switched back on.',
+    'promo-inactive': 'off', 'promo-expired': 'expired', 'promo-copied': 'Copied {code}.',
+    'promo-ref': 'Referral codes of customers: {n} (not listed).',
     'notif-title': 'Notifications',
     'notif-empty': 'Payments, reminders before your subscription ends and news about the service will appear here.',
     'notif-now': 'just now', 'notif-min': '{n} min ago', 'notif-hr': '{n} h ago',
@@ -2642,7 +2683,17 @@ const translations = {
     'grant-hint': 'Без оплаты: подарок или перенос клиента. Выдаёт первое устройство, если его нет, добавляет период после оставшихся дней и отправляет письмо «Доступ открыт».',
     'grant-send': 'Выдать', 'grant-confirm': 'Выдать {plan} пользователю {user}?',
     'grant-done': '{user}: до {date}, устройств до {n}.', 'grant-empty': 'Введите логин.',
-    'grant-404': 'Такого пользователя нет.', 'grant-fail': 'Не удалось выдать доступ.',
+    'grant-404': 'Такого пользователя нет.', 'grant-fail': 'Не удалось выдать доступ.', 'grant-devices': 'до {n} устройств',
+    'promo-title': 'Промокоды', 'promo-pct': 'Скидка, %', 'promo-uses': 'Оплат по коду, не больше',
+    'promo-days': 'Действует, дней', 'promo-code': 'Код (пусто — случайный)', 'promo-note': 'Заметка — для кого',
+    'promo-hint': 'Действует на любой тариф. Использование — это оплаченный заказ: брошенная оплата код не тратит. Скидка до 60%. Коды выключаются, но не удаляются.',
+    'promo-send': 'Создать', 'promo-done': 'Код {code} создан — нажмите на него в списке, чтобы скопировать.',
+    'promo-bad': 'Скидка 1–60%; код 3–32 символа: A–Z, 0–9 и дефис.', 'promo-taken': 'Такой код уже есть.',
+    'promo-fail': 'Не удалось создать код.', 'promo-empty': 'Рекламных кодов пока нет.',
+    'promo-col-code': 'Код', 'promo-col-pct': '%', 'promo-col-uses': 'Оплат', 'promo-col-until': 'До', 'promo-col-note': 'Заметка',
+    'promo-off': 'Выключить', 'promo-off-confirm': 'Выключить {code}? Включить обратно будет нельзя.',
+    'promo-inactive': 'выкл.', 'promo-expired': 'истёк', 'promo-copied': 'Скопировано: {code}.',
+    'promo-ref': 'Реферальных кодов клиентов: {n} (в списке не показаны).',
     'notif-title': 'Уведомления',
     'notif-empty': 'Здесь появятся сообщения об оплате, напоминания перед окончанием подписки и новости сервиса.',
     'notif-now': 'только что', 'notif-min': '{n} мин назад', 'notif-hr': '{n} ч назад',
@@ -3859,6 +3910,7 @@ async function doLogin() {
         showView('admin');
         applyTranslations();
         loadAdminDash();
+        loadPromos();
         startAutoRefresh();
       } else {
         showView('dashboard');
@@ -4604,7 +4656,7 @@ function fillGrantPlans() {
   const sel = document.getElementById('grant-plan');
   if (!sel || sel.options.length) return;
   for (const [key, p] of Object.entries(PLANS)) {
-    sel.add(new Option(`${key} · ${p.configs} · ${p.days}`, key));
+    sel.add(new Option(`${planLabel(key)} · ${t('grant-devices').replace('{n}', p.configs)}`, key));
   }
   sel.value = 'ext-6m';
 }
@@ -4614,7 +4666,7 @@ async function grantAccess() {
   const plan = document.getElementById('grant-plan').value;
   const note = document.getElementById('grant-note'), btn = document.getElementById('grant-send');
   if (!user) { note.textContent = t('grant-empty'); return; }
-  if (!confirm(t('grant-confirm').replace('{plan}', plan).replace('{user}', user))) return;
+  if (!confirm(t('grant-confirm').replace('{plan}', planLabel(plan)).replace('{user}', user))) return;
   btn.disabled = true;
   note.textContent = '';
   try {
@@ -4635,6 +4687,96 @@ async function grantAccess() {
     btn.disabled = false;
   }
 }
+
+// Campaign codes (api/admin_promo.py). Referral codes belong to customers and
+// are only counted here; a code is switched off, never deleted, because the
+// payments made with it point at it.
+async function loadPromos() {
+  const box = document.getElementById('promo-list');
+  if (!box) return;
+  try {
+    const res = await adminFetch(`${API}/api/admin/promo`, {headers: hdrs()});
+    if (!res.ok) throw new Error(res.status);
+    const codes = (await res.json()).codes || [];
+    const camp = codes.filter(c => c.kind === 'campaign');
+    const refs = codes.length - camp.length;
+    const locale = currentLang === 'ru' ? 'ru-RU' : 'en-GB';
+    const rows = camp.map(c => {
+      const expired = c.expires_at && new Date(c.expires_at) < new Date();
+      const state = !c.is_active ? t('promo-inactive') : (expired ? t('promo-expired') : '');
+      const until = c.expires_at ? new Date(c.expires_at).toLocaleDateString(locale) : '∞';
+      const off = c.is_active && !expired
+        ? `<button class="btn-sm danger promo-off" data-code="${escHtml(c.code)}">${escHtml(t('promo-off'))}</button>` : escHtml(state);
+      return `<tr${state ? ' style="opacity:.5"' : ''}>
+        <td><button class="btn-sm promo-copy" data-code="${escHtml(c.code)}" title="copy">${escHtml(c.code)}</button></td>
+        <td>${c.discount_percent}</td>
+        <td>${c.uses}${c.max_uses ? ' / ' + c.max_uses : ''}</td>
+        <td>${escHtml(until)}</td>
+        <td style="color:var(--text-dim)">${escHtml(c.note || '')}</td>
+        <td>${off}</td></tr>`;
+    }).join('');
+    box.innerHTML = (camp.length ? `<div style="overflow-x:auto"><table class="table"><thead><tr>
+        <th>${escHtml(t('promo-col-code'))}</th><th>${escHtml(t('promo-col-pct'))}</th><th>${escHtml(t('promo-col-uses'))}</th>
+        <th>${escHtml(t('promo-col-until'))}</th><th>${escHtml(t('promo-col-note'))}</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>` : `<div class="sup-hint">${escHtml(t('promo-empty'))}</div>`)
+      + (refs ? `<div class="sup-hint">${escHtml(t('promo-ref').replace('{n}', refs))}</div>` : '');
+  } catch (e) {
+    box.innerHTML = `<div class="sup-hint">${escHtml(t('promo-fail'))}</div>`;
+  }
+}
+
+async function createPromo() {
+  const out = document.getElementById('promo-note-out'), btn = document.getElementById('promo-send');
+  const pct = parseInt(document.getElementById('promo-pct').value, 10);
+  const uses = parseInt(document.getElementById('promo-uses').value, 10);
+  const days = parseInt(document.getElementById('promo-days').value, 10);
+  const code = document.getElementById('promo-code').value.trim().toUpperCase();
+  const note = document.getElementById('promo-note').value.trim();
+  if (!(pct >= 1 && pct <= 60) || (code && !/^[A-Z0-9][A-Z0-9-]{2,31}$/.test(code))) { out.textContent = t('promo-bad'); return; }
+  const body = {discount_percent: pct};
+  if (code) body.code = code;
+  if (uses > 0) body.max_uses = uses;
+  if (days > 0) body.expires_at = new Date(Date.now() + days * 86400000).toISOString();
+  if (note) body.note = note;
+  btn.disabled = true;
+  out.textContent = '';
+  try {
+    const res = await adminFetch(`${API}/api/admin/promo`, {
+      method: 'POST', headers: {...hdrs(), 'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    if (res.status === 409) { out.textContent = t('promo-taken'); return; }
+    if (res.status === 400 || res.status === 422) { out.textContent = t('promo-bad'); return; }
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    out.textContent = t('promo-done').replace('{code}', d.code);
+    ['promo-code', 'promo-note', 'promo-uses', 'promo-days'].forEach(id => { document.getElementById(id).value = ''; });
+    loadPromos();
+  } catch (e) {
+    out.textContent = t('promo-fail');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener('click', async e => {
+  const copy = e.target.closest('.promo-copy');
+  if (copy) {
+    try { await navigator.clipboard.writeText(copy.dataset.code); } catch (_) {}
+    document.getElementById('promo-note-out').textContent = t('promo-copied').replace('{code}', copy.dataset.code);
+    return;
+  }
+  const off = e.target.closest('.promo-off');
+  if (!off) return;
+  const code = off.dataset.code;
+  if (!confirm(t('promo-off-confirm').replace('{code}', code))) return;
+  try {
+    const res = await adminFetch(`${API}/api/admin/promo/${encodeURIComponent(code)}/deactivate`, {method: 'POST', headers: hdrs()});
+    if (!res.ok) throw new Error(res.status);
+  } catch (_) {
+    document.getElementById('promo-note-out').textContent = t('promo-fail');
+  }
+  loadPromos();
+});
 
 async function sendBroadcast() {
   const head = document.getElementById('bc-head'), body = document.getElementById('bc-body');
@@ -4745,6 +4887,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
     if (user === 'admin') {
       showView('admin');
       loadAdminDash();
+      loadPromos();
       startAutoRefresh();
     } else {
       showView('dashboard');

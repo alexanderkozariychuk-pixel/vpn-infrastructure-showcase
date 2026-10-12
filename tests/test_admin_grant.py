@@ -153,3 +153,16 @@ def test_the_access_letter_follows_the_letter_rules(lang):
     assert "<b>x</b>" not in html and "&lt;b&gt;x&lt;/b&gt;" in html
     assert "<" not in mailer.granted_email("friend_1", "ext", 180, NOW, True, lang)[2]
     assert ("You received this" if lang == "en" else "Вы получили это письмо") in html
+
+
+def test_the_admin_page_names_plans_and_manages_promo_codes():
+    from pathlib import Path
+    html = (Path(__file__).parent.parent / "pwa" / "static" / "index.html").read_text()
+    # Plans by name in the grant form, not by key.
+    assert "planLabel(key)" in html and "${key} · ${p.configs}" not in html
+    # The promo card talks to the guarded admin routes and escapes what it draws.
+    assert 'id="promo-list"' in html and "/api/admin/promo" in html and "/deactivate" in html
+    assert "${escHtml(c.code)}" in html and "${escHtml(c.note || '')}" in html
+    # Only the admin loads it; a customer's page never asks.
+    init = html[html.index("(function init()"):]
+    assert init.index("loadPromos()") < init.index("} else {")
