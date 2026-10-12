@@ -49,6 +49,7 @@ import argparse
 import configparser
 import json
 import os
+import re
 import socket
 import ssl
 import subprocess
@@ -74,6 +75,8 @@ DEFAULT_LIMITS = {
     "backup_max_h": "26",
     "pulled_backup_max_h": "27",
     "expiry_max_h": "2",
+    "pool_warn_pct": "70",
+    "pool_bad_pct": "95",
 }
 
 
@@ -143,6 +146,40 @@ def _list(value: str) -> list[str]:
     return [v.strip() for v in value.replace(",", " ").split() if v.strip()]
 
 
+POOL_LABELS = {"paid": "платный пул", "trial": "пробный пул"}
+
+
+def parse_pools(value: str) -> list[tuple[str, str, int, int]]:
+    """'paid:10.88.88.42-199, trial:10.88.89.10-250' -> [(label, prefix, lo, hi)]."""
+    out = []
+    for item in value.split(","):
+        label, _, rng = item.strip().partition(":")
+        m = re.fullmatch(r"(\d+\.\d+\.\d+)\.(\d+)-(\d+)", rng.strip())
+        if label and m:
+            out.append((label.strip(), m.group(1), int(m.group(2)), int(m.group(3))))
+    return out
+
+
+def pool_usage(section, probe: dict | None) -> list[dict]:
+    """How full each address pool is, from the client interfaces' peer addresses."""
+    if not probe:
+        return []
+    ips = set()
+    for ifname in _list(section.get("clients", "")):
+        ips.update(x for x in str(probe.get(f"awg.{ifname}.ips", "")).split(",") if x)
+    out = []
+    for label, prefix, lo, hi in parse_pools(section.get("pools", "")):
+        used = 0
+        for ip in ips:
+            head, _, last = ip.rpartition(".")
+            if head == prefix and last.isdigit() and lo <= int(last) <= hi:
+                used += 1
+        size = hi - lo + 1
+        out.append({"label": label, "range": f"{prefix}.{lo}-{hi}", "used": used, "size": size,
+                    "pct": used * 100 // size})
+    return out
+
+
 def host_problems(name: str, section, limits, probe: dict | None, why: str) -> dict:
     """{problem key: message} for one host's probe."""
     if probe is None:
@@ -170,6 +207,13 @@ def host_problems(name: str, section, limits, probe: dict | None, why: str) -> d
     for ifname in _list(section.get("clients", "")):
         if f"awg.{ifname}.peers" not in probe:
             p[f"{name}:iface:{ifname}"] = f"{name}: клиентского интерфейса {ifname} нет"
+    for pool in pool_usage(section, probe):
+        label = POOL_LABELS.get(pool["label"], pool["label"])
+        text = f"{name}: {label} занят на {pool['pct']}% ({pool['used']} из {pool['size']})"
+        if pool["pct"] >= int(limits["pool_bad_pct"]):
+            p[f"{name}:poolfull:{pool['label']}"] = text + " — новые устройства скоро не выдать"
+        elif pool["pct"] >= int(limits["pool_warn_pct"]):
+            p[f"{name}:pool:{pool['label']}"] = text
 
     if "backup_max_h" in section or "backup_age" in probe:
         age = probe.get("backup_age")
@@ -220,14 +264,15 @@ def web_checks(cfg, limits) -> tuple[dict, dict]:
     return p, facts
 
 
-WARN_KINDS = ("disk", "mem", "load", "units")
+WARN_KINDS = ("disk", "mem", "load", "units", "pool")
 
 
 def level(key: str) -> str:
     """'warn' = something to do soon, 'bad' = broken now."""
     if key.startswith("cert:"):
         return "warn"
-    _, _, kind = key.partition(":")
+    # "host:kind" or "host:kind:detail" ("entry:pool:paid", "entry:link:awg1").
+    kind = (key.split(":") + [""])[1]
     return "warn" if kind in WARN_KINDS else "bad"
 
 
@@ -324,6 +369,8 @@ def build_report(cfg, probes: dict, errors: dict, web: dict, state: dict, now: f
         "links": {s[5:]: _list(cfg[s].get("links", "")) for s in hosts if _list(cfg[s].get("links", ""))},
         "clients": {s[5:]: _list(cfg[s].get("clients", "")) for s in hosts if _list(cfg[s].get("clients", ""))},
         "web": web,
+        "pools": {s[5:]: pool_usage(cfg[s], probes.get(s[5:])) for s in hosts
+                  if cfg[s].get("pools") and probes.get(s[5:])},
         "problems": [{"key": k, "text": v["text"], "level": level(k), "since": v["since"]}
                      for k, v in state.get("problems", {}).items() if v["count"] >= confirm],
         "notices": state.get("notices", []),

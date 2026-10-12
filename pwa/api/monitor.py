@@ -57,6 +57,7 @@ class Report(BaseModel):
     links: dict[str, list[str]] = {}
     clients: dict[str, list[str]] = {}
     web: dict = {}
+    pools: dict[str, list[dict]] = {}
     problems: list[Problem] = Field(default=[], max_length=200)
     notices: list[Notice] = Field(default=[], max_length=50)
 

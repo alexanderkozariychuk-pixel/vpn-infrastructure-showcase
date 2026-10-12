@@ -33,12 +33,17 @@ disk_pct = 85
 mem_avail_pct = 10
 load_per_cpu = 2.0
 link_stale_s = 300
+pool_warn_pct = 70
+pool_bad_pct = 95
 cert_min_days = 14
 confirm_runs = 2
 remind_h = 6
 
 # One section per host. `links` = AmneziaWG interfaces between nodes (one peer,
-# its handshake must stay fresh); `clients` = interfaces that must exist.
+# its handshake must stay fresh); `clients` = interfaces that must exist;
+# `pools` = client address pools counted over the clients' peers (warn at
+# pool_warn_pct, alarm at pool_bad_pct). Keep them equal to CLIENT_POOL and
+# TRIAL_POOL in pwa/services/provisioner.py.
 # Fill them from `sudo awg show interfaces` and sov-probe's output on each node.
 
 [host:portal]
@@ -50,6 +55,7 @@ expiry_max_h = 2
 ssh = sovmon@212.67.14.85
 clients = awg0
 links = awg1
+pools = paid:10.88.88.42-199, trial:10.88.89.10-250
 
 [host:exit]
 ssh = sovmon@45.134.217.122

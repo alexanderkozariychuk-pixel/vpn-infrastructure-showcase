@@ -192,3 +192,17 @@ def test_the_panel_draws_the_words_escaped():
     html = (Path(__file__).parent.parent / "pwa" / "static" / "index.html").read_text()
     assert "/api/admin/monitor" in html and 'id="mon-card"' in html
     assert "${escHtml(c.title)}" in html and "${escHtml(p)}" in html and "escHtml(l)" in html
+
+
+def test_pool_usage_shows_on_the_entry_card(db):
+    r = _report()
+    r.pools = {"entry": [{"label": "paid", "range": "10.88.88.42-199", "used": 27, "size": 158, "pct": 17},
+                         {"label": "trial", "range": "10.88.89.10-250", "used": 0, "size": 241, "pct": 0}]}
+    _send(db, r)
+    lines = _card(_state(db), "entry")["lines"]
+    assert "Платный пул: занято 27 из 158 (17%)" in lines and "Пробный пул: занято 0 из 241 (0%)" in lines
+
+
+def test_a_report_from_an_older_monitor_without_pools_is_fine(db):
+    _send(db, _report())
+    assert not any("пул" in l for l in _card(_state(db), "entry")["lines"])

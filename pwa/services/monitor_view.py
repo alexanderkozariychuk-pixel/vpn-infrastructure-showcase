@@ -88,7 +88,21 @@ def _stamp(age, base: datetime, now: datetime) -> str:
     return f"{when(base - timedelta(seconds=age), now)} ({ago(age)})"
 
 
-def _host_lines(name: str, p: dict, clients: list[str], base: datetime, now: datetime) -> list[str]:
+POOL_TITLES = {"paid": "Платный пул", "trial": "Пробный пул"}
+
+
+def _pool_lines(pools: list[dict]) -> list[str]:
+    out = []
+    for pool in pools or []:
+        if not isinstance(pool, dict) or not pool.get("size"):
+            continue
+        title = POOL_TITLES.get(pool.get("label"), pool.get("label") or "Пул")
+        out.append(f"{title}: занято {pool.get('used', '?')} из {pool['size']} ({pool.get('pct', 0)}%)")
+    return out
+
+
+def _host_lines(name: str, p: dict, clients: list[str], base: datetime, now: datetime,
+                pools: list[dict] | None = None) -> list[str]:
     lines = []
     for ifname in clients:
         peers, active = p.get(f"awg.{ifname}.peers"), p.get(f"awg.{ifname}.active")
@@ -97,6 +111,7 @@ def _host_lines(name: str, p: dict, clients: list[str], base: datetime, now: dat
             if active is not None:
                 line += f", активны сейчас: {active}"
             lines.append(line)
+    lines += _pool_lines(pools)
     if "backup_age" in p:
         lines.append("Бэкап базы: " + _stamp(p["backup_age"], base, now))
     if "pulled_backup_age" in p:
@@ -140,6 +155,7 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
     clients = payload.get("clients") or {}
     web = payload.get("web") or {}
     problems = payload.get("problems") or []
+    pools = payload.get("pools") or {}
 
     def mine(prefix: str, *, only: str | None = None, skip: str | None = None) -> list[dict]:
         out = []
@@ -175,7 +191,8 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
             cards.append(_card(name, title, [f"Не отвечает: {errors.get(name, 'причина неизвестна')}"],
                                host_problems, status="bad"))
             continue
-        cards.append(_card(name, title, _host_lines(name, probe, clients.get(name) or [], base, now),
+        cards.append(_card(name, title, _host_lines(name, probe, clients.get(name) or [], base, now,
+                                                    pools.get(name)),
                            host_problems, raw=probe))
 
     # Links between nodes get a card of their own: the thing customers feel.

@@ -168,3 +168,60 @@ def test_the_report_matches_what_the_portal_accepts():
 def test_without_telegram_set_up_the_monitor_still_runs():
     cfg = configparser.ConfigParser()
     assert mon.send_telegram(cfg, "x") is True and mon.send_report(cfg, {}) is True
+
+
+# ── address pools ───────────────────────────────────────────────────────
+
+POOLS = "paid:10.88.88.42-199, trial:10.88.89.10-250"
+
+
+def _entry(ips):
+    return {**HEALTHY, "awg.awg0.ips": ",".join(ips)}
+
+
+def test_parse_pools_skips_junk():
+    assert mon.parse_pools(POOLS + ", nonsense, x:1.2.3-4") == [
+        ("paid", "10.88.88", 42, 199), ("trial", "10.88.89", 10, 250)]
+
+
+def test_pool_usage_counts_only_addresses_inside_the_pool():
+    ips = ["10.88.88.2", "10.88.88.41", "10.88.88.42", "10.88.88.199", "10.88.88.200", "10.88.89.12"]
+    use = mon.pool_usage(_section(clients="awg0", pools=POOLS), _entry(ips))
+    assert use == [{"label": "paid", "range": "10.88.88.42-199", "used": 2, "size": 158, "pct": 1},
+                   {"label": "trial", "range": "10.88.89.10-250", "used": 1, "size": 241, "pct": 0}]
+
+
+def test_a_filling_pool_warns_then_alarms():
+    sec = _section(clients="awg0", pools="paid:10.88.88.42-199")
+    ips = lambda n: [f"10.88.88.{42 + i}" for i in range(n)]  # noqa: E731
+    assert mon.host_problems("entry", sec, LIMITS, _entry(ips(110)), "") == {}          # 69%
+    p = mon.host_problems("entry", sec, LIMITS, _entry(ips(111)), "")                   # 70%
+    assert list(p) == ["entry:pool:paid"] and "111 из 158" in p["entry:pool:paid"]
+    assert mon.level("entry:pool:paid") == "warn"
+    p = mon.host_problems("entry", sec, LIMITS, _entry(ips(151)), "")                   # 95%
+    assert list(p) == ["entry:poolfull:paid"] and mon.level("entry:poolfull:paid") == "bad"
+
+
+def test_the_report_carries_pool_usage():
+    cfg = configparser.ConfigParser()
+    cfg.read_string(f"[host:entry]\nssh = x\nclients = awg0\npools = {POOLS}\n[host:exit]\nssh = y\n")
+    r = mon.build_report(cfg, {"entry": _entry(["10.88.88.50"]), "exit": HEALTHY}, {}, {}, {}, 0, 2)
+    assert list(r["pools"]) == ["entry"] and r["pools"]["entry"][0]["used"] == 1
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="no bash")
+def test_the_probe_lists_peer_addresses(tmp_path):
+    fake = tmp_path / "awg"
+    fake.write_text("#!/bin/sh\ncase \"$*\" in\n"
+                    "  'show interfaces') echo awg0 ;;\n"
+                    "  'show all latest-handshakes') printf 'awg0\\tK1\\t0\\nawg0\\tK2\\t0\\n' ;;\n"
+                    "  'show all allowed-ips') printf 'awg0\\tK1\\t10.88.88.42/32\\nawg0\\tK2\\t10.88.88.7/32 10.9.9.9/32\\n' ;;\n"
+                    "esac\n")
+    fake.chmod(0o755)
+    src = (ROOT / "sov-probe").read_text().replace(
+        "export LC_ALL=C PATH=/usr/local/sbin", f"export LC_ALL=C PATH={tmp_path}:/usr/local/sbin")
+    script = tmp_path / "probe"
+    script.write_text(src)
+    out = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=30)
+    v = mon.parse_probe(out.stdout)
+    assert v["awg.awg0.ips"] == "10.88.88.42,10.88.88.7" and v["awg.awg0.peers"] == 2
