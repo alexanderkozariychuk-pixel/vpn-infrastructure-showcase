@@ -51,7 +51,6 @@ ssh = sovmon@212.67.14.85
 clients = awg0
 links = awg1
 
-# awg-de is a leftover link with no handshake for months: not watched.
 [host:exit]
 ssh = sovmon@45.134.217.122
 links = awg0
