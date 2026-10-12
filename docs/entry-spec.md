@@ -56,16 +56,25 @@ from shellcheck and become linted role files when Ansible takes them over.
 
 ## Found on A, to fix there
 
-1. **A broken peer block in `awg0.conf`.** Lines 219–220 hold a
-   `PresharedKey` and `AllowedIPs = 10.88.88.49/32` with no `[Peer]` or
-   `PublicKey` of their own, so the parser folds them into the previous peer
-   (`.48`): on the next restart that peer would get a second PSK — the last
-   one wins — and an extra address. The running interface is correct; the
-   file is not. Fix the file, not the runtime.
-2. **`ip rule 100` is created by something not yet found.** Neither the units
-   nor the PostUp lines on A create it, yet it is present. If it lives only at
-   runtime, a reboot would send paying clients' traffic out through the RU
-   uplink instead of the exit. To be traced before any restart.
+1. **A headerless peer fragment in `awg0.conf`.** Lines 219–220 hold a
+   `PresharedKey` (fingerprint `d4fb054e`, matching no running peer) and
+   `AllowedIPs = 10.88.88.49/32` with no `[Peer]` or `PublicKey` of their
+   own, inside the block of `client18` (`.48`). The running interface is
+   correct; only the file is wrong. On the next start of `awg0` from the file,
+   `client18` would most likely get the stray PSK — a repeated key overwrites
+   the first in the WireGuard parser; not yet confirmed on this
+   amneziawg-tools build — and stop connecting. `.49`'s own block comes later
+   and keeps its address.
+   **Deferred (2026-10-12) to the hand-issued peers review**, a few days out:
+   no client is affected until `awg0` is restarted, and removing `client18`
+   through `pwa-del-peer` takes the fragment with it (the wrapper drops a
+   block up to the next `[Peer]`). If `awg0` has to restart first, run
+   `tools/once/2026-10-12-awg0-orphan-psk.sh` before it, then
+   `tools/awg-conf-check.sh`.
+2. **`ip rule 100` lives in `/etc/rc.local`** (run at boot by
+   `rc-local.service`), next to a `table 200` default route that also comes
+   from `awg1`'s PostUp. It survives a reboot, but in a place nobody looks; on
+   B both rules go where the rest of the policy routing is.
 3. Docker is installed and running on the entry, its chains first in FORWARD.
    Docker is never co-located with a VPN node; to be removed from A.
 
