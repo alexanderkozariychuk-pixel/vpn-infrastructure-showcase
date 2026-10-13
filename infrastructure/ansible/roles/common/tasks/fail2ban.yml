@@ -1,0 +1,15 @@
+---
+- name: fail2ban jail
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: fail2ban running
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: started

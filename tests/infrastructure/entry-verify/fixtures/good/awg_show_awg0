@@ -1,0 +1,19 @@
+interface: awg0
+  public key: QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=
+  private key: (hidden)
+  listening port: 8443
+  jc: 3
+  jmin: 50
+  jmax: 1000
+  s1: 72
+  s2: 146
+  h1: 1163059398
+  h2: 1787455160
+  h3: 970047041
+  h4: 133143559
+
+peer: Q0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0M=
+  preshared key: (hidden)
+  endpoint: 198.51.100.7:40000
+  allowed ips: 10.88.88.50/32
+  jc: 99

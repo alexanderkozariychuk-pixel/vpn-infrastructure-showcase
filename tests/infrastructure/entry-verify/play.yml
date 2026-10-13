@@ -1,0 +1,29 @@
+---
+# Runs the two verify task files on localhost with every command they call
+# replaced by a stub (stubs/) answering from a fixture directory. Driven by
+# ../test_entry_verify.sh; not meant to be run by hand.
+- name: Verify tasks against a fixture
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  gather_subset: [min]
+  environment:
+    PATH: "{{ stub_dir }}:/usr/bin:/bin"
+    FIXTURE: "{{ fixture }}"
+  vars_files:
+    - ../../../infrastructure/ansible/inventory/group_vars/entry/main.yml
+    - vars.yml
+  tasks:
+    - name: Common checks
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: verify
+    - name: Entry checks
+      ansible.builtin.include_role:
+        name: entry
+        tasks_from: verify
+    - name: Write findings, one per line
+      ansible.builtin.copy:
+        dest: "{{ out }}"
+        content: "{{ (verify_problems | default([]) | sort | join('\n')) ~ '\n' }}"
+        mode: "0644"

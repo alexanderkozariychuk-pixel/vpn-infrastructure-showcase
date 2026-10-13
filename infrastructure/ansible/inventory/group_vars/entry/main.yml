@@ -1,0 +1,19 @@
+---
+# Values every entry shares. They are what a client config carries, so they
+# are the same on A and B by definition (docs/entry-spec.md, "same").
+# Nothing secret here: the obfuscation parameters are also in
+# pwa/services/provisioner.py (AWG_PARAMS), which writes the client side.
+
+entry_awg0_port: 8443
+entry_awg0_address: 10.88.88.1/24
+entry_client_subnet: 10.88.88.0/24
+entry_awg0_obfuscation:
+  jc: 3
+  jmin: 50
+  jmax: 1000
+  s1: 72
+  s2: 146
+  h1: 1163059398
+  h2: 1787455160
+  h3: 970047041
+  h4: 133143559

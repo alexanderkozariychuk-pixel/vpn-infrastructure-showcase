@@ -1,0 +1,28 @@
+---
+# Installed from infrastructure/trial/, where the script and its tests live.
+# The kill switch state (/etc/sovereign/trial.state) is operational and not
+# managed here; a missing file reads as `off`.
+- name: Trial subnet script
+  ansible.builtin.copy:
+    src: "{{ sovereign_repo }}/infrastructure/trial/sovrn-trial-net"
+    dest: /usr/local/bin/sovrn-trial-net
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart trial net
+
+- name: Trial subnet unit
+  ansible.builtin.copy:
+    src: "{{ sovereign_repo }}/infrastructure/trial/sovrn-trial-net.service"
+    dest: /etc/systemd/system/sovrn-trial-net.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart trial net
+
+- name: Trial subnet enabled and up
+  ansible.builtin.systemd_service:
+    name: sovrn-trial-net
+    enabled: true
+    state: started
+    daemon_reload: true

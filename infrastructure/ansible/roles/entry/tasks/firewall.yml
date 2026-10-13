@@ -1,0 +1,15 @@
+---
+- name: Client port open
+  community.general.ufw:
+    rule: allow
+    port: "{{ entry_awg0_port | string }}"
+    proto: udp
+    comment: awg0 clients
+
+- name: Link port open
+  community.general.ufw:
+    rule: allow
+    port: "{{ entry_link.port | string }}"
+    proto: udp
+    comment: "{{ entry_link.if }} link to exit"
+  when: entry_link is defined

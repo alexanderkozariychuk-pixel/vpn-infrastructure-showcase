@@ -1,0 +1,72 @@
+---
+- name: State directory
+  ansible.builtin.file:
+    path: /etc/sovereign
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Split-tunnel scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - sov-split-tunnel.sh
+    - sov-update-ru-list.sh
+  notify: Restart sov-split
+
+- name: Split-tunnel unit
+  ansible.builtin.copy:
+    src: sov-split.service
+    dest: /etc/systemd/system/sov-split.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart sov-split
+
+- name: Weekly RU list refresh
+  ansible.builtin.copy:
+    src: sov-ru-update.cron
+    dest: /etc/cron.d/sov-ru-update
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Refresh log rotation
+  ansible.builtin.copy:
+    src: sov-ru-update.logrotate
+    dest: /etc/logrotate.d/sov-ru-update
+    owner: root
+    group: root
+    mode: "0644"
+
+# A new node has no dump yet and sov-split.service cannot start without one.
+# The update script fetches from RIPE and writes it; its own floor
+# (8000 prefixes) refuses a short list, which the next task then catches.
+- name: First RU list
+  ansible.builtin.command: /usr/local/bin/sov-update-ru-list.sh
+  args:
+    creates: /etc/sovereign/ru_nets.ipset
+
+- name: The dump exists
+  ansible.builtin.stat:
+    path: /etc/sovereign/ru_nets.ipset
+  register: entry_ru_dump
+
+- name: Refuse to start the split tunnel without a dump
+  ansible.builtin.assert:
+    that: entry_ru_dump.stat.exists
+    fail_msg: "no /etc/sovereign/ru_nets.ipset — see /var/log/sov-ru-update.log"
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Split tunnel enabled and applied
+  ansible.builtin.systemd_service:
+    name: sov-split
+    enabled: true
+    state: started
+    daemon_reload: true

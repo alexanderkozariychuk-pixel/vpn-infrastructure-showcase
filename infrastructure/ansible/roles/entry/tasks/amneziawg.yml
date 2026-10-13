@@ -1,0 +1,33 @@
+---
+# The Amnezia PPA, keyed by full fingerprint. linux-headers-generic is what
+# lets DKMS build the module for a kernel installed by unattended-upgrades;
+# without it the next reboot comes up with no awg module.
+- name: Amnezia PPA
+  ansible.builtin.deb822_repository:
+    name: amnezia-ppa
+    types: deb
+    uris: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu/
+    suites: "{{ ansible_distribution_release }}"
+    components: main
+    signed_by: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75C9DD72C799870E310542E24166F2C257290828
+  register: entry_ppa
+
+- name: Refresh apt after adding the PPA  # noqa: no-handler — needed before the install below, not at the end
+  ansible.builtin.apt:
+    update_cache: true
+  when: entry_ppa is changed
+
+- name: AmneziaWG packages
+  ansible.builtin.apt:
+    name:
+      - amneziawg
+      - amneziawg-tools
+      - linux-headers-generic
+    state: present
+
+- name: Module built for the running kernel
+  ansible.builtin.command: modinfo -F version amneziawg
+  register: entry_awg_module
+  changed_when: false
+  check_mode: false
+  failed_when: entry_awg_module.rc != 0 and not ansible_check_mode

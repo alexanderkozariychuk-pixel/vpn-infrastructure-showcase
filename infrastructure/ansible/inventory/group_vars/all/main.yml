@@ -1,0 +1,5 @@
+---
+# The repository root, so roles install node scripts from the one place they
+# are maintained (infrastructure/wrappers, trial, monitoring) instead of
+# keeping copies. Playbooks sit in infrastructure/ansible/playbooks/.
+sovereign_repo: "{{ playbook_dir | dirname | dirname | dirname }}"

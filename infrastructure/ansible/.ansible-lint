@@ -1,0 +1,10 @@
+---
+# Task names start with the thing they act on, and that is often a lowercase
+# identifier (awg0, nf_conntrack, pwa-provisioner). Renaming them to satisfy
+# a casing rule would make them harder to find in output.
+skip_list:
+  - name[casing]
+  # verify_problems is shared on purpose: both roles add findings and the
+  # playbook reports them once. Inventory-level names (admin_user,
+  # monitor_from) are used by more than one role.
+  - var-naming[no-role-prefix]

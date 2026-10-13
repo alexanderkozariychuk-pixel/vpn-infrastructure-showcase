@@ -1,0 +1,13 @@
+# Installed by Ansible (roles/entry) — edit in the repository, not on the node.
+[Unit]
+Description=Sovereign RU split-tunnel restore
+After=network-online.target awg-quick@awg0.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sov-split-tunnel.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

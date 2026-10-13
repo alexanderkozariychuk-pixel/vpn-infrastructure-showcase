@@ -1,0 +1,17 @@
+---
+# admin_user, admin_ssh_pubkey, monitor_from, sovmon_ssh_pubkey come from the
+# inventory; there are no safe defaults for them.
+common_admin_sudoers_file: "90-{{ admin_user }}"
+common_timezone: Etc/UTC
+common_swap_mb: 2048
+common_ssh_port: 22
+common_f2b_maxretry: 6
+common_f2b_bantime: 600
+
+# What `sshd -T` must report (lowercase keywords, as sshd prints them).
+common_sshd_want:
+  permitrootlogin: "no"
+  passwordauthentication: "no"
+  kbdinteractiveauthentication: "no"
+  pubkeyauthentication: "yes"
+  x11forwarding: "no"

@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Checked with `sshd -T` (playbooks/entry.yml, post_tasks), never with grep:
+# the effective value depends on every file sshd reads, in order.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+X11Forwarding no

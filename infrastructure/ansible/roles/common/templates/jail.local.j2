@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+[DEFAULT]
+bantime     = {{ common_f2b_bantime }}
+banaction   = iptables-ipset-proto6
+
+[sshd]
+enabled     = true
+maxretry    = {{ common_f2b_maxretry }}

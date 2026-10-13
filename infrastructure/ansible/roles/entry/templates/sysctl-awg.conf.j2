@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+# Named awg.conf, as on entry A, so a check run shows the change in place.
+# Sorts after the 10-/60-/99- files, so these values win.
+net.ipv4.ip_forward = 1
+
+# Loose reverse-path filtering. Replies from the internet arrive on the link
+# interface but the main table routes their sources out of the uplink, so
+# strict mode (1) would drop them. Ubuntu's default is 2 already; it is set
+# here because the routing depends on it, not left to the image.
+net.ipv4.conf.all.rp_filter = 2
+net.ipv4.conf.default.rp_filter = 2
+
+# On A this came from a provider file (60-tcp-congestion-control.conf).
+net.ipv4.tcp_congestion_control = bbr
+
+# A ran the default 65536 with ~20 clients. nf_conntrack is loaded at boot
+# by modules-load.d/sovereign.conf, before systemd-sysctl applies this.
+net.netfilter.nf_conntrack_max = {{ entry_conntrack_max }}
+
+# IPv6 forwarding (on A) is not carried: awg0 has no IPv6, and forwarding=1
+# makes the kernel ignore router advertisements on the uplink.

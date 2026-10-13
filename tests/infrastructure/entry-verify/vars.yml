@@ -1,0 +1,11 @@
+---
+entry_awg0_public_key: "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="
+entry_uplink_if: eth0
+entry_route_table: 200
+entry_conntrack_max: 262144
+entry_ru_min_prefixes: 8000
+entry_isolate_clients: true
+entry_link:
+  if: awg1
+  port: 51821
+  public_key: "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI="

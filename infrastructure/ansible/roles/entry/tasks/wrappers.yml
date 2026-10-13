@@ -1,0 +1,35 @@
+---
+# The portal reaches the entry as pwa-provisioner and may run these four
+# wrappers as root, nothing else (infrastructure/wrappers/README.md).
+- name: Wrappers
+  ansible.builtin.copy:
+    src: "{{ sovereign_repo }}/infrastructure/wrappers/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ entry_wrappers }}"
+
+- name: pwa-provisioner user
+  ansible.builtin.user:
+    name: pwa-provisioner
+    shell: /bin/bash
+    create_home: true
+
+- name: pwa-provisioner key, from the portal only
+  ansible.posix.authorized_key:
+    user: pwa-provisioner
+    key: "{{ entry_pwa_provisioner_pubkey }}"
+    key_options: 'from="{{ entry_portal_from }}",restrict'
+    exclusive: true
+
+- name: pwa-provisioner may run the wrappers as root, nothing else
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/pwa-provisioner
+    content: |
+      # {{ ansible_managed }}
+      pwa-provisioner ALL=(root) NOPASSWD: {{ entry_wrappers | map('regex_replace', '^', '/usr/local/bin/') | join(', ') }}
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s

@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# Link from this entry to the exit. Each entry has its own link: own keys,
+# own /30, own port, to its own interface on the exit (docs/entry-spec.md).
+[Interface]
+PrivateKey = {{ entry_link_private_key }}
+Address = {{ entry_link.address }}
+ListenPort = {{ entry_link.port }}
+MTU = {{ entry_link.mtu | default(1300) }}
+# Routes go into table {{ entry_route_table }} only; the entry's own traffic
+# keeps using its uplink.
+Table = off
+{% for k in ['jc', 'jmin', 'jmax', 's1', 's2', 's3', 's4', 'h1', 'h2', 'h3', 'h4'] if k in (entry_link.obfuscation | default({})) %}
+{{ k | capitalize }} = {{ entry_link.obfuscation[k] }}
+{% endfor %}
+PostUp = ip route replace default via {{ entry_link.peer_address }} dev %i table {{ entry_route_table }}
+PostUp = iptables -t nat -C POSTROUTING -o %i -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o %i -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE
+
+[Peer]
+PublicKey = {{ entry_link.peer_public_key }}
+PresharedKey = {{ entry_link_psk }}
+Endpoint = {{ entry_link.peer_endpoint }}
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = {{ entry_link.keepalive | default(25) }}

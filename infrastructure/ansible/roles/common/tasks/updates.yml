@@ -1,0 +1,22 @@
+---
+- name: Unattended upgrades enabled
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    owner: root
+    group: root
+    mode: "0644"
+
+# A reboot drops every client for a minute and reorders boot-time setup that
+# has bitten before (ip rules, the split ipset). Reboots are done by hand.
+- name: No automatic reboot
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/52unattended-upgrades-sovereign
+    content: |
+      // {{ ansible_managed }}
+      Unattended-Upgrade::Automatic-Reboot "false";
+    owner: root
+    group: root
+    mode: "0644"

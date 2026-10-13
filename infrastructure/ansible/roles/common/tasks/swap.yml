@@ -1,0 +1,26 @@
+---
+# Only on a host with no swap at all; an existing swap file or partition is
+# left as it is.
+- name: Swap file
+  when: ansible_swaptotal_mb | int == 0
+  block:
+    - name: Allocate /swapfile
+      ansible.builtin.command: fallocate -l {{ common_swap_mb }}M /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Swap file is root-only
+      ansible.builtin.file:
+        path: /swapfile
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Format and enable
+      ansible.builtin.shell: mkswap /swapfile && swapon /swapfile
+      changed_when: true
+
+    - name: Swap survives reboot
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: /swapfile none swap sw 0 0

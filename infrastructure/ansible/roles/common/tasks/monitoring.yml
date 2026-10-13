@@ -1,0 +1,33 @@
+---
+# sov-monitor on am1 runs sov-probe over SSH as `sovmon`. The key can run that
+# one command, from am1's address only; sudo grants that one command.
+# Install and access are as described in infrastructure/monitoring/sov-probe.
+- name: sov-probe installed
+  ansible.builtin.copy:
+    src: "{{ sovereign_repo }}/infrastructure/monitoring/sov-probe"
+    dest: /usr/local/sbin/sov-probe
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: sovmon user
+  ansible.builtin.user:
+    name: sovmon
+    shell: /bin/bash
+    create_home: true
+
+- name: sovmon may run sov-probe as root, nothing else
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/sov-probe
+    content: "sovmon ALL=(root) NOPASSWD: /usr/local/sbin/sov-probe\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+
+- name: sovmon key, pinned to the probe and to am1
+  ansible.posix.authorized_key:
+    user: sovmon
+    key: "{{ sovmon_ssh_pubkey }}"
+    key_options: 'command="sudo -n /usr/local/sbin/sov-probe",from="{{ monitor_from }}",restrict'
+    exclusive: true

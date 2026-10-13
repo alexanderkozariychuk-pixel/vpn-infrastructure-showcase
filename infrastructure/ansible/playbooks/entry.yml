@@ -1,0 +1,53 @@
+---
+# Build or check an entry node (docs/entry-spec.md).
+#
+# From infrastructure/ansible/:
+#
+#   check entry A, changes nothing, no vault:
+#     ansible-playbook playbooks/entry.yml --limit entry-a --check --diff --skip-tags keyfiles
+#
+#   build entry B:
+#     ansible-playbook playbooks/entry.yml --limit entry-b -e @~/.sovereign/vault-b.yml --ask-vault-pass
+#
+# The last task lists everything the read-only checks found. In check mode
+# that list is the answer; in a real run it is fatal.
+
+- name: Entry node
+  hosts: entry
+  become: true
+
+  pre_tasks:
+    # entry A carries paying clients. The roles are checked against it, not
+    # applied to it: changes on A are made by hand, one at a time.
+    - name: Hosts in `live` are checked, never changed
+      ansible.builtin.assert:
+        that: ansible_check_mode or inventory_hostname not in groups.get('live', [])
+        fail_msg: "{{ inventory_hostname }} is in the live group: run with --check"
+        quiet: true
+
+  roles:
+    - common
+    - entry
+
+  # After the handlers: sshd has been reloaded, sysctl applied, units started.
+  post_tasks:
+    - name: Check the base system
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: verify
+
+    - name: Check the entry
+      ansible.builtin.include_role:
+        name: entry
+        tasks_from: verify
+
+    - name: Findings
+      ansible.builtin.debug:
+        msg: "{{ verify_problems | default([]) if verify_problems | default([]) else 'none' }}"
+
+    - name: Stop on findings (outside check mode)
+      ansible.builtin.fail:
+        msg: "{{ verify_problems | length }} finding(s) above"
+      when:
+        - verify_problems | default([]) | length > 0
+        - not ansible_check_mode

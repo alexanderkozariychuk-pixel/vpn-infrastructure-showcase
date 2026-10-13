@@ -1,0 +1,155 @@
+---
+# Read-only checks of what the entry is actually running. Every command here
+# only reads (awg show without peers, ip rule/route show, ipset list -t,
+# iptables -S, sysctl -n, systemctl is-active) and runs with
+# check_mode: false, so a --check run against entry A reports A's real state.
+# Findings go into verify_problems; the playbook's last task reports them.
+#
+# This is where awg0 is compared, since awg0.conf is never rewritten: the
+# running interface must carry the public key, port and obfuscation every
+# client config was issued with.
+
+- name: Interfaces present
+  ansible.builtin.command: awg show interfaces
+  register: entry_v_ifs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Interface sections (no peers)
+  # Pretty output masks the private key; the sed cuts everything from the
+  # first peer on, so client keys and endpoints are never collected.
+  ansible.builtin.shell: |
+    set -o pipefail
+    awg show {{ item }} | sed '/^peer: /,$d'
+  args:
+    executable: /bin/bash
+  register: entry_v_show
+  changed_when: false
+  check_mode: false
+  loop: "{{ ['awg0'] + ([entry_link.if] if entry_link is defined else []) }}"
+  when: item in entry_v_ifs.stdout.split()
+
+- name: Interfaces that should be up are up
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [item ~ ': interface not up'] }}"
+  loop: "{{ ['awg0'] + ([entry_link.if] if entry_link is defined else []) }}"
+  when: item not in entry_v_ifs.stdout.split()
+
+- name: Expected interface values
+  ansible.builtin.set_fact:
+    entry_v_want:
+      awg0: "{{ {'public key': entry_awg0_public_key, 'listening port': entry_awg0_port | string}
+               | combine(entry_awg_obf_defaults | combine(entry_awg0_obfuscation)) }}"
+      link: "{{ {} if entry_link is not defined else
+               ({'listening port': entry_link.port | string}
+                | combine({'public key': entry_link.public_key} if entry_link.public_key is defined else {})
+                | combine(entry_awg_obf_defaults | combine(entry_link.obfuscation) if entry_link.obfuscation | default({}) else {})) }}"
+
+- name: Parse the running interfaces
+  vars:
+    # "  jc: 3" -> {"jc": "3"}; a header range printed as "N-N" is N.
+    _v_parsed: >-
+      {{ dict(item.stdout_lines | select('match', '^\s+\S')
+              | map('trim') | map('regex_replace', '^(.*?): (\d+)-\2$', '\1: \2')
+              | map('split', ': ', 1)) }}
+  ansible.builtin.set_fact:
+    entry_v_have: "{{ entry_v_have | default({}) | combine({item.item: _v_parsed}) }}"
+  loop: "{{ entry_v_show.results | selectattr('stdout_lines', 'defined') }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+# Values awg prints only when they differ from the default are compared
+# against that default (an absent `s3` means 0, an absent `h1` means 1).
+- name: Running interfaces match
+  vars:
+    _v_have: "{{ entry_v_have[item.if][item.key] | default(entry_awg_obf_defaults[item.key] | default('absent')) | string }}"
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [item.if ~ ': ' ~ item.key ~ ' is ' ~ _v_have ~ ', want ' ~ item.value] }}"
+  loop: >-
+    {{ (entry_v_want.awg0 | dict2items | map('combine', {'if': 'awg0'}) | list)
+       + ((entry_v_want.link | dict2items | map('combine', {'if': entry_link.if}) | list) if entry_link is defined else []) }}
+  loop_control:
+    label: "{{ item.if }} {{ item.key }}"
+  when:
+    - item.if in entry_v_have
+    - _v_have != (item.value | string)
+
+# The node's own clock on both sides of the subtraction.
+- name: Link handshake is recent
+  ansible.builtin.shell: |
+    date +%s
+    awg show {{ entry_link.if }} latest-handshakes
+  register: entry_v_hs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: entry_link is defined and entry_link.if in entry_v_ifs.stdout.split()
+
+- name: Link is carrying traffic
+  vars:
+    # line 1: now; line 2: "<peer key>\t<last handshake, 0 = never>"
+    _v_now: "{{ entry_v_hs.stdout_lines[0] | default(0) | int }}"
+    _v_last: "{{ ((entry_v_hs.stdout_lines[1] | default('')).split() + ['', '0'])[1] | int }}"
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [entry_link.if ~ ': no handshake in the last 180 s'] }}"
+  when:
+    - entry_v_hs is not skipped
+    - (_v_now | int) - (_v_last | int) > 180
+
+- name: Policy rules, table 200, ipset, firewall, sysctl, units
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "== rules";    ip rule show
+    echo "== table";    ip route show table {{ entry_route_table }}
+    echo "== ipset";    ipset list -t ru_nets 2>/dev/null | awk -F': ' '/^Number of entries/{print $2}'
+    echo "== forward";  iptables -S FORWARD
+    echo "== nat";      iptables -t nat -S POSTROUTING
+    echo "== sysctl"
+    for k in net.ipv4.ip_forward net.ipv4.conf.all.rp_filter net.ipv4.tcp_congestion_control net.netfilter.nf_conntrack_max; do
+      echo "$k=$(sysctl -n "$k" 2>/dev/null)"
+    done
+    echo "== units"
+    for u in awg-quick@awg0 sov-split sovrn-trial-net {{ ('awg-quick@' ~ entry_link.if) if entry_link is defined else '' }}; do
+      echo "$u=$(systemctl is-active "$u") $(systemctl is-enabled "$u" 2>/dev/null)"
+    done
+  args:
+    executable: /bin/bash
+  register: entry_v_state
+  changed_when: false
+  check_mode: false
+
+- name: Compare routing, firewall, sysctl and units
+  vars:
+    _v_out: "{{ entry_v_state.stdout }}"
+    _v_sec: "{{ dict(_v_out.split('== ')[1:] | map('split', '\n', 1)) }}"
+    _v_rules: "{{ _v_sec['rules'] | default('') }}"
+    _v_sysctl: "{{ dict((_v_sec['sysctl'] | default('')).splitlines() | select('match', '^\\S+=') | map('split', '=', 1)) }}"
+    _v_checks:
+      - ok: "{{ _v_rules | regex_findall('(?m)^99:\\s+from all fwmark 0x64 lookup main') | length == 1 }}"
+        msg: "ip rule 99 (fwmark 0x64 -> main): want exactly one"
+      - ok: "{{ _v_rules | regex_findall('(?m)^100:\\s+from ' ~ entry_client_subnet ~ ' lookup ' ~ entry_route_table ~ '\\b') | length == 1 }}"
+        msg: "ip rule 100 (from {{ entry_client_subnet }} -> {{ entry_route_table }}): want exactly one"
+      - ok: "{{ entry_link is not defined or _v_sec['table'] | default('') is search('^default via ', multiline=True) }}"
+        msg: "table {{ entry_route_table }} has no default route: foreign traffic falls back to the uplink"
+      - ok: "{{ (_v_sec['ipset'] | default('0') | trim | int) >= entry_ru_min_prefixes }}"
+        msg: "ipset ru_nets: {{ (_v_sec['ipset'] | default('') | trim) or 'missing' }} entries, want >= {{ entry_ru_min_prefixes }}"
+      - ok: "{{ not entry_isolate_clients or _v_sec['forward'] | default('') is search('^-A FORWARD -i awg0 -o awg0 -j DROP$', multiline=True) }}"
+        msg: "FORWARD: no awg0 -> awg0 DROP, clients reach each other"
+      - ok: "{{ _v_sec['nat'] | default('') is search('^-A POSTROUTING -o ' ~ entry_uplink_if ~ ' -j MASQUERADE$', multiline=True) }}"
+        msg: "nat: no MASQUERADE out of {{ entry_uplink_if }}"
+      - ok: "{{ _v_sysctl['net.ipv4.ip_forward'] | default('') == '1' }}"
+        msg: "ip_forward = {{ _v_sysctl['net.ipv4.ip_forward'] | default('?') }}"
+      - ok: "{{ _v_sysctl['net.ipv4.conf.all.rp_filter'] | default('') == '2' }}"
+        msg: "rp_filter (all) = {{ _v_sysctl['net.ipv4.conf.all.rp_filter'] | default('?') }}, want 2"
+      - ok: "{{ _v_sysctl['net.ipv4.tcp_congestion_control'] | default('') == 'bbr' }}"
+        msg: "tcp_congestion_control = {{ _v_sysctl['net.ipv4.tcp_congestion_control'] | default('?') }}, want bbr"
+      - ok: "{{ (_v_sysctl['net.netfilter.nf_conntrack_max'] | default(0) | int) >= entry_conntrack_max }}"
+        msg: "nf_conntrack_max = {{ _v_sysctl['net.netfilter.nf_conntrack_max'] | default('?') }}, want >= {{ entry_conntrack_max }}"
+  ansible.builtin.set_fact:
+    verify_problems: >-
+      {{ verify_problems | default([])
+         + (_v_checks | rejectattr('ok') | map(attribute='msg') | list)
+         + ((_v_sec['units'] | default('')).splitlines() | select('match', '^\S+=')
+            | reject('match', '^\S+=active enabled$')
+            | map('regex_replace', '^(\S+)=(.*)$', 'unit \1: \2') | list) }}

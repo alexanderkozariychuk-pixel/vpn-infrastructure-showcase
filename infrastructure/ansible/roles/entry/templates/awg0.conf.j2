@@ -1,0 +1,21 @@
+# Written once by Ansible (roles/entry) when this file did not exist.
+# From then on the peers below belong to the portal (pwa-add-peer /
+# pwa-del-peer) and Ansible never rewrites this file; the [Interface] values
+# are checked against the running interface instead (tasks/verify.yml).
+[Interface]
+PrivateKey = {{ entry_awg0_private_key }}
+Address = {{ entry_awg0_address }}
+ListenPort = {{ entry_awg0_port }}
+{% for k in ['jc', 'jmin', 'jmax', 's1', 's2', 's3', 's4', 'h1', 'h2', 'h3', 'h4'] if k in entry_awg0_obfuscation %}
+{{ k | capitalize }} = {{ entry_awg0_obfuscation[k] }}
+{% endfor %}
+{% if entry_isolate_clients %}
+# Clients do not reach each other. Not on entry A as of 2026-10-12
+# (docs/entry-spec.md); inserted first so the ACCEPT below cannot shadow it.
+PostUp = iptables -I FORWARD 1 -i %i -o %i -j DROP
+PostDown = iptables -D FORWARD -i %i -o %i -j DROP
+{% endif %}
+PostUp = iptables -A FORWARD -i %i -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -o {{ entry_uplink_if }} -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -o {{ entry_uplink_if }} -j MASQUERADE

@@ -1,0 +1,31 @@
+---
+- name: Config directory is root-only
+  ansible.builtin.file:
+    path: /etc/amnezia/amneziawg
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Created once, never overwritten (force: false): the peers in this file are
+# the portal's. A template that owned the whole file erased 35 production
+# peers in July. The [Interface] values are checked by tasks/verify.yml.
+# diff: false — the file carries the private key.
+- name: awg0.conf, only if absent
+  ansible.builtin.template:
+    src: awg0.conf.j2
+    dest: /etc/amnezia/amneziawg/awg0.conf
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+  diff: false
+  tags: [keyfiles]
+
+# started, never restarted: a restart drops every peer the portal added
+# with `awg set` and reloads them from the file.
+- name: awg0 enabled and running
+  ansible.builtin.systemd_service:
+    name: awg-quick@awg0
+    enabled: true
+    state: started

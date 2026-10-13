@@ -1,0 +1,15 @@
+# The real file lives OUTSIDE the repository, encrypted:
+#   ansible-vault create ~/.sovereign/vault-b.yml
+# one file per entry, passed to a run against that entry with
+#   -e @~/.sovereign/vault-b.yml --ask-vault-pass
+# (extra vars apply to every host in the run, hence one file per host).
+# A check run against entry A needs no vault: it skips the key files.
+# Back it up next to the SSH key (Bitwarden). Losing entry_awg0_private_key
+# means every client config has to be reissued.
+
+# awg0 — copied from entry A, never generated. Same on every entry.
+entry_awg0_private_key: "<44 chars>"
+
+# This entry's own link to the exit.
+entry_link_private_key: "<44 chars>"
+entry_link_psk: "<44 chars>"

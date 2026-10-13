@@ -1,0 +1,26 @@
+---
+- name: Base packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - fail2ban
+      - ipset          # fail2ban's ban action is iptables-ipset
+      - iptables
+      - python3
+      - systemd-timesyncd
+      - ufw
+      - unattended-upgrades
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Clock in UTC (the journal, cron and logs all assume it)
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+- name: Time sync running
+  ansible.builtin.systemd_service:
+    name: systemd-timesyncd
+    enabled: true
+    state: started

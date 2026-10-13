@@ -1,0 +1,32 @@
+---
+- name: Inventory provides what has no default
+  ansible.builtin.assert:
+    that:
+      - entry_awg0_public_key is defined and entry_awg0_public_key is match('^[A-Za-z0-9+/]{43}=$')
+      - entry_portal_from is defined and entry_portal_from | length > 0
+      - entry_pwa_provisioner_pubkey is defined and entry_pwa_provisioner_pubkey is match('^ssh-(ed25519|rsa) ')
+    quiet: true
+
+- name: AmneziaWG
+  ansible.builtin.import_tasks: amneziawg.yml
+
+- name: Kernel settings
+  ansible.builtin.import_tasks: sysctl.yml
+
+- name: Client interface awg0
+  ansible.builtin.import_tasks: awg0.yml
+
+- name: Link to the exit
+  ansible.builtin.import_tasks: link.yml
+
+- name: Split tunnel
+  ansible.builtin.import_tasks: split.yml
+
+- name: Trial subnet
+  ansible.builtin.import_tasks: trial.yml
+
+- name: Portal wrappers
+  ansible.builtin.import_tasks: wrappers.yml
+
+- name: Firewall
+  ansible.builtin.import_tasks: firewall.yml

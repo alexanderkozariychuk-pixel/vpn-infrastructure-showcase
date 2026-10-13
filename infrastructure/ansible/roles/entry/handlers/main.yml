@@ -1,0 +1,22 @@
+---
+- name: Apply sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: true
+
+# Bounces this entry's link for a second. Never notified on awg0.
+- name: Restart link
+  ansible.builtin.systemd_service:
+    name: "awg-quick@{{ entry_link.if }}"
+    state: restarted
+
+- name: Restart sov-split
+  ansible.builtin.systemd_service:
+    name: sov-split
+    state: restarted
+    daemon_reload: true
+
+- name: Restart trial net
+  ansible.builtin.systemd_service:
+    name: sovrn-trial-net
+    state: restarted
+    daemon_reload: true

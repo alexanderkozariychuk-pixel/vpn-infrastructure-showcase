@@ -1,0 +1,30 @@
+---
+# Root login is switched off in this file. The admin key must already work,
+# or the next connection is refused and the node is reachable only through
+# the provider's console.
+- name: Read the admin user's authorized keys
+  ansible.builtin.slurp:
+    src: "/home/{{ admin_user }}/.ssh/authorized_keys"
+  register: common_admin_keys
+  when: not ansible_check_mode
+
+- name: Refuse to harden SSH before the admin key is in place
+  ansible.builtin.assert:
+    that:
+      - (admin_ssh_pubkey.split()[1]) in (common_admin_keys.content | b64decode)
+    fail_msg: "{{ admin_user }} has no workstation key; hardening now would lock the node"
+    quiet: true
+  when: not ansible_check_mode
+
+# 00- because sshd keeps the first value it reads for a keyword, and drop-ins
+# are read in order: cloud images ship 50-cloud-init.conf with
+# PasswordAuthentication yes, which a later-sorting file would not override.
+- name: Hardening drop-in
+  ansible.builtin.template:
+    src: 00-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload ssh

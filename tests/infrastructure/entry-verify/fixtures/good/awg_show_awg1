@@ -1,0 +1,9 @@
+interface: awg1
+  public key: QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=
+  private key: (hidden)
+  listening port: 51821
+  jc: 4
+  h1: 11-11
+
+peer: RERERERERERERERERERERERERERERERERERERERERERE=
+  endpoint: 203.0.113.10:51822

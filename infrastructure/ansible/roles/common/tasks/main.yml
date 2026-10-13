@@ -1,0 +1,41 @@
+---
+- name: Built and tested on Ubuntu 24.04 only
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == 'Ubuntu'
+      - ansible_distribution_version == '24.04'
+    fail_msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}: the roles are written for Ubuntu 24.04"
+    quiet: true
+
+- name: Inventory provides what has no default
+  ansible.builtin.assert:
+    that:
+      - admin_user is defined and admin_user | length > 0
+      - admin_ssh_pubkey is defined and admin_ssh_pubkey is match('^ssh-(ed25519|rsa) ')
+      - monitor_from is defined and monitor_from | length > 0
+      - sovmon_ssh_pubkey is defined and sovmon_ssh_pubkey is match('^ssh-(ed25519|rsa) ')
+    quiet: true
+
+- name: Packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Admin user
+  ansible.builtin.import_tasks: users.yml
+
+- name: SSH daemon
+  ansible.builtin.import_tasks: sshd.yml
+
+- name: Firewall
+  ansible.builtin.import_tasks: firewall.yml
+
+- name: fail2ban
+  ansible.builtin.import_tasks: fail2ban.yml
+
+- name: Unattended upgrades
+  ansible.builtin.import_tasks: updates.yml
+
+- name: Swap
+  ansible.builtin.import_tasks: swap.yml
+
+- name: Monitoring probe
+  ansible.builtin.import_tasks: monitoring.yml

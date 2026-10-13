@@ -1,0 +1,26 @@
+---
+- name: Admin user exists
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Admin user has the workstation key
+  # Not exclusive: a key added by hand in an emergency is not removed by a
+  # routine run. Old keys are retired deliberately, by hand.
+  ansible.posix.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ admin_ssh_pubkey }}"
+    state: present
+
+- name: Admin user has passwordless sudo
+  # Key-only login and no password set: sudo has nothing to ask for.
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ common_admin_sudoers_file }}"
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s

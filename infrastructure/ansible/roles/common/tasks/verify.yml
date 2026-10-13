@@ -1,0 +1,30 @@
+---
+# Read-only. Commands here run with check_mode: false, so a --check run
+# reports what the host actually has. Findings go into verify_problems;
+# the playbook's last task reports them (fatal outside check mode).
+- name: Effective sshd settings
+  ansible.builtin.command: sshd -T
+  register: common_sshd_t
+  changed_when: false
+  check_mode: false
+
+- name: sshd matches the hardening
+  vars:
+    _v_sshd: "{{ dict(common_sshd_t.stdout_lines | select('match', '^\\S+ ') | map('split', ' ', 1)) }}"
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + ['sshd: ' ~ item.key ~ ' is ' ~ _v_sshd[item.key] | default('unset') ~ ', want ' ~ item.value] }}"
+  loop: "{{ common_sshd_want | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: _v_sshd[item.key] | default('') != item.value
+
+- name: ufw active
+  ansible.builtin.command: ufw status
+  register: common_ufw_status
+  changed_when: false
+  check_mode: false
+
+- name: ufw is on
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + ['ufw: ' ~ common_ufw_status.stdout_lines[0] | default('no output')] }}"
+  when: "'Status: active' not in common_ufw_status.stdout"

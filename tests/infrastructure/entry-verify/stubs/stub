@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# One stub for every command the verify tasks run. Answers from files in
+# $FIXTURE; a missing file means the command fails, as on a node without it.
+set -u
+f() { [[ -f "$FIXTURE/$1" ]] || exit 1; cat "$FIXTURE/$1"; }
+cmd=$(basename "$0")
+case "$cmd $*" in
+    "awg show interfaces")          f awg_interfaces ;;
+    "awg show "*" latest-handshakes")
+        # The handshake age is relative to now; the file holds seconds ago.
+        ago=$(f "awg_hs_age_$2") || exit 1
+        printf 'PEERKEY=\t%s\n' "$(( $(date +%s) - ago ))" ;;
+    "awg show "*)                   f "awg_show_$2" ;;
+    "ip rule show")                 f ip_rule ;;
+    "ip route show table "*)        f "ip_route_$4" ;;
+    "ipset list -t ru_nets")        f ipset_ru_nets ;;
+    "iptables -S FORWARD")          f iptables_forward ;;
+    "iptables -t nat -S POSTROUTING") f iptables_nat ;;
+    "sysctl -n "*)  grep -m1 "^$2=" "$FIXTURE/sysctl" | cut -d= -f2- | grep . || exit 1 ;;
+    "systemctl is-active "*)        v=$(grep -m1 "^$2=" "$FIXTURE/units" | cut -d= -f2 | cut -d' ' -f1); echo "${v:-inactive}"; [[ $v == active ]] ;;
+    "systemctl is-enabled "*)       v=$(grep -m1 "^$2=" "$FIXTURE/units" | cut -d' ' -f2); echo "${v:-disabled}"; [[ $v == enabled ]] ;;
+    "sshd -T")                      f sshd_T ;;
+    "ufw status")                   f ufw_status ;;
+    *) echo "stub: unexpected call: $cmd $*" >&2; exit 99 ;;
+esac

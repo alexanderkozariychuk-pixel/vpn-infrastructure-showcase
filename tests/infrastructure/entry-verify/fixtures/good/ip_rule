@@ -1,0 +1,6 @@
+0:	from all lookup local
+99:	from all fwmark 0x64 lookup main
+100:	from 10.88.88.0/24 lookup 200
+101:	from 10.88.89.0/24 lookup 200
+32766:	from all lookup main
+32767:	from all lookup default

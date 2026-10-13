@@ -1,0 +1,33 @@
+---
+- name: nf_conntrack loaded at boot (its sysctl does not exist before)
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/sovereign.conf
+    content: "nf_conntrack\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: nf_conntrack loaded now
+  community.general.modprobe:
+    name: nf_conntrack
+    state: present
+
+- name: Forwarding, reverse-path filter, congestion control, conntrack size
+  ansible.builtin.template:
+    src: sysctl-awg.conf.j2
+    dest: /etc/sysctl.d/awg.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+
+# ufw applies its own sysctl file when it starts, and Ubuntu's sets
+# rp_filter=1 there, after systemd-sysctl has set 2. Strict mode drops the
+# replies that come back through the link. Commented out, not deleted, so an
+# ufw package upgrade shows the change in a dpkg prompt.
+- name: ufw does not set rp_filter
+  ansible.builtin.replace:
+    path: /etc/ufw/sysctl.conf
+    regexp: '^(net/ipv4/conf/(all|default)/rp_filter=.*)$'
+    replace: '#\1  # off: the entry sets rp_filter=2 in /etc/sysctl.d/awg.conf'
+  notify: Apply sysctl
