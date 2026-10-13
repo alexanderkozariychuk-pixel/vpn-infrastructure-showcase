@@ -16,6 +16,7 @@
     daemon_reload: true
 
 - name: Restart trial net
+  when: entry_link is defined
   ansible.builtin.systemd_service:
     name: sovrn-trial-net
     state: restarted

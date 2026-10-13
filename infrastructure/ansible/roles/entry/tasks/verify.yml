@@ -110,7 +110,7 @@
       echo "$k=$(sysctl -n "$k" 2>/dev/null)"
     done
     echo "== units"
-    for u in awg-quick@awg0 sov-split sovrn-trial-net {{ ('awg-quick@' ~ entry_link.if) if entry_link is defined else '' }}; do
+    for u in awg-quick@awg0 sov-split {{ ('sovrn-trial-net awg-quick@' ~ entry_link.if) if entry_link is defined else '' }}; do
       echo "$u=$(systemctl is-active "$u") $(systemctl is-enabled "$u" 2>/dev/null)"
     done
   args:

@@ -13,6 +13,11 @@
 - name: Entry node
   hosts: entry
   become: true
+  # A failed task otherwise discards every pending notification for good:
+  # the next run finds the files already in place, notifies nothing, and
+  # sshd keeps running without the hardening it has on disk (seen on entry
+  # B, 2026-10-13). With this, handlers notified before a failure still run.
+  force_handlers: true
 
   pre_tasks:
     # Second fence. A live node (entry A) is not in the inventory at all;

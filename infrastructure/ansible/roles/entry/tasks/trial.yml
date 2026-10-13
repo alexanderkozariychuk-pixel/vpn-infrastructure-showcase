@@ -20,9 +20,40 @@
     mode: "0644"
   notify: Restart trial net
 
+# Trial traffic leaves through the link's table; `sovrn-trial-net up` ends
+# with a check that refuses a missing default route there. Until the link
+# exists (stage 3) the unit is neither started nor enabled: enabled, it
+# would fail at every boot and show as a failed unit to sov-monitor.
 - name: Trial subnet enabled and up
   ansible.builtin.systemd_service:
     name: sovrn-trial-net
     enabled: true
     state: started
     daemon_reload: true
+  when: entry_link is defined
+
+- name: Trial subnet off until the link exists
+  when: entry_link is not defined
+  block:
+    - name: Trial unit stopped and disabled
+      ansible.builtin.systemd_service:
+        name: sovrn-trial-net
+        enabled: false
+        state: stopped
+        daemon_reload: true
+
+    # A failed `up` keeps what it applied (its rollback covers failures
+    # before the end, not the closing check), and stopping a failed unit
+    # does not run ExecStop. `down` is idempotent and removes only what
+    # `up` adds.
+    - name: Nothing of the trial subnet left applied
+      ansible.builtin.command: /usr/local/bin/sovrn-trial-net down
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Failed state cleared
+      ansible.builtin.command: systemctl reset-failed sovrn-trial-net
+      register: entry_trial_reset
+      changed_when: false
+      failed_when: false
+      when: not ansible_check_mode
