@@ -3,11 +3,9 @@
 #
 # From infrastructure/ansible/:
 #
-#   check entry A, changes nothing, no vault:
-#     ansible-playbook playbooks/entry.yml --limit entry-a --check --diff --skip-tags keyfiles
+#   ansible-playbook playbooks/entry.yml --limit entry-b -e @~/.sovereign/vault-b.yml --ask-vault-pass
 #
-#   build entry B:
-#     ansible-playbook playbooks/entry.yml --limit entry-b -e @~/.sovereign/vault-b.yml --ask-vault-pass
+# Entry A is not in the inventory: it is changed by hand (README.md).
 #
 # The last task lists everything the read-only checks found. In check mode
 # that list is the answer; in a real run it is fatal.
@@ -17,9 +15,10 @@
   become: true
 
   pre_tasks:
-    # entry A carries paying clients. The roles are checked against it, not
-    # applied to it: changes on A are made by hand, one at a time.
-    - name: Hosts in `live` are checked, never changed
+    # Second fence. A live node (entry A) is not in the inventory at all;
+    # if one is ever added to it, it must also be in `live`, and then only
+    # a --check run gets past this.
+    - name: Hosts in `live` are never changed
       ansible.builtin.assert:
         that: ansible_check_mode or inventory_hostname not in groups.get('live', [])
         fail_msg: "{{ inventory_hostname }} is in the live group: run with --check"

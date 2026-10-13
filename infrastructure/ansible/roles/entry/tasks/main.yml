@@ -3,8 +3,11 @@
   ansible.builtin.assert:
     that:
       - entry_awg0_public_key is defined and entry_awg0_public_key is match('^[A-Za-z0-9+/]{43}=$')
-      - entry_portal_from is defined and entry_portal_from | length > 0
-      - entry_pwa_provisioner_pubkey is defined and entry_pwa_provisioner_pubkey is match('^ssh-(ed25519|rsa) ')
+      - entry_portal_from is defined and entry_portal_from is match(common_addr_re)
+      - entry_pwa_provisioner_pubkey is defined and entry_pwa_provisioner_pubkey is match(common_pubkey_re)
+    fail_msg: >-
+      hosts.yml still has an example value or is missing one
+      (entry_awg0_public_key, entry_portal_from, entry_pwa_provisioner_pubkey)
     quiet: true
 
 - name: AmneziaWG

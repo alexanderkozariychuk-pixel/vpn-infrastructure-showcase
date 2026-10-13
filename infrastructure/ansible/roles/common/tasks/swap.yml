@@ -1,8 +1,18 @@
 ---
 # Only on a host with no swap at all; an existing swap file or partition is
-# left as it is.
+# left as it is. Each step needs the previous one to have happened, so in
+# check mode the block only reports.
+- name: Swap would be created
+  ansible.builtin.debug:
+    msg: "no swap: a real run creates /swapfile, {{ common_swap_mb }} MB"
+  when:
+    - ansible_facts['swaptotal_mb'] | int == 0
+    - ansible_check_mode
+
 - name: Swap file
-  when: ansible_swaptotal_mb | int == 0
+  when:
+    - ansible_facts['swaptotal_mb'] | int == 0
+    - not ansible_check_mode
   block:
     - name: Allocate /swapfile
       ansible.builtin.command: fallocate -l {{ common_swap_mb }}M /swapfile

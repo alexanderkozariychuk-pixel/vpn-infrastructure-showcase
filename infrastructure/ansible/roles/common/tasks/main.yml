@@ -2,18 +2,22 @@
 - name: Built and tested on Ubuntu 24.04 only
   ansible.builtin.assert:
     that:
-      - ansible_distribution == 'Ubuntu'
-      - ansible_distribution_version == '24.04'
-    fail_msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}: the roles are written for Ubuntu 24.04"
+      - ansible_facts['distribution'] == 'Ubuntu'
+      - ansible_facts['distribution_version'] == '24.04'
+    fail_msg: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}: the roles are written for Ubuntu 24.04"
     quiet: true
 
 - name: Inventory provides what has no default
   ansible.builtin.assert:
     that:
       - admin_user is defined and admin_user | length > 0
-      - admin_ssh_pubkey is defined and admin_ssh_pubkey is match('^ssh-(ed25519|rsa) ')
-      - monitor_from is defined and monitor_from | length > 0
-      - sovmon_ssh_pubkey is defined and sovmon_ssh_pubkey is match('^ssh-(ed25519|rsa) ')
+      - admin_ssh_pubkey is defined and admin_ssh_pubkey is match(common_pubkey_re)
+      - monitor_from is defined and monitor_from is match(common_addr_re)
+      - sovmon_ssh_pubkey is defined and sovmon_ssh_pubkey is match(common_pubkey_re)
+    fail_msg: >-
+      hosts.yml still has an example value or is missing one (admin_ssh_pubkey,
+      monitor_from, sovmon_ssh_pubkey): the example's placeholders would be
+      written to the node as they are
     quiet: true
 
 - name: Packages

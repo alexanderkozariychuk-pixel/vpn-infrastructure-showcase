@@ -8,6 +8,7 @@
       - ipset          # fail2ban's ban action is iptables-ipset
       - iptables
       - python3
+      - python3-debian # deb822_repository (the Amnezia PPA) needs it
       - systemd-timesyncd
       - ufw
       - unattended-upgrades

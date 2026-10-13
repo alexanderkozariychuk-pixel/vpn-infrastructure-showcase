@@ -34,7 +34,7 @@ marked accordingly:
 | `awg1` PostUp | default route via `10.77.77.1` into table **200**; `nat POSTROUTING -o awg1 MASQUERADE` — the exit sees one address per entry, which is what lets two entries share an exit | same pattern, B's own addresses |
 | Split tunnel | ipset `ru_nets` (hash:net, ~11.4k RU prefixes from RIPE + Yandex/VK/Gosuslugi ranges), restored at boot from `/etc/sovereign/ru_nets.ipset` by `sov-split.service`; mangle marks client traffic to `ru_nets` with `0x64`; `ip rule 99 fwmark 0x64 → main`; `ip rule 100 from 10.88.88.0/24 → 200`; refreshed Sundays 04:00 UTC (`sov-update-ru-list.sh`, atomic `ipset swap`, floor of 8000 prefixes) | same; `ip rule 100` is set by `sov-split-tunnel.sh` next to rule 99, not by `rc.local`; the update script also works on a node with no set yet (first run) |
 | Trial subnet | `sovrn-trial-net` + unit: `10.88.89.0/24` on awg0, `ip rule 101 → 200`, chain `SOVRN-TRIAL` (no reach into client subnets, no port 25, ≤150 new connections per device), shared bandwidth ceiling | same |
-| sysctl | `ip_forward=1` (`awg.conf`), `rp_filter=2` (Ubuntu's own `10-network-security.conf`), bbr (`60-tcp-congestion-control.conf`, from the provider's image), qdisc `fq_codel` (systemd default), `ipv6 forwarding=1` (`awg.conf`), `nf_conntrack_max` 65536 — read 2026-10-13 | `awg.conf` sets `ip_forward`, `rp_filter=2` and bbr itself, since the routing depends on them; `nf_conntrack_max` 262144 (module loaded from `modules-load.d`); IPv6 forwarding **not carried** — awg0 has no IPv6, and forwarding makes the kernel ignore router advertisements on the uplink; `rp_filter` lines in `/etc/ufw/sysctl.conf` commented out (ufw re-applies its file when it starts) |
+| sysctl | `ip_forward=1` (`awg.conf`), `rp_filter=2` (Ubuntu's own `10-network-security.conf`), bbr (`60-tcp-congestion-control.conf`, from the provider's image), qdisc `fq_codel` (systemd default), `ipv6 forwarding=1` (`awg.conf`), `nf_conntrack_max` 65536 — read 2026-10-13 | `awg.conf` sets `ip_forward`, `rp_filter=2` and bbr itself, since the routing depends on them; `nf_conntrack_max` 262144 (module loaded from `modules-load.d`); IPv6 forwarding **not carried** — awg0 has no IPv6, and forwarding makes the kernel ignore router advertisements on the uplink; ufw's own sysctl file sets no `rp_filter` on A (checked 2026-10-13), so it is left alone |
 | Firewall | ufw: in 22/tcp, 8443/udp, link port/udp; default input DROP, forward ACCEPT | same, B's link port |
 | Users | `vpnadmin` (sudo, workstation key); `pwa-provisioner` (key `from=<portal>,restrict`, sudo only for the four wrappers); `sovmon` (key `command=sov-probe,from=<am1>,restrict`) | same |
 | Node scripts | `pwa-add-peer`, `pwa-del-peer`, `pwa-awg-show`, `pwa-logs` (`infrastructure/wrappers/`); `sovrn-trial-net` (`infrastructure/trial/`); `sov-probe` (`infrastructure/monitoring/`); split tunnel (`infrastructure/entry/as-found-2026-10-12/`) | same |
@@ -88,39 +88,35 @@ long-removed peers; `*-credentials.txt` and an empty `privatekey` from May;
 Grafana host is gone); an nginx logrotate entry from the old portal; a sudoers
 line for a non-existent `ubuntu` user; `beget-agent` (the provider's own).
 
-## Expected on a check run against A
+## Comparing B with A
 
-`ansible-playbook playbooks/entry.yml --limit entry-a --check --diff
---skip-tags keyfiles` (infrastructure/ansible/README.md). Predicted from this
-specification before the first run; the run either confirms each line or
-corrects the specification.
+A is not managed by Ansible, not even with `--check`: it carries paying
+clients and is changed by hand. After B is built, both are inventoried the
+same way and the reports compared:
 
-**Diff** (files the roles would write differently on A):
+```bash
+ssh sov-entry   'sudo bash -s' < tools/node-inventory.sh > entry-A.txt
+ssh sov-entry-b 'sudo bash -s' < tools/node-inventory.sh > entry-B.txt
+diff entry-A.txt entry-B.txt
+```
 
-- `/etc/sysctl.d/awg.conf` — rp_filter, bbr, conntrack added, IPv6 forwarding
-  removed; `/etc/modules-load.d/sovereign.conf` new.
-- `/etc/ufw/sysctl.conf` — `rp_filter` lines commented, if active on A.
-- `/etc/apt/sources.list.d/amnezia-ppa.sources` new: A added the PPA with
-  `add-apt-repository`, under another file name.
-- `/usr/local/bin/sov-split-tunnel.sh` (rule 100, quoting),
-  `sov-update-ru-list.sh` (temp files, first-run), the unit and cron file
-  (header comment only).
-- `/etc/ssh/sshd_config.d/00-hardening.conf` new; the admin sudoers drop-in,
-  if A's has another name; `52unattended-upgrades-sovereign` new;
-  `jail.local` (header comment).
-- `pwa-add-peer` — A runs the older version (runtime before config;
-  `infrastructure/trial` stage 3 replaces it together with the portal code).
-- `sovrn-trial-net` and its unit, if not yet installed on A.
-- `/etc/sudoers.d/pwa-provisioner` — one line for four commands, written by
-  the role.
+Every difference should be one of these; anything else is a defect in the
+roles or in this specification.
 
-**Findings** (read-only checks):
-
-- `FORWARD: no awg0 -> awg0 DROP, clients reach each other`.
-- `nf_conntrack_max = 65536, want >= 262144`.
-- `awg1: …` for any link parameter given in the inventory that A does not
-  have.
-
-Not reported, by design: `rc.local` and its second `table 200` route, Docker,
-and everything under "Not carried": the roles do not manage what B does not
-have, and removing it from A is done by hand.
+- **own** — host name, addresses, link keys and port, uplink name.
+- `FORWARD -i awg0 -o awg0 -j DROP` on B only (clients isolated).
+- sysctl: on B `rp_filter`, bbr and `nf_conntrack_max` (262144) come from
+  `/etc/sysctl.d/awg.conf` and `modules-load.d/sovereign.conf`; IPv6
+  forwarding is on A only.
+- `ip rule 100` set by `sov-split-tunnel.sh` on B, by `rc.local` on A; A's
+  `rc.local` also adds a second `table 200` route.
+- Split-tunnel scripts: B runs the linted versions (temp files, first-run
+  support, rule 100); the unit and cron file differ by a header comment.
+- `pwa-add-peer`: B runs the repository version (config before runtime);
+  A runs the older one until `infrastructure/trial` stage 3.
+- `sshd_config.d/00-hardening.conf` on B only; the effective `sshd -T` values
+  should already agree.
+- Admin user `sovadmin` on B, `vpnadmin` on A; sudoers drop-in names differ.
+- Amnezia PPA source file name (`amnezia-ppa.sources` on B,
+  `add-apt-repository`'s on A).
+- Everything under "Not carried", Docker and `beget-agent`: on A only.

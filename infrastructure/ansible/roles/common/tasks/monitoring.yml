@@ -28,6 +28,8 @@
 - name: sovmon key, pinned to the probe and to am1
   ansible.posix.authorized_key:
     user: sovmon
+    # Explicit path: lets --check run before the user exists (a new node).
+    path: "/home/sovmon/.ssh/authorized_keys"
     key: "{{ sovmon_ssh_pubkey }}"
     key_options: 'command="sudo -n /usr/local/sbin/sov-probe",from="{{ monitor_from }}",restrict'
     exclusive: true

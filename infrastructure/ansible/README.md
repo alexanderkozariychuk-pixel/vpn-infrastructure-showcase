@@ -24,43 +24,32 @@ every obfuscation parameter — by reading the running interface
 (`roles/entry/tasks/verify.yml`). A template that owned the file erased 35
 peers in July.
 
-**Entry A is checked, never changed.** It is in the `live` group, and the
-playbook refuses any run against a `live` host without `--check`. Changes on A
-are made by hand, one at a time, as before.
+**Entry A is not managed by Ansible at all.** It carries paying clients;
+every change there is made by hand, one at a time, with a rollback ready. It
+is not in the inventory, not even for `--check`: a check run still executes
+read-only commands on the node and is one forgotten flag away from a real
+one. B is compared with A by `tools/node-inventory.sh` (a diff of the two
+reports), and what B does differently on purpose is listed in
+`docs/entry-spec.md`. As a second fence the playbook refuses any non-check
+run against a host in the `live` group, which is kept empty.
 
 ## Setup on the workstation
 
 ```bash
 pipx install --include-deps ansible        # collections ansible.posix, community.general included
 cd infrastructure/ansible
-cp inventory/hosts.yml.example inventory/hosts.yml   # fill in
+cp inventory/hosts.yml.example inventory/hosts.yml   # fill in; the play refuses example values
 ansible-vault create ~/.sovereign/vault-b.yml        # keys as in vault.yml.example
 ```
 
 The awg0 private key goes from A into the vault without passing through a
-terminal or the chat:
+terminal or the chat (this reads one line on A; nothing on A changes):
 
 ```bash
 ssh sov-entry 'sudo awk -F" = " "/^PrivateKey/{print \$2; exit}" /etc/amnezia/amneziawg/awg0.conf' \
   | { read -r k; printf 'entry_awg0_private_key: "%s"\n' "$k"; } \
   | ansible-vault encrypt --output ~/.sovereign/vault-b.yml   # then add the link keys with ansible-vault edit
 ```
-
-## Checking entry A
-
-```bash
-ansible-playbook playbooks/entry.yml --limit entry-a --check --diff --skip-tags keyfiles
-```
-
-Nothing on A changes. `--skip-tags keyfiles` leaves out the two files that
-carry private keys, so no vault is needed. The commands that do run are
-read-only: `modinfo`, `awg show` (cut before the first peer), `ip rule/route
-show`, `ipset list -t`, `iptables -S`, `sysctl -n`, `systemctl is-active`,
-`sshd -T`, `ufw status`.
-
-What the diff and the findings should contain is listed in
-`docs/entry-spec.md` ("Expected on a check run against A"). Anything else is
-a defect in the roles or in the specification.
 
 ## Building entry B
 

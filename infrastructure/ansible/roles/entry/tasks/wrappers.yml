@@ -19,6 +19,8 @@
 - name: pwa-provisioner key, from the portal only
   ansible.posix.authorized_key:
     user: pwa-provisioner
+    # Explicit path: lets --check run before the user exists (a new node).
+    path: "/home/pwa-provisioner/.ssh/authorized_keys"
     key: "{{ entry_pwa_provisioner_pubkey }}"
     key_options: 'from="{{ entry_portal_from }}",restrict'
     exclusive: true
@@ -27,7 +29,7 @@
   ansible.builtin.copy:
     dest: /etc/sudoers.d/pwa-provisioner
     content: |
-      # {{ ansible_managed }}
+      # Installed by Ansible (roles/entry).
       pwa-provisioner ALL=(root) NOPASSWD: {{ entry_wrappers | map('regex_replace', '^', '/usr/local/bin/') | join(', ') }}
     owner: root
     group: root

@@ -17,32 +17,20 @@ all:
         # awg0's public key, the one every client config carries. Same on
         # every entry; checked against the running interface.
         entry_awg0_public_key: "<awg0 public key, 44 chars>"
+      # Entry A is deliberately not here. It carries paying clients and is
+      # changed by hand; it is compared with B by tools/node-inventory.sh,
+      # not by Ansible.
       hosts:
-        entry-a:
-          # An alias from ~/.ssh/config (HostName, User, IdentityFile live
-          # there), so no address has to be written here at all.
-          ansible_host: sov-entry
-          ansible_user: vpnadmin
-          admin_user: vpnadmin
-          entry_uplink_if: eth0
-          entry_link:
-            if: awg1
-            address: 10.77.77.2/30
-            peer_address: 10.77.77.1
-            port: 51821
-            peer_endpoint: "<exit-address>:51822"
-            peer_public_key: "<exit awg0 public key>"
-            public_key: "<entry-A awg1 public key>"
-            obfuscation: {}   # A's link values, if the check should compare them
         entry-b:
+          # An alias from ~/.ssh/config (HostName, IdentityFile live there).
           ansible_host: sov-entry-b
-          # First run only: root, before sovadmin exists. After that, sovadmin.
+          # First run with -e ansible_user=root, before sovadmin exists.
           ansible_user: sovadmin
           admin_user: sovadmin
           # entry_link is filled in at stage 3, when the exit gets awg2.
 
     # Hosts that carry paying clients. playbooks/entry.yml refuses to run
-    # against these except with --check.
+    # against these except with --check. A second fence: no live host
+    # belongs in this inventory in the first place.
     live:
-      hosts:
-        entry-a:
+      hosts: {}

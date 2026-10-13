@@ -1,7 +1,7 @@
 ---
 # Interface the entry reaches the internet through; RU-bound client traffic
 # is masqueraded out of it.
-entry_uplink_if: "{{ ansible_default_ipv4.interface }}"
+entry_uplink_if: "{{ ansible_facts['default_ipv4']['interface'] }}"
 
 # Drop awg0 -> awg0 (clients reaching each other). Written into awg0.conf on
 # creation only; A has no such rule yet.

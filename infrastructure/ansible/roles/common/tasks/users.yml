@@ -12,6 +12,8 @@
   # routine run. Old keys are retired deliberately, by hand.
   ansible.posix.authorized_key:
     user: "{{ admin_user }}"
+    # Explicit path: lets --check run before the user exists (a new node).
+    path: "/home/{{ admin_user }}/.ssh/authorized_keys"
     key: "{{ admin_ssh_pubkey }}"
     state: present
 
