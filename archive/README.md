@@ -24,6 +24,13 @@ outperformed them and became the production protocol. See the main
 project journal for the underlying research (DPI behavior on mobile
 networks, whitelist-based filtering, tethering detection via TTL).
 
+## ansible-2026-07/
+The first Ansible roles and playbooks (relays, backbone, the RU entry as of
+July 2026). Retired in October 2026 and rewritten from the entry
+specification: they removed ufw, regenerated server keys when a variable was
+unset, and owned the peer list that the portal now writes. Details in its
+own README.
+
 ## early-tooling/
 Standalone scripts (config generation, key rotation, VPS provisioning)
 written before the infrastructure's current complexity. Superseded by the
