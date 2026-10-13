@@ -4894,3 +4894,74 @@ described a layout that no longer exists. Removed with `/api/status`,
   weeks.
 - Remaining audit items: payments end to end, capacity, peer reconcile and
   cleanup, refresh tokens, SPF/DKIM/DMARC, disaster recovery, hosting risk.
+
+---
+
+## 2026-10-13
+
+### 🏗 A second entry, built by Ansible
+If the entry node is blocked, clients should move to a second one by a DNS
+change alone (`n1`), with no new configs. That means entry B carries the same
+awg0 key, port, obfuscation and peers as A. B is a VPS at a second Russian
+provider; its address passed the mobile DPI test before anything was built
+on it.
+
+The July roles were retired to `archive/ansible-2026-07/` rather than patched:
+they removed ufw, generated a new server key whenever the variable was unset,
+owned the peer list the portal now writes, and had host key checking off. The
+new `common` and `entry` roles are written from `docs/entry-spec.md`:
+
+- `awg0.conf` is written once and never again; awg0 is only ever started.
+  What clients were issued (key, port, every obfuscation parameter) is
+  checked against the running interface, not the file.
+- Read-only checks run after every play and fail a real run: `sshd -T`, ufw,
+  policy rules, table 200, the RU ipset, client isolation, NAT, sysctl, units.
+  `tests/infrastructure/test_entry_verify.sh` runs them against stubbed
+  commands — a correct node gives no findings, each of 23 single breakages
+  exactly its own. Writing it found four bugs in the checks before any node
+  saw them.
+- B differs from A on purpose: clients cannot reach each other
+  (`-i awg0 -o awg0 -j DROP`), `ip rule 100` lives with the rest of the
+  split tunnel instead of `rc.local`, sysctl is set explicitly.
+
+**A is not managed by Ansible at all, not even with `--check`.** It carries
+paying clients; a check run still executes commands on the node and is one
+forgotten flag from a real one. A is changed by hand. B is compared with A by
+diffing two `tools/node-inventory.sh` reports. The first diff (738 lines)
+showed the same awg0 key-id, port and parameters on both, and every other
+line was on the expected-differences list in the spec — after two fixes.
+
+B was built from a clean OS three times today:
+1. The first run failed at the trial subnet: its closing self-check wants
+   the route through the link to the exit, which comes in the next stage.
+   The trial unit now waits for the link.
+2. That failure also discarded every pending handler. sshd had the hardening
+   on disk and was never reloaded — root could still log in, and `sshd -T`,
+   which reads files, could not see it. A rerun would not have helped: the
+   files were in place, so nothing notified. `force_handlers: true`, and root
+   is checked by trying to log in. The half-built node was reinstalled.
+3. A clean run, `failed=0`; a second run `changed=0`.
+
+Then the diff: Docker had come with the provider's image and was running,
+and root still had the key copied in before the first run. The role now
+purges container packages and reboots once if it removed any; root's keys go
+on the first run that does not connect as root. That run rebooted B, and the
+checks after it passed — B comes back from a reboot by itself.
+
+Smaller: `ansible_managed` is defined only in templates in current
+ansible-core; placeholders from the example inventory passed the input checks
+and would have been written to the node; the July inventory, still on the
+workstation, became visible to git when its `.gitignore` line was replaced —
+caught before any commit, moved out of the repository.
+
+On A, read-only: the newest installed kernel is the running one and the
+AmneziaWG module is built for it, so a reboot is safe. No kernel metapackage
+is installed, so A's kernel does not update — to look at with A's cleanup.
+
+### 📋 Next
+- The link: `awg2` on the exit (by hand — live node), `entry_link` for B;
+  warm-up through `n2` with own devices. B runs a newer AmneziaWG build than
+  A; this is where a client configured for A is seen to work on B.
+- The portal writes peers to both entries; reconcile.
+- On A, by hand: client isolation, `ip rule 100` out of `rc.local`, Docker,
+  the "not carried" list.
