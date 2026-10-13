@@ -86,6 +86,8 @@ sa-key.json
 #Infrastructure
 # The real inventory names hosts by address; only the example is tracked.
 infrastructure/ansible/inventory/hosts.yml
+# The July inventory, still on the workstation where the old roles ran.
+infrastructure/ansible/inventory/hosts.ini
 # Vault files hold node private keys. They live outside the repository
 # (see infrastructure/ansible/README.md); these lines are a second fence.
 **/vault.yml
