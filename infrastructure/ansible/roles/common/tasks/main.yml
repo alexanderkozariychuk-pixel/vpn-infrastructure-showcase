@@ -23,6 +23,9 @@
 - name: Packages
   ansible.builtin.import_tasks: packages.yml
 
+- name: No Docker on a VPN node
+  ansible.builtin.import_tasks: no-containers.yml
+
 - name: Admin user
   ansible.builtin.import_tasks: users.yml
 

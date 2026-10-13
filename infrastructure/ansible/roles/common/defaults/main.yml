@@ -20,3 +20,20 @@ common_sshd_want:
 # ("ssh-ed25519 AAAA...", "<am1-address>") must not pass.
 common_pubkey_re: '^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{43}( \S+)?$'
 common_addr_re: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'
+
+# Removed if present (no-containers.yml). Both Ubuntu's and Docker's own
+# package names.
+common_container_packages:
+  - docker.io
+  - docker-ce
+  - docker-ce-cli
+  - containerd
+  - containerd.io
+  - docker-compose
+  - docker-compose-v2
+  - docker-compose-plugin
+  - docker-buildx
+  - docker-buildx-plugin
+  - python3-docker
+  - python3-dockerpty
+  - runc

@@ -112,11 +112,26 @@ roles or in this specification.
   `rc.local` also adds a second `table 200` route.
 - Split-tunnel scripts: B runs the linted versions (temp files, first-run
   support, rule 100); the unit and cron file differ by a header comment.
-- `pwa-add-peer`: B runs the repository version (config before runtime);
-  A runs the older one until `infrastructure/trial` stage 3.
 - `sshd_config.d/00-hardening.conf` on B only; the effective `sshd -T` values
   should already agree.
 - Admin user `sovadmin` on B, `vpnadmin` on A; sudoers drop-in names differ.
 - Amnezia PPA source file name (`amnezia-ppa.sources` on B,
   `add-apt-repository`'s on A).
 - Everything under "Not carried", Docker and `beget-agent`: on A only.
+  B's provider image shipped Docker too; the role purges it and reboots
+  once (`roles/common/tasks/no-containers.yml`).
+- `net.core.default_qdisc`: `fq` on B (set by the provider image), `fq_codel`
+  on A. Kept: `fq` is the pacing qdisc bbr is designed for. The trial
+  script sets its own leaf qdiscs either way.
+- AmneziaWG build: B gets the current PPA build (2026-08/09), A runs the
+  one installed in 2026-02/03. Same parameters, same key; that a client
+  configured for A connects to B is what the warm-up through `n2` proves.
+  `awg showconf` on the newer tools also prints parameters left at their
+  defaults (`RekeyAfterTime = 0` and so on).
+- Users: `sovmon` has `/bin/bash` on B, `/bin/sh` on A (its key is
+  `command=`-restricted either way). Root has no `authorized_keys` on either.
+- Provider-image leftovers on B not touched by the roles: `snapd`,
+  `gpu-manager`, `thermald`, `upower`, `fwupd`.
+
+First diff, 2026-10-13: 738 lines, every one accounted for by this list, and
+`awg0 key-id b15a1462aaac, listen 8443` on both.

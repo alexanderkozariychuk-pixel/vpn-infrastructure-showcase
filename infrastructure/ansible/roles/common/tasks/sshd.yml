@@ -28,3 +28,13 @@
     mode: "0644"
     validate: /usr/sbin/sshd -t -f %s
   notify: Reload ssh
+
+# Root logs in with nothing once the hardening is active. A key left in
+# root's authorized_keys (ssh-copy-id before the first run) is removed on the
+# first run that no longer connects as root: removing it while connected as
+# root could cut the run off.
+- name: Root has no SSH keys
+  ansible.builtin.file:
+    path: /root/.ssh/authorized_keys
+    state: absent
+  when: ansible_user != 'root'

@@ -1,0 +1,22 @@
+---
+# Docker is never co-located with a VPN node: it puts its own chains first in
+# FORWARD and its NAT rules ahead of ours, and a node needs none of it. Some
+# provider images ship it (VDSina's Ubuntu 24.04 did, found by diffing
+# node-inventory reports of A and B on 2026-10-13).
+#
+# Purging the packages leaves docker0 and the DOCKER* chains in the running
+# kernel, so a node that had it is rebooted once, right here, before any VPN
+# configuration exists on it. On a node without Docker nothing happens.
+- name: No container runtime
+  ansible.builtin.apt:
+    name: "{{ common_container_packages }}"
+    state: absent
+    purge: true
+    autoremove: true
+  register: common_docker_purge
+
+- name: Reboot once to drop Docker's bridge and chains  # noqa: no-handler — must happen now, before any VPN setup, not at the end
+  ansible.builtin.reboot:
+    msg: "Ansible: Docker removed, rebooting to clear its bridge and iptables chains"
+    reboot_timeout: 600
+  when: common_docker_purge is changed
