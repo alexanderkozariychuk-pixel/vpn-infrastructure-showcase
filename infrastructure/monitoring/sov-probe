@@ -7,7 +7,7 @@
 # it over SSH as the `sovmon` user, whose key is pinned to this one command:
 #
 #   /home/sovmon/.ssh/authorized_keys:
-#     command="sudo -n /usr/local/sbin/sov-probe",from="2.56.204.199",restrict ssh-ed25519 AAAA… sov-monitor@am1
+#     command="sudo -n /usr/local/sbin/sov-probe",from="<am1>",restrict ssh-ed25519 AAAA… sov-monitor@am1
 #   /etc/sudoers.d/sov-probe:
 #     sovmon ALL=(root) NOPASSWD: /usr/local/sbin/sov-probe
 #

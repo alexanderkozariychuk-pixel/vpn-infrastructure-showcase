@@ -49,18 +49,18 @@ remind_h = 6
 # Fill them from `sudo awg show interfaces` and sov-probe's output on each node.
 
 [host:portal]
-ssh = sovmon@159.194.232.158
+ssh = sovmon@<portal>
 backup_max_h = 26
 expiry_max_h = 2
 
 [host:entry]
-ssh = sovmon@212.67.14.85
+ssh = sovmon@<entry-A>
 clients = awg0
 links = awg1
 pools = paid:10.88.88.42-199, trial:10.88.89.10-250
 
 [host:exit]
-ssh = sovmon@45.134.217.122
+ssh = sovmon@<exit>
 links = awg0
 
 [host:am1]
