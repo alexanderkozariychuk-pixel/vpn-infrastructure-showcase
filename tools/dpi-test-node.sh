@@ -51,7 +51,7 @@ esac
 uplink=$(ip -4 route get 1.1.1.1 | awk '{for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1)}')
 [ -n "$uplink" ] || die "cannot find the uplink interface"
 addr=$(ip -4 -o addr show dev "$uplink" scope global | awk '{split($4, a, "/"); print a[1]; exit}')
-[ -n "$uplink" ] && [ -n "$addr" ] || die "cannot find the uplink interface or its address"
+[ -n "$addr" ] || die "cannot find the address of $uplink"
 echo "uplink: $uplink $addr"
 
 echo "== packages"
