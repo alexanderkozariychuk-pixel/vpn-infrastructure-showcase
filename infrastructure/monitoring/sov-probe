@@ -17,6 +17,11 @@
 # Install: sudo install -m 755 -o root -g root infrastructure/monitoring/sov-probe /usr/local/sbin/
 #
 # Output (anything missing on a host is simply not printed):
+#   clock_now                            this host's time, epoch with fractions —
+#                                        printed first, sov-monitor compares it
+#                                        with its own clock around the SSH call
+#   clock_synced                         1/0: the kernel's "synchronised" flag
+#                                        (timedatectl; set by timesyncd and chrony)
 #   host load1 ncpu mem_avail_pct disk_root_pct uptime_s
 #   failed_units  failed_unit_names
 #   awg.<if>.peers  awg.<if>.active     (handshake in the last 3 min)
@@ -30,8 +35,16 @@
 set -uo pipefail
 export LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-now=$(date -u +%s)
 kv() { printf '%s=%s\n' "$1" "$2"; }
+
+# The clock first: the sooner after the SSH call this is read, the tighter
+# sov-monitor's window around it.
+kv clock_now "$(date -u +%s.%N)"
+now=$(date -u +%s)
+case $(timeout 5 timedatectl show -p NTPSynchronized --value 2>/dev/null) in
+    yes) kv clock_synced 1 ;;
+    no)  kv clock_synced 0 ;;
+esac
 
 kv host "$(hostname -s)"
 kv load1 "$(cut -d' ' -f1 /proc/loadavg)"

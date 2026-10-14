@@ -36,6 +36,8 @@ link_stale_s = 300
 pool_warn_pct = 70
 pool_bad_pct = 95
 cert_min_days = 14
+# seconds a host's clock may stray from am1's before it is reported
+clock_skew_s = 2
 confirm_runs = 2
 remind_h = 6
 

@@ -225,3 +225,108 @@ def test_the_probe_lists_peer_addresses(tmp_path):
     out = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=30)
     v = mon.parse_probe(out.stdout)
     assert v["awg.awg0.ips"] == "10.88.88.42,10.88.88.7" and v["awg.awg0.peers"] == 2
+
+
+# ── clocks ──────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("now,skew", [(100.0, 0.0), (103.0, 0.0), (101.5, 0.0),   # inside the window
+                                      (95.0, -5.0), (99.5, -0.5), (110.0, 7.0), ("x", None), (None, None)])
+def test_clock_skew_counts_only_what_lies_outside_the_call(now, skew):
+    assert mon.clock_skew(now, 100.0, 103.0) == skew
+
+
+def test_a_slow_call_widens_the_window_and_never_alarms():
+    # The probe read its clock 9 s after am1 started the call, the call took 12 s.
+    assert mon.clock_skew(1009.0, 1000.0, 1012.0) == 0.0
+
+
+def test_skews_go_into_remote_probes_only():
+    probes = {"entry": {"clock_now": 110.0}, "exit": {"clock_now": 100.5}, "am1": {"clock_now": 500.0},
+              "portal": None}
+    windows = {n: (100.0, 101.0) for n in probes}
+    mon.apply_clock_skews(probes, windows, {"am1"})
+    assert probes["entry"]["clock_skew_s"] == 9.0 and probes["exit"]["clock_skew_s"] == 0.0
+    assert "clock_skew_s" not in probes["am1"] and probes["portal"] is None
+
+
+def test_am1_unsynchronised_is_no_reference():
+    probes = {"entry": {"clock_now": 110.0}, "am1": {"clock_synced": 0}}
+    mon.apply_clock_skews(probes, {"entry": (100.0, 101.0), "am1": (0, 0)}, {"am1"})
+    assert "clock_skew_s" not in probes["entry"]
+
+
+@pytest.mark.parametrize("change,text", [
+    ({"clock_synced": 0}, "entry: часы не синхронизированы (NTP)"),
+    ({"clock_synced": 1, "clock_skew_s": 7.4}, "entry: часы спешат на 7 с относительно am1"),
+    ({"clock_skew_s": -3.0}, "entry: часы отстают на 3 с относительно am1"),
+    ({"clock_skew_s": 2.0}, "entry: часы спешат на 2 с относительно am1"),
+])
+def test_clock_problems(change, text):
+    p = mon.host_problems("entry", _section(), LIMITS, {**HEALTHY, **change}, "")
+    assert p == {"entry:clock": text}
+    assert mon.level("entry:clock") == "warn"
+
+
+@pytest.mark.parametrize("change", [{}, {"clock_synced": 1}, {"clock_synced": 1, "clock_skew_s": 1.9},
+                                    {"clock_skew_s": -1.9}, {"clock_skew_s": 0.0}])
+def test_a_good_clock_or_an_old_probe_is_quiet(change):
+    assert mon.host_problems("entry", _section(), LIMITS, {**HEALTHY, **change}, "") == {}
+
+
+def _probe_with(tmp_path, tool, body):
+    fake = tmp_path / tool
+    fake.write_text("#!/bin/sh\n" + body)
+    fake.chmod(0o755)
+    src = (ROOT / "sov-probe").read_text().replace(
+        "export LC_ALL=C PATH=/usr/local/sbin", f"export LC_ALL=C PATH={tmp_path}:/usr/local/sbin")
+    script = tmp_path / "probe"
+    script.write_text(src)
+    out = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=30)
+    return out.stdout
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="no bash")
+@pytest.mark.parametrize("answer,synced", [("yes", 1), ("no", 0), ("", None)])
+def test_the_probe_reads_the_sync_flag(tmp_path, answer, synced):
+    out = _probe_with(tmp_path, "timedatectl",
+                      f'[ "$*" = "show -p NTPSynchronized --value" ] && echo "{answer}"\n')
+    v = mon.parse_probe(out)
+    assert v.get("clock_synced") == synced
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="no bash")
+def test_the_probe_prints_its_clock_first(tmp_path):
+    import time
+    before = time.time()
+    out = _probe_with(tmp_path, "timedatectl", "exit 1\n")
+    after = time.time()
+    assert out.splitlines()[0].startswith("clock_now=")
+    v = mon.parse_probe(out)
+    assert isinstance(v["clock_now"], float) and mon.clock_skew(v["clock_now"], before, after) == 0.0
+    assert "clock_synced" not in v
+
+
+def test_main_measures_the_clock_around_each_call(tmp_path, monkeypatch, capsys):
+    import json
+    import time
+    ini = tmp_path / "monitor.ini"
+    ini.write_text("[host:entry]\nssh = sovmon@entry\n[host:exit]\nssh = sovmon@exit\n"
+                   "[host:am1]\nssh = local\n")
+    monkeypatch.setattr(mon, "CONFIG", str(ini))
+    monkeypatch.setattr(mon, "STATE", str(tmp_path / "state.json"))
+
+    def fake(target, key, timeout=40):
+        base = {**HEALTHY, "clock_synced": 1}
+        if target == "local":
+            return {**base, "clock_now": time.time()}, ""
+        if target == "sovmon@exit":   # a slow call, a correct clock read at its very end
+            time.sleep(0.3)
+            return {**base, "clock_now": time.time()}, ""
+        return {**base, "clock_now": time.time() + 30}, ""   # entry is 30 s ahead
+    monkeypatch.setattr(mon, "run_probe", fake)
+    monkeypatch.setattr("sys.argv", ["sov-monitor", "--dry-run"])
+    assert mon.main() == 0
+    report, _ = json.JSONDecoder().raw_decode(capsys.readouterr().out)
+    assert 29 <= report["hosts"]["entry"]["clock_skew_s"] <= 30
+    assert report["hosts"]["exit"]["clock_skew_s"] == 0.0
+    assert "clock_skew_s" not in report["hosts"]["am1"]
