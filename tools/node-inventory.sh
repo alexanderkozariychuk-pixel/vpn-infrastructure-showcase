@@ -20,6 +20,10 @@ redact() { sed -E 's#[A-Za-z0-9+/]{42,43}=#<key>#g'; }
 keyid() { printf '%s' "$1" | sha256sum | cut -c1-12; }
 h() { printf '\n######## %s\n' "$*"; }
 run() { printf '\n$ %s\n' "$*"; bash -c "$*" 2>&1 | redact; }
+# run's argument is a command line for `bash -c`, printed as it is: the single
+# quotes are deliberate, so `$(uname -r)` and awk's `\$3` expand on the node,
+# inside that shell, and the report shows the command that actually ran.
+# shellcheck disable=SC2016
 
 {
 h "system"
