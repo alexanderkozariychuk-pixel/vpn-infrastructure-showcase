@@ -4965,3 +4965,50 @@ is installed, so A's kernel does not update — to look at with A's cleanup.
 - The portal writes peers to both entries; reconcile.
 - On A, by hand: client isolation, `ip rule 100` out of `rc.local`, Docker,
   the "not carried" list.
+
+---
+
+## 2026-10-14
+
+### 🕐 Clocks
+The exit node's time zone is UTC now, like every other node. Its automatic
+reboot is off (`"false"`), so the two hours its timers moved by changed
+nothing. A time source that does not depend on the exit's own provider
+(through A, over the link) is deferred: it needs a change on live A.
+
+Then the monitor learned to watch clocks. `sov-probe` prints its own time
+first (`clock_now`, with fractions) and the kernel's synchronised flag
+(`clock_synced`, from `timedatectl` — set by systemd-timesyncd on A and am1,
+by chrony on the portal and the exit). `sov-monitor` notes am1's time just
+before and just after each SSH call and counts only how far a host's time
+lies outside that window: a slow connection widens the window, it never
+raises an alarm. If am1 itself is not synchronised it is no reference, and
+the comparison is skipped while am1's own alarm says why. A clock off by
+2 s or more, or not synchronised, is a warning under the usual two-runs rule.
+An older probe prints neither field and the monitor says nothing, so the
+hosts could be updated one at a time.
+
+Before any change, the deployed files were checked against the repository by
+hash on all four hosts — no hand edits to bring back. Rolled out on am1
+(monitor and probe), then the portal, A and the exit (probe), each with the
+old file kept as `.prev`. A dry run on am1 afterwards: all four synchronised,
+every remote skew 0.0 s, nothing to send. The exit's hostname is all digits
+and came back as a number; it stays text now.
+
+`sov_monitor.py` bc4eb57d… · `sov-probe` a6c4e8a2… · 58 monitor tests, each
+new one failing on a mutation of the code it guards.
+
+### 🧹 Lint had been red for six commits
+Shellcheck failed the Lint workflow from 5c6ae42 (12.10) on, and nobody saw:
+two SC2016 notes in `tools/node-inventory.sh`, whose single quotes are the
+point (`run` hands the line to `bash -c` on the node), and an SC2015 in
+`tools/dpi-test-node.sh` that only CI's shellcheck 0.9.0 reports — 0.11
+passes it, so the first fix went out still red. Both fixed; checked with
+both versions now. The monitoring examples name hosts by role (`<am1>`,
+`<entry-A>`, …), not by their real addresses.
+
+### 📋 Next
+- Remove the `.prev` copies on all four hosts once a few quiet days have
+  passed (am1: `sov-monitor.prev` and `sov-probe.prev`; the others:
+  `sov-probe.prev`; and the copies in `/tmp`).
+- A time source for the exit through A — with the other changes on A.
