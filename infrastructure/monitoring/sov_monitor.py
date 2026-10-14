@@ -89,14 +89,20 @@ DEFAULT_LIMITS = {
 
 # ── collecting ──────────────────────────────────────────────────────────
 
+TEXT_KEYS = {"host", "failed_unit_names"}
+
 def parse_probe(text: str) -> dict:
-    """key=value lines from sov-probe; numbers become numbers."""
+    """key=value lines from sov-probe; numbers become numbers — except the
+    names, which stay text even when they are all digits (the exit's is)."""
     out = {}
     for line in text.splitlines():
         key, sep, value = line.partition("=")
         if not sep or not key.strip():
             continue
         value = value.strip()
+        if key.strip() in TEXT_KEYS:
+            out[key.strip()] = value
+            continue
         try:
             out[key.strip()] = int(value)
         except ValueError:

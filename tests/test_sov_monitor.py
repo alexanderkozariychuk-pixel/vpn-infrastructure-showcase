@@ -35,6 +35,12 @@ def test_parse_probe_types_and_junk():
     assert v == {"host": "entry", "load1": 0.25, "disk_root_pct": 40, "failed_unit_names": "a,b"}
 
 
+def test_a_hostname_of_digits_stays_a_name():
+    # The exit node's hostname is all digits; it is a name, not a number.
+    v = mon.parse_probe("host=833352\nfailed_unit_names=12\nuptime_s=60\n")
+    assert v == {"host": "833352", "failed_unit_names": "12", "uptime_s": 60}
+
+
 def test_a_healthy_host_has_no_problems():
     assert mon.host_problems("entry", _section(links="awg1", clients="awg0"), LIMITS, HEALTHY, "") == {}
 
