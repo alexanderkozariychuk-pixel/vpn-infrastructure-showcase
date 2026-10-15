@@ -11,19 +11,22 @@
       "Bash(ansible *)",
       "Bash(ansible-playbook *)",
       "Bash(ansible-vault *)",
-      "Bash(./deploy.sh)",
-      "Bash(./deploy.sh *)",
-      "Bash(bash deploy.sh*)",
+      "Bash(ansible-*)",
+      "Bash(*deploy.sh*)",
       "Bash(git push)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(gh)",
+      "Bash(gh *)",
+      "Bash(curl)",
+      "Bash(curl *)"
     ],
     "deny": [
       "Read(~/.sovereign/**)",
       "Edit(~/.sovereign/**)",
       "Read(~/.ssh/id_*)",
       "Edit(~/.ssh/**)",
-      "Read(**/.env)",
-      "Edit(**/.env)"
+      "Read(**/.env*)",
+      "Edit(**/.env*)"
     ]
   }
 }
