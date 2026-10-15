@@ -65,6 +65,16 @@ Root login is switched off at the end of that run (after the role has
 confirmed sovadmin's key is in place). Every run after it is as sovadmin. The
 play ends with the findings; a real run with findings fails.
 
+After the run that adds `entry_link`, the trial subnet comes up with its kill
+switch **off**: the role does not manage `/etc/sovereign/trial.state`, and a
+missing file means every trial packet is dropped (a handshake, no traffic).
+Set it by hand to what entry A has:
+
+```bash
+S=$(ssh sov-entry 'cat /etc/sovereign/trial.state 2>/dev/null || echo off')
+ssh sov-entry-b "sudo sovrn-trial-net $S && sudo sovrn-trial-net check"
+```
+
 ## Tests
 
 `tests/infrastructure/test_entry_verify.sh` runs the read-only checks against
