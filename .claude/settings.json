@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "ask": [
+      "Bash(ssh)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(sftp *)",
+      "Bash(rsync *)",
+      "Bash(sudo *)",
+      "Bash(ansible *)",
+      "Bash(ansible-playbook *)",
+      "Bash(ansible-vault *)",
+      "Bash(./deploy.sh)",
+      "Bash(./deploy.sh *)",
+      "Bash(bash deploy.sh*)",
+      "Bash(git push)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Read(~/.sovereign/**)",
+      "Edit(~/.sovereign/**)",
+      "Read(~/.ssh/id_*)",
+      "Edit(~/.ssh/**)",
+      "Read(**/.env)",
+      "Edit(**/.env)"
+    ]
+  }
+}

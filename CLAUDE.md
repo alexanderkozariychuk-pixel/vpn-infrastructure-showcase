@@ -83,3 +83,14 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
   `peer-remove.sh`, `dpi-test-node.sh`.
 - `pwa/services/provisioner.py` — client config, address pools, how the portal
   talks to the entry.
+
+## Permissions
+`.claude/settings.json` starts sessions in Manual mode and makes every command
+that reaches a node or publishes something ask first — even in auto mode:
+`ssh`, `scp`, `rsync`, `sudo`, Ansible, `deploy.sh`, `git push`. It also keeps
+Claude's file tools out of `~/.sovereign/` (vault, inventory backups), SSH
+private keys and `.env` files. These rules match commands as written; they are
+a fence, not a guarantee — still read every command that touches a node.
+Commands that wait for a password (`--ask-vault-pass`, `sudo` on the
+workstation, a key passphrase) cannot be answered by Claude: Alexander runs
+those in his own terminal.
