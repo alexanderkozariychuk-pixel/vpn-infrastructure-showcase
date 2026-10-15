@@ -5093,8 +5093,47 @@ public keys and the obfuscation values only.
 B now carries one peer, the paid test peer — kept for checks until stage 4,
 removed before the first reconcile.
 
+### 🚨 The exit would have dropped A's link on its next reboot
+Asked what restores the rules outside ufw at boot: nothing. No
+netfilter-persistent, no `/etc/iptables`, no `rc.local`, no `@reboot`. The rule
+letting A's link in (`INPUT … --dport <A's link port> -j ACCEPT`) and all the
+junk around it existed only in memory. And ufw — `ENABLED=yes`, unit enabled —
+had never started in this boot (no journal entries): it was switched on by
+hand after the last boot. At the next boot it would come up with INPUT DROP
+and only 22/tcp and B's link allowed. A's link — every paying client's
+foreign traffic — would stay down until someone added the rule by hand.
+
+How it got there, from this journal: 2026-06-30 the exit rebooted into a new
+kernel, the link went down, iptables was restored by hand (the rule outside
+ufw dates from then); the reboot-readiness checklist that day said "iptables
+in PostUp ✓" — true for NAT and FORWARD, and INPUT did not matter while ufw
+was off. 2026-07-01 ufw was enabled allowing `51820/udp` — not the port awg0
+listens on; "handshake alive" afterwards, because the hand-made rule was still
+in memory. The checklist was not run again. Automatic reboot was off, so for
+three and a half months nothing tested it. 2026-10-14 this journal's own
+notes said "the rule lives outside ufw" without drawing the conclusion.
+
+**Fixed**, by hand, the same way as B's link earlier the same day: one ufw
+rule, A's link port from A's address only — persistent in `user.rules`. It
+only adds: the rules outside ufw stay, the behaviour now is unchanged. Around
+the change: two rules for the port before and after, A's handshake under
+180 s, ~60 MB of A's traffic in each 10 s window.
+
+**Reboot-readiness, read again in full:** one kernel installed (the running
+one), the DKMS module built for it, nothing pending a reboot; module loaded
+at boot; `awg-quick@awg0`, `awg-quick@awg2`, ufw, chrony, fail2ban enabled;
+`ssh.socket` enabled (the service itself is socket-activated); `ip_forward`
+in `sysctl.conf`; ufw's saved rules exactly SSH, A's link, B's link;
+automatic reboot off. The junk (duplicates, rules for ports nothing listens
+on, `awg-de`) lives only in memory and goes away with a reboot; `udp2raw`
+is not running, only its config file is left.
+
+**Lesson:** a reboot-readiness checklist is not done once — any firewall
+change voids it. "Works now" says nothing about "works after a reboot".
+
 ### 📋 Next
 - Stage 4: the portal writes every peer to both entries, deletions included;
   `peer_reconcile.py` against both. Merge `main` into `cluster-b` first.
-- On the exit, read-only: what restores the rules outside ufw at boot.
-- `User sovadmin` for the B alias in `~/.ssh/config`.
+- The exit, at night with minimal online: remove `udp2raw_server.conf`, a
+  controlled reboot, then both links, NAT, ufw and the clock checked. The
+  console (VNC) at hand.
