@@ -2326,6 +2326,7 @@ const translations = {
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
     'set-title': 'Settings', 'set-sub': 'Language, theme and account',
     'hist-granted': 'Gift',
+    'peer-no-hint': 'From the peer address: 33 is 10.88.88.33, 89.10 is 10.88.89.10',
     'src-col': 'Source', 'src-portal': 'portal', 'src-trial': 'trial', 'src-manual': 'by hand', 'src-unknown': 'unknown',
     'src-rename': 'Name this peer', 'src-prompt': 'Name for this peer (empty to clear):', 'src-fail': 'Could not save the name.',
     'grant-title': 'Open access', 'grant-user': 'Username', 'grant-plan': 'Plan',
@@ -2677,6 +2678,7 @@ const translations = {
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
     'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
     'hist-granted': 'Подарок',
+    'peer-no-hint': 'По адресу пира: 33 — это 10.88.88.33, 89.10 — 10.88.89.10',
     'src-col': 'Источник', 'src-portal': 'портал', 'src-trial': 'пробный', 'src-manual': 'вручную', 'src-unknown': 'неизвестно',
     'src-rename': 'Назвать пир', 'src-prompt': 'Имя для этого пира (пусто — убрать):', 'src-fail': 'Не удалось сохранить имя.',
     'grant-title': 'Выдать доступ', 'grant-user': 'Логин', 'grant-plan': 'Тариф',
@@ -4424,7 +4426,7 @@ async function loadAdminClients() {
       <div class="sup-hint" style="margin:0 0 12px">${summary}</div>
       <table class="table">
         <thead><tr>
-          <th>Name</th><th data-i18n="src-col">${escHtml(t('src-col'))}</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
+          <th title="${escHtml(t('peer-no-hint'))}">№</th><th>Name</th><th data-i18n="src-col">${escHtml(t('src-col'))}</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
         </tr></thead>
         <tbody>
           ${d.clients.map(c => {
@@ -4433,6 +4435,7 @@ async function loadAdminClients() {
               ? ` <button class="btn-sm peer-label-btn" data-key="${escHtml(c.key)}" data-label="${escHtml(c.source === 'manual' ? c.name : '')}" title="${escHtml(t('src-rename'))}">✎</button>`
               : '';
             return `<tr>
+            <td title="${escHtml(c.address || '')}" style="font-variant-numeric:tabular-nums">${escHtml(c.number || '—')}</td>
             <td>${escHtml(c.name)}${edit}</td>
             <td><span class="badge badge-src-${c.source}">${escHtml(t(PEER_SOURCE[c.source] || c.source))}</span></td>
             <td><span class="badge badge-${c.status}">${c.status}</span></td>

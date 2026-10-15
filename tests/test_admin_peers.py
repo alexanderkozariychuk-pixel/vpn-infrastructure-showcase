@@ -100,3 +100,44 @@ def test_pages_are_revalidated_and_the_build_is_published(monkeypatch):
         assert tc.get(path).headers["cache-control"] == "no-cache", path
     v = tc.get("/api/version").json()["version"]
     assert len(v) == 12 and v == main.APP_VERSION
+
+
+# ── the number: from the peer's address ─────────────────────────────────
+
+@pytest.mark.parametrize("allowed,address,number", [
+    ("10.88.88.33/32", "10.88.88.33", "33"),
+    ("10.88.89.10/32", "10.88.89.10", "89.10"),
+    ("10.88.88.48/32, 10.88.88.49/32", "10.88.88.48", "48"),
+    ("10.77.77.1/32", "10.77.77.1", "10.77.77.1"),
+    ("(none)", "", ""),
+    ("", "", ""),
+])
+def test_number_and_address(allowed, address, number):
+    assert clients.peer_address(allowed) == address
+    assert clients.peer_number(address) == number
+
+
+def test_an_unknown_peer_is_shown_by_its_number(db, node):
+    _account(db, "ivan_1", _key(1))
+    node += [PeerStatus(_key(1), allowed_ips="10.88.88.60/32"),
+             PeerStatus(_key(6), allowed_ips="10.88.88.33/32"),
+             PeerStatus(_key(7), allowed_ips="10.88.89.12/32")]
+    _label(db, _key(7), "Даша")
+    out = {c["key"]: c for c in _list(db)["clients"]}
+    assert (out[_key(6)]["name"], out[_key(6)]["number"], out[_key(6)]["address"]) == ("№33", "33", "10.88.88.33")
+    # Named peers keep their names and get the number too.
+    assert (out[_key(1)]["name"], out[_key(1)]["number"]) == ("ivan_1 · device-1", "60")
+    assert (out[_key(7)]["name"], out[_key(7)]["number"]) == ("Даша", "89.12")
+
+
+def test_the_node_listing_carries_each_peers_address(monkeypatch):
+    from services import net_manager
+    text = ("interface: awg0\n  public key: SERVER\n  listening port: 8443\n\n"
+            "peer: KEY1\n  preshared key: (hidden)\n  endpoint: 1.2.3.4:5\n  allowed ips: 10.88.88.33/32\n"
+            "  latest handshake: 1 minute, 2 seconds ago\n  transfer: 1 KiB received, 2 KiB sent\n\n"
+            "peer: KEY2\n  preshared key: (hidden)\n  allowed ips: 10.88.89.10/32\n")
+    monkeypatch.setattr(net_manager, "_ssh_bridge", lambda cmd, *a, **k: (text, ""))
+    peers, err = net_manager.get_bridge_status_data()
+    assert err is None
+    assert [(p.public_key, p.allowed_ips) for p in peers] == [("KEY1", "10.88.88.33/32"), ("KEY2", "10.88.89.10/32")]
+    assert peers[0].endpoint == "1.2.3.4:5" and peers[1].handshake == "never"

@@ -6,7 +6,11 @@ Each peer is named from what we know about it:
     portal    issued by the portal: "<username> · <device>", from configs
     trial     the same, for a trial device
     manual    not from the portal, named by the operator (peer_labels)
-    unknown   on the node and nowhere else — the first 12 characters of its key
+    unknown   on the node and nowhere else — "№<number>"
+
+Every peer carries a number taken from its address: 10.88.88.33 is 33, a trial
+address 10.88.89.10 is 89.10. It does not move when the list is re-sorted, it
+is unique on the node, and it is the address tools/peer-remove.sh takes.
 
 "unknown" is the list to work through when moving customers to the portal:
 each such peer is either labelled (it is someone's) or removed.
@@ -51,17 +55,36 @@ async def _known(db: AsyncSession) -> tuple[dict, dict]:
     return configs, labels
 
 
+def peer_address(allowed_ips: str) -> str:
+    """The peer's own address: the first of its allowed ips, without the prefix."""
+    first = (allowed_ips or "").split(",")[0].strip()
+    return "" if first in ("", "(none)") else first.split("/")[0]
+
+
+def peer_number(address: str) -> str:
+    """33 for 10.88.88.33, 89.10 for 10.88.89.10; anything else as it is."""
+    if address.startswith("10.88.88."):
+        return address.rsplit(".", 1)[1]
+    if address.startswith("10.88.89."):
+        return "89." + address.rsplit(".", 1)[1]
+    return address
+
+
 def _describe(peer, configs: dict, labels: dict) -> dict:
     key = peer.public_key
+    address = peer_address(peer.allowed_ips)
+    number = peer_number(address)
     if key in configs:
         c = configs[key]
         name, source = c["name"], ("trial" if c["kind"] == "trial" else "portal")
     elif key in labels:
         name, source = labels[key], "manual"
     else:
-        name, source = key[:12], "unknown"
+        name, source = (f"№{number}" if number else key[:12]), "unknown"
     return {
         "name": name,
+        "number": number,
+        "address": address,
         "source": source,
         "key": key,
         "public_key": key[:12] + "...",

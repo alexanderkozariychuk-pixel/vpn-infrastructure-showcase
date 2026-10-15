@@ -31,6 +31,7 @@ class PeerStatus:
     endpoint: str = "N/A"
     handshake: str = "never"
     transfer: str = "0 B"
+    allowed_ips: str = ""
 
 
 # ----------------------------------------------------------------------
@@ -95,6 +96,8 @@ def get_bridge_status_data() -> tuple[list[PeerStatus] | None, str | None]:
             current.transfer = line.split(": ", 1)[1]
         elif current and "endpoint:" in line:
             current.endpoint = line.split(": ", 1)[1]
+        elif current and line.startswith("allowed ips:"):
+            current.allowed_ips = line.split(": ", 1)[1]
     if current:
         peers.append(current)
 
