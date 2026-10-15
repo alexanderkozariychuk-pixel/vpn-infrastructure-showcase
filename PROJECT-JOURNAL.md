@@ -5012,3 +5012,66 @@ both versions now. The monitoring examples name hosts by role (`<am1>`,
   passed (am1: `sov-monitor.prev` and `sov-probe.prev`; the others:
   `sov-probe.prev`; and the copies in `/tmp`).
 - A time source for the exit through A — with the other changes on A.
+
+---
+
+## 2026-10-15
+
+### 🔗 Entry B linked to the exit
+Stage 3 of the standby cluster, the link half. The exit is live (A's link
+carries every paying client), so its side was done by hand, each step shown
+first with its way back; B's side by the role.
+
+**Read first.** On the exit: `awg0` is the only interface (`10.77.77.0/30`,
+the port A connects to); nothing else listens on UDP but chrony on
+localhost; NAT is a plain `MASQUERADE -o <uplink>`, FORWARD policy ACCEPT
+and ufw routes. The rule letting A's link in still lives outside ufw — along
+with duplicates of it, of the NAT rule and of awg0's FORWARD rules, and
+leftovers for ports and an interface (`awg-de`) that no longer exist. Not
+touched today; whether that rule survives a reboot of the exit is the open
+question, to be read before any cleanup.
+
+**The exit's side — `awg2`.** Its own port, `10.77.77.4/30` (exit `.5`,
+B `.6`), own obfuscation (S1/S2/H1–H4 drawn at random, Jc/Jmin/Jmax as on
+`awg0`; no S3/S4, the same parameter set as the live link). Keys and the PSK
+generated on the exit into a root-only directory; the config written and
+read back before anything went up. Then one ufw rule — the port, from B's
+address only — and `awg-quick@awg2` enabled. `awg2`'s own PostUp/PostDown
+add and remove only its own rules (the NAT rule carries `-s` of the link's
+/30), so neither interface's PostDown can take the other's rules with it.
+Measured around the change: the count of rules for A's port unchanged, A's
+handshake fresh, A's traffic flowing in 10 s windows before and after.
+
+**B's side.** The link key and PSK went from the exit into the vault in one
+pipe — decrypted to a stream, two lines appended straight from `ssh`,
+encrypted back, nothing in plaintext on disk, nothing in a terminal or the
+chat; lengths read back (44 each). `entry_link` in `hosts.yml`; a `--check`
+run showed exactly the expected five changes (link config, link unit, trial
+subnet, link port, the restart handler), then the real run: `changed=5`,
+no findings. The trial subnet came up with the link, as the role intends.
+
+**Seen from both ends:** handshake on `awg1`/`awg2`, ping over the link
+without loss (~59 ms Moscow → Germany), `default via 10.77.77.5 dev awg1`
+in table 200, units active. A's link unaffected throughout. The key copies
+left on the exit are removed next (`shred`): B's key lives in the vault and
+on B, the PSK and the exit's key in `awg2.conf`.
+
+B's AmneziaWG prints two parameters the exit's does not (`random trailers`,
+`disable cookies`, both off) — the newer build's defaults, no effect on the
+handshake.
+
+**Small lessons.** `sudo -v` asked for a password on the exit although its
+admin user has NOPASSWD: the user is also in group `sudo`, and `-v` wants
+*every* matching entry to be NOPASSWD (`verifypw=all`). `sudo -n true` is
+the check that never prompts. The SSH alias for B has no `User` (first login
+was root), so a bare `ssh` there is refused — Ansible was unaffected, it
+takes the user from the inventory. A command block that checks the branch
+must stop on the wrong one, not just print it: one ran on `main`, where the
+July Ansible reads `hosts.ini`; nothing was written, and the backup copy it
+left inside the repository was moved out.
+
+### 📋 Next
+- `n2.sov3r3ign.com` → B; test peers for own devices, configs as the portal
+  issues them; Wi-Fi and mobile.
+- On the exit, read-only: what restores the rules outside ufw at boot.
+- Merge `main` into `cluster-b` before stage 4 (`peer_reconcile.py` lives there).

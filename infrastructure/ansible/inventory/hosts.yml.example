@@ -27,7 +27,28 @@ all:
           # First run with -e ansible_user=root, before sovadmin exists.
           ansible_user: sovadmin
           admin_user: sovadmin
-          # entry_link is filled in at stage 3, when the exit gets awg2.
+          # The link to this entry's own interface on the exit (awg2 for B),
+          # set up on the exit by hand first. Private key and PSK go into
+          # the vault as entry_link_private_key / entry_link_psk.
+          # Without entry_link the role builds no link and no trial subnet.
+          # entry_link:
+          #   if: awg1
+          #   address: 10.77.77.6/30          # this end of the link's /30
+          #   peer_address: 10.77.77.5        # the exit's end
+          #   port: 51821                     # this entry's listen port
+          #   peer_endpoint: "<exit>:51823"   # the exit's awg2 port
+          #   peer_public_key: "<exit awg2 public key>"
+          #   public_key: "<this end's public key>"   # checked against awg1
+          #   obfuscation:                    # same values as awg2 on the exit
+          #     jc: "4"
+          #     jmin: "50"
+          #     jmax: "1000"
+          #     s1: "<15-150>"
+          #     s2: "<15-150, not s1+56>"
+          #     h1: "<random>"
+          #     h2: "<random>"
+          #     h3: "<random>"
+          #     h4: "<random>"
 
     # Hosts that carry paying clients. playbooks/entry.yml refuses to run
     # against these except with --check. A second fence: no live host
