@@ -5070,8 +5070,31 @@ must stop on the wrong one, not just print it: one ran on `main`, where the
 July Ansible reads `hosts.ini`; nothing was written, and the backup copy it
 left inside the repository was moved out.
 
+### 📱 Warm-up through `n2`
+`n2.sov3r3ign.com` → B in Njalla (TTL 5 min; `n1` untouched). Test peers for
+the iPhone X — the most demanding client — added with `pwa-add-peer` on B,
+the way the portal does it. Client keys made in memory on B and never
+written there; the config built from B's *running* `awg0` (server key and
+obfuscation), so a working phone also proves B hands out what A does; shown
+as a QR code in the workstation's terminal.
+
+- Paid subnet (`.88.251`): Wi-Fi and mobile — works, foreign sites see the
+  exit's address, RU sites see B's (the split works), speed no worse than
+  through A. The newer AmneziaWG on B takes a client configured for A.
+- Trial subnet (`.89.2`): handshake, no traffic. The kill switch: the role
+  leaves `/etc/sovereign/trial.state` alone and a missing file reads as
+  `off`, which drops every trial packet — by design. Set by hand to A's value
+  (`on`); traffic flowed, `check` all ok. Written into `entry-spec` and the
+  Ansible README. The trial test peer removed afterwards.
+
+The key copies on the exit were removed (`shred`); `/root/link-b` keeps the
+public keys and the obfuscation values only.
+
+B now carries one peer, the paid test peer — kept for checks until stage 4,
+removed before the first reconcile.
+
 ### 📋 Next
-- `n2.sov3r3ign.com` → B; test peers for own devices, configs as the portal
-  issues them; Wi-Fi and mobile.
+- Stage 4: the portal writes every peer to both entries, deletions included;
+  `peer_reconcile.py` against both. Merge `main` into `cluster-b` first.
 - On the exit, read-only: what restores the rules outside ufw at boot.
-- Merge `main` into `cluster-b` before stage 4 (`peer_reconcile.py` lives there).
+- `User sovadmin` for the B alias in `~/.ssh/config`.
