@@ -5137,3 +5137,68 @@ change voids it. "Works now" says nothing about "works after a reboot".
 - The exit, at night with minimal online: remove `udp2raw_server.conf`, a
   controlled reboot, then both links, NAT, ufw and the clock checked. The
   console (VNC) at hand.
+
+---
+
+## 2026-10-16
+
+### 🧹 Hand-made peers on A: identified, fifteen removed
+The audit of A's peers against the portal's database, started 2026-10-15.
+The portal's side was clean: 29 active configs, 29 peers, none missing, none
+ended and still running. Beside them, 39 peers issued by hand before the
+portal, none of them labelled — the admin list showed each as the first
+characters of its key, nothing a person could write down.
+
+So the list got a number for every peer, taken from its address (№33 is
+`.88.33`, a trial address `.89.10` is №89.10): it does not move when the list
+is re-sorted, and it is the address the removal tool takes. Alexander named
+the peers from that list, and the rest by where they connect from: grouping
+the endpoints showed several old free configs in the homes of paying
+accounts. Notices went out on the 15th.
+
+A day and a half later the database had not one new config, so "remove whoever
+has not moved" would have meant nearly all 39, live devices included. The
+removal went by an explicit list instead: fifteen peers silent five days or
+more, four of them never seen since `awg0` came up on 2026-07-31.
+
+**`tools/peer-remove.sh`**, written for this: the whole list checked against
+the running interface before anything changes (address, the first characters
+of the key, no peer seen in the last three minutes without `--allow-live`), a
+snapshot of the file and the running peers, removal one by one through the
+same `pwa-del-peer` the portal uses, stop at the first refusal; `--restore`
+puts one peer back from the snapshot. Tested against the fake `awg` and the
+real wrapper, every guard broken once on purpose and caught.
+
+Before running it on A: the wrapper on the node matched the repository by
+hash, and the structure of `awg0.conf` was read off the node with every key
+replaced by a fingerprint, rebuilt here with fake keys, and the whole evening
+rehearsed on it — fifteen removals, the stray PSK pair, the file-against-
+runtime check, two restores. Every kept block came out byte for byte.
+
+On A (in the evening, by Alexander's choice — a removal takes one peer off the
+running interface and restarts nothing): 68 peers → 53. Then the headerless
+`PresharedKey`/`AllowedIPs` pair inside `client18`'s block, found 2026-10-12:
+`client18` is in use, so the pair went with the one-off script rather than with
+the peer. `awg-conf-check`: **file == running for the first time since the
+12th** — the file A would start from after a reboot is the one it runs now.
+Against the snapshot the file lost 94 lines (fifteen blocks, the pair) and
+gained or changed none. Around the change, peers online and traffic in 10 s
+windows: traffic flowing, online count up with the evening, as expected —
+the fifteen had been silent for days. The one removed peer that had a label
+left it behind; the next reconcile lists such labels with the `DELETE` that
+removes them.
+
+The snapshot under `/root/peer-audit-*` holds every client's preshared key:
+removed after a few quiet days.
+
+Smaller: `pwa-del-peer` names its copy of the file by the second, so fifteen
+quick removals left two copies, not fifteen — harmless, the snapshot comes
+first; the copies made during the run were shredded, the twelve older ones
+are for A's cleanup. Fewer labels reached the database than Alexander had
+meant to save — to look at in the admin panel's labelling.
+
+### 📋 Next
+- 24 hand-made peers remain (11 labelled, 13 not): what happens to them is
+  Alexander's call, peer by peer.
+- Delete the snapshot after a few quiet days.
+- Client isolation on A, by hand, on a night of its own.
