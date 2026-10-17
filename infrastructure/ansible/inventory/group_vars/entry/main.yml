@@ -7,6 +7,9 @@
 entry_awg0_port: 8443
 entry_awg0_address: 10.88.88.1/24
 entry_client_subnet: 10.88.88.0/24
+# Every client address: paying 10.88.88.0/24 and trial 10.88.89.0/24. What
+# the isolation rule in awg0.conf drops when a client sends to it.
+entry_client_nets: 10.88.88.0/23
 entry_awg0_obfuscation:
   jc: 3
   jmin: 50

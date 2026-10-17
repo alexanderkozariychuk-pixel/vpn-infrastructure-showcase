@@ -1,5 +1,6 @@
 -P FORWARD ACCEPT
 -A FORWARD -j SOVRN-TRIAL-JUMP
+-A FORWARD -d 10.88.88.0/23 -i awg0 -j DROP
 -A FORWARD -i awg0 -o awg0 -j DROP
 -A FORWARD -j ufw-before-forward
 -A FORWARD -i awg0 -j ACCEPT

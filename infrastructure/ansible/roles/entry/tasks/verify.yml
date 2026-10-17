@@ -125,6 +125,18 @@
     _v_sec: "{{ dict(_v_out.split('== ')[1:] | map('split', '\n', 1)) }}"
     _v_rules: "{{ _v_sec['rules'] | default('') }}"
     _v_sysctl: "{{ dict((_v_sec['sysctl'] | default('')).splitlines() | select('match', '^\\S+=') | map('split', '=', 1)) }}"
+    # The isolation DROP by destination must come before the first rule that
+    # accepts client traffic: ufw's forward chains or the blanket awg0 ACCEPT.
+    # The DROP is matched in either option order (-d/-i).
+    _v_iso_dst: "^-A FORWARD(?=.*\\s-i awg0(\\s|$))(?=.*\\s-d {{ entry_client_nets | regex_escape }}(\\s|$)).*\\s-j DROP$"
+    _v_iso_acc: "^-A FORWARD (-j ufw-before-forward|-i awg0 -j ACCEPT)$"
+    _v_iso_dst_first: >-
+      {%- set ns = namespace(iso=0, acc=0) -%}
+      {%- for l in (_v_sec['forward'] | default('')).splitlines() -%}
+      {%- if ns.iso == 0 and l is search(_v_iso_dst) -%}{%- set ns.iso = loop.index -%}{%- endif -%}
+      {%- if ns.acc == 0 and l is search(_v_iso_acc) -%}{%- set ns.acc = loop.index -%}{%- endif -%}
+      {%- endfor -%}
+      {{ ns.iso > 0 and (ns.acc == 0 or ns.iso < ns.acc) }}
     _v_checks:
       - ok: "{{ _v_rules | regex_findall('(?m)^99:\\s+from all fwmark 0x64 lookup main') | length == 1 }}"
         msg: "ip rule 99 (fwmark 0x64 -> main): want exactly one"
@@ -136,6 +148,8 @@
         msg: "ipset ru_nets: {{ (_v_sec['ipset'] | default('') | trim) or 'missing' }} entries, want >= {{ entry_ru_min_prefixes }}"
       - ok: "{{ not entry_isolate_clients or _v_sec['forward'] | default('') is search('^-A FORWARD -i awg0 -o awg0 -j DROP$', multiline=True) }}"
         msg: "FORWARD: no awg0 -> awg0 DROP, clients reach each other"
+      - ok: "{{ not entry_isolate_clients or _v_iso_dst_first }}"
+        msg: "FORWARD: no DROP of awg0 -> {{ entry_client_nets }} ahead of ufw and the awg0 ACCEPT, clients reach each other"
       - ok: "{{ _v_sec['nat'] | default('') is search('^-A POSTROUTING -o ' ~ entry_uplink_if ~ ' -j MASQUERADE$', multiline=True) }}"
         msg: "nat: no MASQUERADE out of {{ entry_uplink_if }}"
       - ok: "{{ _v_sysctl['net.ipv4.ip_forward'] | default('') == '1' }}"

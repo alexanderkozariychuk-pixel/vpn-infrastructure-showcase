@@ -10,9 +10,16 @@ ListenPort = {{ entry_awg0_port }}
 {{ k | capitalize }} = {{ entry_awg0_obfuscation[k] }}
 {% endfor %}
 {% if entry_isolate_clients %}
-# Clients do not reach each other. Not on entry A as of 2026-10-12
-# (docs/entry-spec.md); inserted first so the ACCEPT below cannot shadow it.
+# Clients do not reach each other (docs/entry-spec.md, "Client isolation").
+# Inserted first, ahead of ufw, which accepts new and established forwarded
+# traffic before the ACCEPT below is reached.
+# By destination: rule 100 sends a packet for another client into table 200
+# and out to the exit while the link is up, and through awg0 back to the
+# neighbour when it is down; this drops it on the way in either way.
+# By interface: catches a peer whose address lies outside the client nets.
 PostUp = iptables -I FORWARD 1 -i %i -o %i -j DROP
+PostUp = iptables -I FORWARD 1 -i %i -d {{ entry_client_nets }} -j DROP
+PostDown = iptables -D FORWARD -i %i -d {{ entry_client_nets }} -j DROP
 PostDown = iptables -D FORWARD -i %i -o %i -j DROP
 {% endif %}
 PostUp = iptables -A FORWARD -i %i -j ACCEPT
