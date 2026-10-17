@@ -112,7 +112,8 @@ apply() {
 
     echo "backup: $dir"
     echo "== diff backup -> file"
-    diff "$dir/awg0.conf" "$F" | grep '^[<>]' || echo "(no change)"
+    # diff exits 1 when the files differ; under pipefail that alone would print "(no change)".
+    { diff "$dir/awg0.conf" "$F" || true; } | grep '^[<>]' || echo "(no change)"
     show_state
 }
 
