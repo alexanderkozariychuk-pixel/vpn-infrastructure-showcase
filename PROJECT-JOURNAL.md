@@ -5257,8 +5257,8 @@ fake A and B files, both shellcheck versions.
 
 On B: `apply` added two lines and one rule, `awg-conf-check` OK, trial check
 OK. iptables prints the rule as `-d … -i awg0`. **Rebooted:** both DROPs back
-from the file at positions 2 and 3, the awg0 ACCEPT at 10 with ufw's six
-jumps between (read from `-L` numbering; `-S` to confirm); the phones: in only, `-d` counter = captured,
+from the file, right after the trial jump and above ufw's chains (`-S`, up 7
+minutes, all five units active); the phones: in only, `-d` counter = captured,
 `-o awg0` 0.
 
 Smaller: a command block's branch guard stopped `git pull` but not the lines
