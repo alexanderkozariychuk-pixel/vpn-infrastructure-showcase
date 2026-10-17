@@ -28,7 +28,7 @@ marked accordingly:
 | OS | Ubuntu 24.04, kernel 6.8 generic, UTC, timesyncd, 2 GB swap file | same release; own host |
 | AmneziaWG | `amneziawg`, `amneziawg-tools`, `amneziawg-dkms` 1.0.0 from the Amnezia PPA; `linux-headers-generic` installed so a kernel from unattended upgrades gets its module built | same |
 | `awg0` — clients | port **8443/udp**; `10.88.88.1/24` + `10.88.89.1/24` (the second added by `sovrn-trial-net`); obfuscation `Jc 3, Jmin 50, Jmax 1000, S1 72, S2 146, S3 0, S4 0`, `H1–H4` = `AWG_PARAMS` in `pwa/services/provisioner.py`; no MTU set (clients use 1300) | **same** — including the private key (key-id `b15a1462aaac`) |
-| `awg0` PostUp | `FORWARD -i awg0 ACCEPT`; `nat POSTROUTING -o eth0 MASQUERADE` (RU-bound traffic leaves locally) | same, interface name of B's uplink, **plus** `FORWARD -i awg0 -o awg0 DROP` first: A lets clients reach each other (to be fixed on A separately). Written into `awg0.conf` when the file is created; the file is never rewritten after that |
+| `awg0` PostUp | `FORWARD -i awg0 ACCEPT`; `nat POSTROUTING -o eth0 MASQUERADE` (RU-bound traffic leaves locally) | same, interface name of B's uplink, **plus** the two isolation DROPs first (below, "Client isolation"). Written into `awg0.conf` when the file is created; the file is never rewritten after that, so on B the second DROP was added by hand (2026-10-17) |
 | `awg0` peers | 58: portal-issued (pool `.42–.199`, trial `.10–.250` of `.89`) and hand-issued (below `.42`, `.200+`) | portal peers **same**, kept in step by the portal; hand-issued: not carried (moving to the portal or switched off) |
 | `awg1` — link to exit | port 51821; `10.77.77.2/30`; `Table = off`; MTU 1300; own obfuscation; peer = exit `:51822`, keepalive 25, `AdvancedSecurity = on` (the default, also on the exit side) | **own**: a separate link — own keys, own /30, own port, to a separate interface on the exit (`awg2`), so the live `awg0` on the exit is never touched |
 | `awg1` PostUp | default route via `10.77.77.1` into table **200**; `nat POSTROUTING -o awg1 MASQUERADE` — the exit sees one address per entry, which is what lets two entries share an exit | same pattern, B's own addresses |
@@ -46,6 +46,44 @@ The as-found copies are byte for byte what A runs and are excluded from
 shellcheck. The split-tunnel files now live, linted and amended, in
 `infrastructure/ansible/roles/entry/files/`; the as-found copies stay as the
 record of what A had on 2026-10-12.
+
+## Client isolation
+
+Clients must not reach each other's devices. Two rules, both inserted first
+in FORWARD by `awg0`'s PostUp:
+
+```
+-A FORWARD -d 10.88.88.0/23 -i awg0 -j DROP     # by destination: the one that works
+-A FORWARD -i awg0 -o awg0 -j DROP              # by interface: a peer outside the client nets
+```
+
+Why by destination (modelled on B with two phones, 2026-10-17):
+
+- **`awg1` up.** Rule 100 sends everything from `10.88.88.0/24` to table 200,
+  which holds only the default via the exit, so a packet for another client
+  leaves through `awg1`, masqueraded. The exit has no route to the client
+  nets (each link's AllowedIPs is the entry's `/32`) and sends it out of its
+  uplink to the provider's gateway. Nothing comes back: clients do not reach
+  each other, but `-o awg0` never matches, and private-address packets leak
+  past the exit.
+- **`awg1` down** (stopped, restarting, not up after a boot): table 200 is
+  empty, the lookup falls through to main, and the packet goes back out of
+  `awg0` to the neighbour. ufw's forward chains accept it (new TCP/UDP,
+  established, ICMP echo), long before the `-i awg0 -j ACCEPT`. Measured with
+  the DROPs removed: both phones answered each other.
+- **`-d 10.88.88.0/23`** dropped the packet on the way in in both states — the
+  counter rose by exactly what tcpdump saw, no answers, internet and the split
+  unchanged — and is back after a reboot from `awg0.conf`.
+
+Both rules must sit above ufw's chains; the trial chain's jump may sit above
+them (it drops trial → client traffic itself). `roles/entry/tasks/verify.yml`
+checks both and the position of the first. On an existing entry the lines are
+added by `tools/once/2026-10-17-client-isolation.sh` (`check`, `apply`,
+`rollback`), which never restarts `awg0`.
+
+Separate finding from the same model: with `awg1` down, clients' internet
+traffic leaves from the entry's own address (table 200 is empty, main's
+default route takes over) — no kill switch for paying clients. Not fixed here.
 
 ## Secrets an entry needs, and where they come from
 
@@ -104,7 +142,7 @@ Every difference should be one of these; anything else is a defect in the
 roles or in this specification.
 
 - **own** — host name, addresses, link keys and port, uplink name.
-- `FORWARD -i awg0 -o awg0 -j DROP` on B only (clients isolated).
+- The two isolation DROPs ("Client isolation") on B only, until A gets them.
 - sysctl: on B `rp_filter`, bbr and `nf_conntrack_max` (262144) come from
   `/etc/sysctl.d/awg.conf` and `modules-load.d/sovereign.conf`; IPv6
   forwarding is on A only.

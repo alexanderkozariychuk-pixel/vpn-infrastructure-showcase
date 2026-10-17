@@ -5202,3 +5202,75 @@ meant to save — to look at in the admin panel's labelling.
   Alexander's call, peer by peer.
 - Delete the snapshot after a few quiet days.
 - Client isolation on A, by hand, on a night of its own.
+
+## 2026-10-17
+
+### 🧱 Client isolation: the hole was not where we thought — modelled on B
+The plan for A said: `-A FORWARD -i awg0 -j ACCEPT` lets `awg0 → awg0`
+through, add `-i awg0 -o awg0 -j DROP` above it, as on B. Reading A first
+changed that twice.
+
+- **ufw accepts the traffic, not that rule.** Of 7131M forwarded packets on A,
+  918K reached `-i awg0 -j ACCEPT`; ufw's forward chains (new TCP/UDP,
+  established, ICMP echo) take the rest. Any DROP has to sit above ufw.
+- **Routing never sends client to client through `awg0`.** `ip route get` for
+  `.44 → .2` with `iif awg0`: rule 100, table 200, out through `awg1`. On the
+  exit, both links' AllowedIPs are the entry's `/32` and there is no route to
+  `10.88.88.0/23`: the packet goes out of the exit's uplink to the provider.
+  `ru_nets` holds no client address, every peer's AllowedIPs is inside
+  `/23`, awg0 has no IPv6 route. A has no conntrack table to look at.
+
+Alexander's idea: B is A's routing, built from its spec — model it there
+first. A narrow diff of the routing and firewall layer (rules, table 200,
+FORWARD, nat, mangle, ufw policy, rp_filter, accept_local) found only the
+expected: link addresses, uplink name, Docker, B's DROP. The exit treats its
+two links the same way.
+
+Two phones on B: the iPhone X (`.251`) and the Samsung (`.252`, added with
+`pwa-add-peer` like the first, keys in memory, QR in the terminal). A browser
+opening the other phone's address is the probe: a timeout means no path,
+"refused" means the neighbour answered. tcpdump on `awg0` and `awg1`,
+conntrack, the DROP counters. Every rule change in memory only.
+
+| state | result |
+|---|---|
+| as built (`-o awg0` DROP), `awg1` up | SYNs go out of `awg1` to the exit, conntrack `UNREPLIED`, DROP counter 0, timeouts |
+| `awg1` stopped | table 200 empty, path `dev awg0`; `-o awg0` DROP counts exactly the captured SYNs |
+| `awg1` stopped, no DROP — A in that window | every packet in and out of `awg0`, both phones answer with RST: the hole |
+| `-i awg0 -d 10.88.88.0/23 -j DROP` first, `awg1` stopped | in only, counter = captured, internet works |
+| same, `awg1` up | in only, counter = captured; ifconfig.me shows the exit, Yandex shows B: split intact |
+
+Also measured, with `awg1` stopped: ifconfig.me showed **B's own address** —
+paying clients' traffic leaves from the entry when the link is down. Not
+fixed today; its own task.
+
+Kept both rules (`-d` does the work; `-o awg0` covers a peer whose address
+lies outside the client nets and is already checked). Role: template, a
+`verify.yml` check that the `-d` DROP sits above ufw and the awg0 ACCEPT, four
+test cases (29/29). `tools/once/2026-10-17-client-isolation.sh` for entries
+whose `awg0.conf` already exists: `check` (read-only), `apply` (backup of the
+file and FORWARD under `/root/sov-backup/`, the missing lines into
+`[Interface]` only if the file did not change meanwhile and the diff is
+exactly the missing lines, the missing rules at position 1, no restart),
+`rollback` (file from the backup, only the rules `apply` added). Rehearsed on
+fake A and B files, both shellcheck versions.
+
+On B: `apply` added two lines and one rule, `awg-conf-check` OK, trial check
+OK. iptables prints the rule as `-d … -i awg0`. **Rebooted:** both DROPs back
+from the file at positions 2 and 3, the awg0 ACCEPT at 10 with ufw's six
+jumps between (read from `-L` numbering; `-S` to confirm); the phones: in only, `-d` counter = captured,
+`-o awg0` 0.
+
+Smaller: a command block's branch guard stopped `git pull` but not the lines
+after it — blocks are now one `if`. Alexander's local `cluster-b` held an
+unpushed settings commit from 2026-10-15; rebased onto the remote, pushed.
+`conntrack` and `tcpdump` were installed on B for this.
+
+### 📋 Next
+- A: `check`, then `apply` at a quiet hour, measured before and after
+  (handshakes, traffic in 10 s, rule count), `awg-conf-check`, trial check;
+  the reboot-readiness check again. Expected effect on clients: none — the
+  packets it drops already die past the exit.
+- The kill switch for paying clients when `awg1` is down — model on B.
+- B: remove `conntrack`, `tcpdump` and the `.252` test peer before stage 4's
+  first reconcile, with `.251`.

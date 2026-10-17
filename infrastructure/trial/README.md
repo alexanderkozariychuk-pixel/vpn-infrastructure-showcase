@@ -152,9 +152,11 @@ not the runtime.
 
 ## Found while preparing this, not changed here
 
-- `-A FORWARD -i awg0 -j ACCEPT` also forwards `awg0 → awg0`: paying clients
-  can reach each other's devices. Trials are blocked from it by their chain;
-  paying clients are not.
+- `-A FORWARD -i awg0 -j ACCEPT` (and ufw before it) also forwards
+  `awg0 → awg0`. It only matters while `awg1` is down — otherwise rule 100
+  sends client-to-client packets to the exit, where they die — and then paying
+  clients reach each other. Trials are blocked by their chain either way.
+  Measured and fixed on B 2026-10-17: `docs/entry-spec.md`, "Client isolation".
 - `ip rule 100` exists only in `/etc/rc.local` (after `sleep 5`), and the
   default route in table 200 is added both there and by `awg1`'s PostUp.
   Harmless today; belongs in `sov-split-tunnel.sh`.
