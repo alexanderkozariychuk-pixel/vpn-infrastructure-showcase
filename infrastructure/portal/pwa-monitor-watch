@@ -1,0 +1,8 @@
+# /etc/cron.d/pwa-monitor-watch on the portal host — the dead man's switch
+# for sov-monitor (pwa/monitor_watch.py): a letter when the backup host's
+# reports stop for more than ten minutes, another when they are back.
+#
+# Install: sudo install -m 644 infrastructure/portal/pwa-monitor-watch /etc/cron.d/
+#          (/var/log/pwa exists already: the expiry sweep logs there)
+# The address is MONITOR_ALERT_EMAIL in the portal's .env, SUPPORT_INBOX if unset.
+*/5 * * * * root cd /opt/pwa/vpn-infrastructure-showcase/pwa && /usr/bin/docker compose exec -T pwa python monitor_watch.py >> /var/log/pwa/monitor-watch.log 2>&1
