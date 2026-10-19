@@ -84,6 +84,12 @@ object VpnTunnel : Tunnel {
         try {
             mutableState.value = b.setState(this, Tunnel.State.DOWN, null)
             stoppedFromOutside = false
+        } catch (e: Exception) {
+            // The library can fail part-way — after the tunnel is off, before
+            // it says so. Whatever happened, the screen shows what is true now.
+            Log.e(TAG, "down failed", e)
+            mutableState.value = runCatching { b.getState(this) }.getOrDefault(Tunnel.State.DOWN)
+            throw e
         } finally {
             changingHere = false
         }
