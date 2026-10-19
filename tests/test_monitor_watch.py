@@ -83,6 +83,8 @@ def test_silence_is_told_once_and_its_end_once(db, letters):
     assert len(letters) == 1
     (event,) = _silent_events(db)
     assert event.ended_at is None and event.level == "bad"
+    # The history counts the silence from the last report.
+    assert event.started_at.replace(tzinfo=timezone.utc) == T0
 
     _report_at(db, T0 + timedelta(minutes=80))
     assert _watch(db, T0 + timedelta(minutes=81)) == "recovered"

@@ -23,7 +23,7 @@ silence only counts after the monitor has spoken.
 """
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from html import escape
 
 from sqlalchemy import select
@@ -75,8 +75,10 @@ async def watch(db: AsyncSession, now: datetime | None = None) -> str:
              "Когда отчёты вернутся, придёт письмо «мониторинг снова на связи»."])
         if not await mailer.send_email(alert_address(), subject, html, text):
             return "alert-failed"
+        # The silence began with the last report, not when the threshold was
+        # crossed: the history shows how long nothing was watched.
         db.add(MonitorEvent(key=SILENT_KEY, level="bad", text="Мониторинг (am1) молчит",
-                            started_at=last + timedelta(seconds=STALE_AFTER_S)))
+                            started_at=last))
         await db.commit()
         logger.warning("monitor silent since %s, alert sent", last.isoformat())
         return "alerted"
@@ -84,7 +86,7 @@ async def watch(db: AsyncSession, now: datetime | None = None) -> str:
     if open_event is None:
         return "quiet"
     # From the last report before the silence to the first one after it.
-    gap = (last - aware(open_event.started_at)).total_seconds() + STALE_AFTER_S
+    gap = (last - aware(open_event.started_at)).total_seconds()
     subject, html, text = _letter(
         "Sovereign: мониторинг снова на связи",
         [f"Отчёты от монитора (am1) снова приходят: последний — {when(last, now)} МСК.",
