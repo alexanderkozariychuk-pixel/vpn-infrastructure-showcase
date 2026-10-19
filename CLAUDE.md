@@ -64,6 +64,10 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
   cannot read `/root`, so `ls` gets a literal `*` and finds nothing. Expand it
   as root: `sudo sh -c 'ls -d /root/x-*'`; delete by the full path you listed.
 - Ubuntu's `awk` is mawk (no `asort`).
+- A script fed with `ssh host 'sudo bash -s' < file` is read from stdin line
+  by line: a command inside it that reads stdin (`ssh`, `sov-monitor`, which
+  runs ssh) swallows the rest of the script, silently. Redirect such commands
+  from `/dev/null`, or run them in a separate call.
 - Base64 keys contain `/` and `+`: never put them into `sed s///` or awk
   regexes, compare them as strings.
 - `sudo -v` asks for a password even with NOPASSWD when the user is also in
