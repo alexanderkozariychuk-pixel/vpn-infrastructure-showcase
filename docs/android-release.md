@@ -67,6 +67,10 @@ as keytool prints it). `tools/android-release.sh` refuses any APK whose
 signer does not match it. It is public by nature: anyone with the APK can
 read it.
 
+```
+SHA-256: C2:0F:F7:0B:BC:FD:16:87:15:E9:C5:2B:E2:BF:7E:C5:14:F9:AC:C5:66:71:04:2F:C3:36:3C:76:07:D1:8F:00
+```
+
 ## Building and checking a release
 
 `versionCode` goes up by one for every APK that is published, even a
