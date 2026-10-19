@@ -129,6 +129,8 @@ fun MainScreen(
     val access = ui.profile?.hasAccessAt(now)
     val offer = ui.profile?.let { trialOffer(it, ui.trialOffer?.enabled == true, now) } ?: TrialOfferKind.NONE
     val openPayment = { runCatching { uriHandler.openUri(PAYMENT_URL) }; Unit }
+    // Connected again: a notice about the last profile no longer applies.
+    LaunchedEffect(status.link) { if (status.link == Link.ON) model.dismissNotice() }
     val startTrial: () -> Unit = { if (!ui.busy) scope.launch { model.startTrial() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -190,7 +192,9 @@ fun MainScreen(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = Sov.Red, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
                 ui.notice?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Sov.Yellow, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    // A tap puts it away; choosing a profile or connecting does too.
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = Sov.Yellow, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().clickable(onClickLabel = "Скрыть") { model.dismissNotice() })
                 }
                 ui.release?.takeIf { updateAvailable(BuildConfig.VERSION_CODE, it) }?.let { r ->
                     UpdateRow(updateLine(r)) { runCatching { uriHandler.openUri(DOWNLOAD_URL) } }

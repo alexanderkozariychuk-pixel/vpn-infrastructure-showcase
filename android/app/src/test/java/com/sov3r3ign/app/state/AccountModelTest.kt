@@ -121,6 +121,15 @@ class AccountModelTest {
     }
 
     @Test
+    fun `choosing another profile puts the removal notice away`() = runBlocking {
+        val (m, _, _) = model(up = true, profile, list(lap), lapConf)
+        m.load()
+        assertEquals(DEVICE_GONE, m.ui.value.notice)
+        m.use(lap)
+        assertNull(m.ui.value.notice)
+    }
+
+    @Test
     fun `a failed list forgets nothing and leaves the tunnel up`() = runBlocking {
         val (m, _, tunnel) = model(up = true, profile, HttpReply(502, "<html>"))
         m.load()

@@ -118,6 +118,8 @@ class AccountModel(
     suspend fun use(device: Device) = work {
         when (val r = withContext(io) { session.select(device) }) {
             is ApiResult.Ok -> {
+                // A profile is chosen: "this phone's profile was removed" is over.
+                state.update { it.copy(notice = null) }
                 refreshSelected()
                 followSelection()
             }
@@ -135,7 +137,10 @@ class AccountModel(
                     added = true
                     // A device added from this phone is meant for this phone.
                     when (val s = withContext(io) { session.select(r.value) }) {
-                        is ApiResult.Ok -> followSelection()
+                        is ApiResult.Ok -> {
+                            state.update { it.copy(notice = null) }
+                            followSelection()
+                        }
                         is ApiResult.Failed -> failed(s.error)
                     }
                 }
@@ -192,7 +197,10 @@ class AccountModel(
                 is ApiResult.Ok -> {
                     reload = true
                     when (val s = withContext(io) { session.select(r.value) }) {
-                        is ApiResult.Ok -> followSelection()
+                        is ApiResult.Ok -> {
+                            state.update { it.copy(notice = null) }
+                            followSelection()
+                        }
                         is ApiResult.Failed -> failed(s.error, Action.TRIAL)
                     }
                 }
