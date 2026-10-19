@@ -98,7 +98,8 @@ $BT/aapt2 dump badging "$APK" | grep -E "^package:|application-debuggable"
 rm -rf /tmp/apkx && unzip -q "$APK" -d /tmp/apkx
 grep -rlaE "PrivateKey = [A-Za-z0-9+/]{43}=" /tmp/apkx || echo "no key"
 
-# 4. The GPL tools stayed out: libwg-go.so only, per architecture.
+# 4. The GPL tools stayed out: libwg-go.so (the tunnel) and
+#    libandroidx.graphics.path.so (Compose, Apache-2.0) only, per architecture.
 unzip -l "$APK" | grep "\.so$"
 
 sha256sum "$APK"

@@ -11,7 +11,9 @@
 #      android/release-cert.sha256 (public; written once, when the key was made);
 #   2. the package is ours and not debuggable;
 #   3. no WireGuard private key inside, by key format;
-#   4. native code is libwg-go.so alone (the GPL tools stay out);
+#   4. native code is the known list (NATIVE_OK): the tunnel's libwg-go.so and
+#      Compose's own libandroidx.graphics.path.so (Apache-2.0) — and never the
+#      GPL tools libwg.so / libwg-quick.so;
 #   5. the versionCode is above the one the portal offers now.
 #
 # Publishing writes two files into /opt/pwa/downloads on the app server, which
@@ -30,6 +32,9 @@ CERT_FILE=$REPO/android/release-cert.sha256
 HOST=${HOST:-sov-app}
 DEST=/opt/pwa/downloads
 PACKAGE=com.sov3r3ign.app
+# Native libraries an APK of ours may carry. A new one stops the release until
+# someone has looked at where it comes from and under what licence.
+NATIVE_OK='libwg-go.so libandroidx.graphics.path.so'
 
 BT=${BT:-$(ls -d "$HOME"/Android/Sdk/build-tools/* 2>/dev/null | sort -V | tail -1)}
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -64,10 +69,12 @@ if grep -rlaE "PrivateKey = [A-Za-z0-9+/]{43}=" "$tmp/x" >/dev/null; then fail "
 ok "no private key inside"
 
 # 4. Native code.
-other=$(unzip -Z1 "$APK" | grep '\.so$' | grep -v '/libwg-go\.so$' || true)
-[[ -z $other ]] || fail "unexpected native libraries: $other"
+other=$(unzip -Z1 "$APK" | grep '\.so$' | while read -r so; do
+    [[ " $NATIVE_OK " == *" ${so##*/} "* ]] || echo "$so"
+done)
+[[ -z $other ]] || fail "unexpected native libraries: $(echo $other)"
 [[ -n $(unzip -Z1 "$APK" | grep '/libwg-go\.so$') ]] || fail "libwg-go.so missing"
-ok "native code: libwg-go.so only"
+ok "native code: $NATIVE_OK, nothing else"
 
 size=$(stat -c %s "$APK")
 sha=$(sha256sum "$APK" | cut -d' ' -f1)
