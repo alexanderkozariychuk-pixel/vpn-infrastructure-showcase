@@ -1,7 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+/*
+ * Release signing. The repository is public, so the key and its passwords
+ * never enter it: they are read from a properties file outside it —
+ * ~/.config/sovrn/keystore.properties, or the path given as
+ * -Psovrn.signing=<file>. Without that file the release build comes out
+ * unsigned (app-release-unsigned.apk), which Android refuses to install;
+ * nothing half-signed is produced. See docs/android-release.md.
+ */
+val releaseSigning: Properties? = run {
+    val path = findProperty("sovrn.signing") as String?
+        ?: "${System.getProperty("user.home")}/.config/sovrn/keystore.properties"
+    val f = file(path)
+    if (f.isFile) Properties().apply { f.inputStream().use { load(it) } } else null
 }
 
 android {
@@ -20,8 +37,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        releaseSigning?.let { p ->
+            create("release") {
+                storeFile = file(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
+            // Off for the first release: the tunnel library reaches Java from
+            // native code by name, and shrinking would need keep rules proven
+            // on a device first.
             optimization {
                 enable = false
             }
