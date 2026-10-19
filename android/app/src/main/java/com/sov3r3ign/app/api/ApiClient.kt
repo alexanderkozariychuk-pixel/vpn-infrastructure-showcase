@@ -77,7 +77,7 @@ class ApiClient(private val transport: Transport) {
      * any role but "client" is refused here rather than kept.
      */
     fun login(username: String, password: String): ApiResult<TokenResponse> {
-        val body = json.encodeToString(LoginRequest.serializer(), LoginRequest(username, password))
+        val body = json.encodeToString(LoginRequest.serializer(), LoginRequest(username, password, refresh = true))
         val result = call("POST", "/api/auth/token", null, body) {
             json.decodeFromString(TokenResponse.serializer(), it)
         }
@@ -159,6 +159,22 @@ class ApiClient(private val transport: Transport) {
      * server sets. Needs a confirmed email (403 email_not_verified); a second
      * one is refused (409 trial_used).
      */
+    /** A new access token for the stored refresh token. 401: it is no longer valid. */
+    fun refresh(refreshToken: String): ApiResult<TokenResponse> {
+        val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))
+        val result = call("POST", "/api/auth/refresh", null, body) {
+            json.decodeFromString(TokenResponse.serializer(), it)
+        }
+        if (result is ApiResult.Ok && result.value.role != "client") {
+            return ApiResult.Failed(ApiError.Unauthorized)
+        }
+        return result
+    }
+
+    /** Ends this app's session on the portal: the refresh token stops working. */
+    fun logout(refreshToken: String): ApiResult<Unit> =
+        call("POST", "/api/auth/logout", null, json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))) {}
+
     fun startTrial(token: String): ApiResult<Device> =
         call("POST", "/api/client/trial", token, "{}") {
             json.decodeFromString(TrialStarted.serializer(), it).config

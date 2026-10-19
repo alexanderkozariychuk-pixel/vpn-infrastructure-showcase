@@ -28,8 +28,16 @@ const val MAX_DEVICE_NAME = 6
  */
 val DEVICE_NAME = Regex("[A-Za-z0-9_-]{1,$MAX_DEVICE_NAME}")
 
+/**
+ * [refresh] asks the portal for a refresh token as well (api/auth.py): the
+ * app's sign-in then outlives the day-long access token. No default on
+ * purpose — kotlinx.serialization leaves defaults out of the JSON.
+ */
 @Serializable
-data class LoginRequest(val username: String, val password: String)
+data class LoginRequest(val username: String, val password: String, val refresh: Boolean)
+
+@Serializable
+data class RefreshRequest(@SerialName("refresh_token") val refreshToken: String)
 
 @Serializable
 data class RegisterRequest(
@@ -46,6 +54,8 @@ data class NewDeviceRequest(val name: String)
 data class TokenResponse(
     @SerialName("access_token") val accessToken: String,
     val role: String,
+    /** Only from a sign-in that asked for it; a refresh answers without one. */
+    @SerialName("refresh_token") val refreshToken: String? = null,
 )
 
 @Serializable

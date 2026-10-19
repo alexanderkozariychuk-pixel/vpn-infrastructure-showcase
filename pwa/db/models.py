@@ -264,3 +264,29 @@ class MonitorEvent(Base):
     text: Mapped[str] = mapped_column(String(300), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AppSession(Base):
+    """
+    A signed-in app: the long-lived half of the Android client's sign-in.
+
+    The access token (JWT) lasts a day and is never stored server-side. The
+    app also gets a random refresh token at sign-in and trades it for a new
+    access token when the old one runs out (api/auth.py, /api/auth/refresh).
+    Only its SHA-256 is kept here, so a database dump opens nothing.
+
+    The expiry slides: each trade moves it APP_SESSION_DAYS ahead, so an app
+    opened now and then is never asked to sign in again. A password reset
+    removes every row of the account; signing out of the app removes its own.
+    """
+    __tablename__ = "app_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

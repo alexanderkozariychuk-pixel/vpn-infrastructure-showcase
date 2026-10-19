@@ -135,7 +135,29 @@ class ApiClientTest {
         val token = ok(ApiClient(t).login("paid", "secret"))
         assertEquals("<JWT>", token.accessToken)
         assertEquals(listOf("POST /api/auth/token -"), t.calls)
-        assertEquals("""{"username":"paid","password":"secret"}""", t.lastBody)
+        // The app always asks for a refresh token: its sign-in outlives the day.
+        assertEquals("""{"username":"paid","password":"secret","refresh":true}""", t.lastBody)
+        assertEquals(null, token.refreshToken)
+    }
+
+    @Test
+    fun `the refresh token is read, traded without an access token, and handed back on sign-out`() {
+        val signIn = Recorder(200, """{"access_token":"A1","token_type":"bearer","role":"client","refresh_token":"R1"}""")
+        assertEquals("R1", ok(ApiClient(signIn).login("paid", "secret")).refreshToken)
+
+        val t = Recorder(200, """{"access_token":"A2","token_type":"bearer","role":"client","refresh_token":null}""")
+        assertEquals("A2", ok(ApiClient(t).refresh("R1")).accessToken)
+        assertEquals(listOf("POST /api/auth/refresh -"), t.calls)
+        assertEquals("""{"refresh_token":"R1"}""", t.lastBody)
+
+        assertEquals(ApiError.Unauthorized, error(ApiClient(Recorder(401, """{"detail":"Invalid or expired token"}""")).refresh("R1")))
+        // An admin's token is never kept, by this door either.
+        assertEquals(ApiError.Unauthorized, error(ApiClient(Recorder(200, """{"access_token":"A","role":"admin"}""")).refresh("R1")))
+
+        val out = Recorder(200, """{"ok":true}""")
+        ok(ApiClient(out).logout("R1"))
+        assertEquals(listOf("POST /api/auth/logout -"), out.calls)
+        assertEquals("""{"refresh_token":"R1"}""", out.lastBody)
     }
 
     @Test

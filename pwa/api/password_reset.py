@@ -30,7 +30,7 @@ from db.models import User
 from auth.jwt import hash_password
 from services.mailer import send_email, password_reset_email
 from api.email_verify import mark_verified
-from services import ratelimit
+from services import app_sessions, ratelimit
 from services.net import resolve_source_ip
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,9 @@ async def reset_password(
 
     # set new password, invalidate token (single-use)
     user.password_hash = hash_password(req.new_password)
+    # Every app signed in with the old password signs in again: a reset is
+    # what a customer does when a phone is lost or the password leaked.
+    await app_sessions.close_all(db, user)
     user.reset_token = None
     user.reset_expires = None
     # The link came from a letter to this address, so the address is theirs.

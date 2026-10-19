@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from db.base import get_db
 from db.models import User
 from auth.jwt import verify_password, create_token, hash_password, require_auth
-from services import ratelimit
+from services import app_sessions, ratelimit
 from services.net import resolve_source_ip
 
 router = APIRouter()
@@ -25,12 +25,20 @@ class LoginRequest(BaseModel):
     # Caps, not rules: a megabyte "password" would otherwise be fed to argon2.
     username: str = Field(max_length=64)
     password: str = Field(max_length=128)
+    # The Android app asks for a refresh token too (services/app_sessions.py);
+    # the site does not, and its sign-in still lasts the access token's day.
+    refresh: bool = False
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str = "client"
+    refresh_token: str | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(max_length=128)
 
 
 @router.post("/api/auth/token", response_model=TokenResponse)
@@ -65,7 +73,35 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
     # The token carries the stored spelling: everything downstream looks the
     # user up by `sub` exactly.
     token = create_token({"sub": user.username, "role": "client"})
+    refresh = None
+    if req.refresh:
+        refresh = await app_sessions.open_session(db, user)
+        await db.commit()
+    return TokenResponse(access_token=token, role="client", refresh_token=refresh)
+
+
+@router.post("/api/auth/refresh", response_model=TokenResponse)
+async def refresh(req: RefreshRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    A new access token for the app's refresh token. 401 when the token is
+    unknown or expired, or the account disabled: the app then signs in.
+    Admins never get a refresh token, so this only ever issues a client's.
+    """
+    ratelimit.take(ratelimit.LOGIN_PER_IP, resolve_source_ip(request))
+    user = await app_sessions.use_session(db, req.refresh_token)
+    await db.commit()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    token = create_token({"sub": user.username, "role": "client"})
     return TokenResponse(access_token=token, role="client")
+
+
+@router.post("/api/auth/logout")
+async def logout(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Signing out of the app: its refresh token stops working. Holding it is the proof."""
+    await app_sessions.close_session(db, req.refresh_token)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.get("/api/auth/verify")
