@@ -59,6 +59,14 @@ fun validateDeviceName(name: String): String? = when {
  * the server records which installation holds which config, the app cannot
  * see the other device.
  */
+/** Under the username on registration: the server's rule (USERNAME_RE in register.py). */
+const val USERNAME_HINT = "От 3 до 27 символов: латинские буквы, цифры, - и _"
+
+/** Under the registration button: the letter comes, and what it is for. */
+const val REGISTER_NOTE =
+    "После регистрации на почту придёт письмо со ссылкой — подтвердите адрес, " +
+        "он нужен для пробного периода и оплаты."
+
 const val ONE_DEVICE_PER_CONFIG =
     "В случае подключения больше одного устройства к выбранному выше профилю " +
         "работоспособность сервиса не гарантируется."

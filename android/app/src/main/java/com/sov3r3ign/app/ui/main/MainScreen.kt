@@ -67,6 +67,8 @@ import com.sov3r3ign.app.state.AccountModel
 import com.sov3r3ign.app.ui.CONFIRM_EMAIL_TEXT
 import com.sov3r3ign.app.ui.DOWNLOAD_URL
 import com.sov3r3ign.app.ui.Link
+import com.sov3r3ign.app.ui.drawMark
+import com.sov3r3ign.app.ui.wordmark
 import com.sov3r3ign.app.ui.PAYMENT_URL
 import com.sov3r3ign.app.ui.TrialOfferKind
 import com.sov3r3ign.app.ui.expiryWarning
@@ -255,7 +257,7 @@ private fun TopBar(onDevices: () -> Unit, onPay: () -> Unit, onSignOut: () -> Un
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Canvas(Modifier.size(28.dp)) { drawMark() }
             Text(
-                buildWordmark(),
+                wordmark(),
                 style = MaterialTheme.typography.titleMedium,
                 color = Sov.TextBright,
             )
@@ -283,28 +285,6 @@ private fun TopBar(onDevices: () -> Unit, onPay: () -> Unit, onSignOut: () -> Un
             }
         }
     }
-}
-
-/** «Sover**ei**gn», the «ei» in the accent, as on the site. */
-private fun buildWordmark() = androidx.compose.ui.text.buildAnnotatedString {
-    append("Sover")
-    pushStyle(androidx.compose.ui.text.SpanStyle(color = Sov.Accent))
-    append("ei")
-    pop()
-    append("gn")
-}
-
-/** The mark itself, from the site's SVG: viewBox 100 100 312 312. */
-private fun DrawScope.drawMark() {
-    val k = size.width / 312f
-    fun p(x: Float, y: Float) = Offset((x - 100f) * k, (y - 100f) * k)
-    val route = listOf(p(150f, 180f), p(360f, 150f), p(256f, 360f))
-    for (i in route.indices) drawLine(Sov.AccentDim, route[i], route[(i + 1) % 3], 16f * k, StrokeCap.Round)
-    listOf(p(150f, 180f), p(360f, 150f)).forEach {
-        drawCircle(Sov.Bg, 32f * k, it)
-        drawCircle(Sov.Accent, 32f * k, it, style = Stroke(16f * k))
-    }
-    drawCircle(Sov.Accent, 40f * k, p(256f, 360f))
 }
 
 @Composable
