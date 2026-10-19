@@ -60,6 +60,9 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
 ## Pitfalls already paid for
 - `sudo cmd < file`: the redirect runs without sudo. Pass the path as an
   argument or use `sudo tee`.
+- `sudo ls /root/x-*`: the glob is expanded by the admin user's shell, which
+  cannot read `/root`, so `ls` gets a literal `*` and finds nothing. Expand it
+  as root: `sudo sh -c 'ls -d /root/x-*'`; delete by the full path you listed.
 - Ubuntu's `awk` is mawk (no `asort`).
 - Base64 keys contain `/` and `+`: never put them into `sed s///` or awk
   regexes, compare them as strings.
