@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Sovereign" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark, as the site: there is no light theme. The window paints the brand's
+         background from the first frame; Compose draws everything else. -->
+    <style name="Theme.Sovereign" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/sov_bg</item>
+        <item name="android:colorBackground">@color/sov_bg</item>
+    </style>
 </resources>
