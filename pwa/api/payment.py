@@ -19,14 +19,14 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from db.base import get_db
-from db.models import User, Payment
+from db.models import Config, User, Payment
 from auth.jwt import require_auth
 from services import heleket
 from services import credit
 from services.provisioner import activate_payment
-from config import PLANS
+from config import PLANS, config_limit
 from services import net, platega
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,20 @@ async def _open_order(
     # left behind by a refusal. 403 with a fixed code the portal recognises.
     if user.email_verified_at is None:
         raise HTTPException(status_code=403, detail="email_not_verified")
+
+    # A plan that allows fewer devices than the account holds is not sold until
+    # the extra ones are deleted. activate_payment never takes devices away, so
+    # without this an early renewal from Extended to Basic kept all five on the
+    # Basic price, period after period. Counted whatever the subscription's
+    # state: in the hour between an end and the expiry sweep the devices are
+    # still active, and a payment then is treated as a renewal too.
+    held = (await db.execute(select(func.count()).select_from(Config).where(
+        Config.user_id == user.id, Config.is_active.is_(True), Config.kind != "trial",
+    ))).scalar_one()
+    limit = config_limit(req.plan)
+    if held > limit:
+        raise HTTPException(status_code=409,
+                            detail={"code": "too_many_devices", "held": held, "limit": limit})
 
     quote = await credit.price_order(
         db, user, req.plan, code=req.code, use_credit=req.use_credit

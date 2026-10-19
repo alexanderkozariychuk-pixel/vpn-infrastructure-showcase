@@ -2396,6 +2396,8 @@ const translations = {
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
     'vb-already': 'Your email is already confirmed.',
+    'pay-too-many': 'Devices on this plan: {limit}; on your account now: {held}. Delete the extra ones first, then pay.',
+    'pay-too-many-go': 'Go to my devices →',
     'pay-need-verify': 'Confirm your email first — the link is in the letter we sent after registration.',
     'verify-title-1': 'Email', 'verify-title-2': ' confirmation',
     'verify-wait': 'Confirming…',
@@ -2754,6 +2756,8 @@ const translations = {
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
     'vb-already': 'Почта уже подтверждена.',
+    'pay-too-many': 'Устройств на этом тарифе: {limit}, у вас сейчас: {held}. Сначала удалите лишние, потом оплатите.',
+    'pay-too-many-go': 'К моим устройствам →',
     'pay-need-verify': 'Сначала подтвердите почту — ссылка в письме, которое пришло после регистрации.',
     'verify-title-1': 'Подтверждение', 'verify-title-2': ' почты',
     'verify-wait': 'Подтверждаем…',
@@ -3597,6 +3601,16 @@ async function startPayment() {
     if (res.status === 403 && d.detail === 'email_not_verified') {
       if (out) out.textContent = t('pay-need-verify');
       loadClientMe();
+    } else if (res.status === 409 && d.detail && d.detail.code === 'too_many_devices') {
+      // The plan allows fewer devices than the account holds: delete first.
+      if (out) {
+        out.textContent = t('pay-too-many').replace('{held}', d.detail.held).replace('{limit}', d.detail.limit) + ' ';
+        const go = document.createElement('a');
+        go.href = '#';
+        go.textContent = t('pay-too-many-go');
+        go.addEventListener('click', e => { e.preventDefault(); closeCheckout(); showPage('client', 'config'); });
+        out.appendChild(go);
+      }
     } else if (out) {
       out.textContent = (d.detail ? (t('pay-error') + ': ' + d.detail) : t('pay-error'));
     }
