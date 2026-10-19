@@ -26,8 +26,11 @@ services:
     environment:
       PWA_SSH_DIR: /home/app/.ssh
     # Must be owned by uid 10001 on the host: chown -R 10001:10001 /opt/pwa/ssh_keys
+    # The Android APK and its description (api/android.py), put there by
+    # tools/android-release.sh. Read-only: the app never writes a download.
     volumes:
       - /opt/pwa/ssh_keys:/home/app/.ssh:ro
+      - /opt/pwa/downloads:/app/downloads:ro
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

@@ -1370,6 +1370,18 @@
       font-size: 12px; font-weight: 700; font-family: var(--font-mono);
     }
     .conn-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .conn-pulse.ready { background: var(--green); animation: none; }
+    .apk-box { margin-top: 16px; }
+    a.apk-btn { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+    a.apk-btn[hidden] { display: none; }
+    .apk-meta { margin-top: 8px; font-size: 13px; color: var(--text-dim); text-align: center; }
+    .apk-sum { margin-top: 6px; font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
+    .apk-sum[hidden] { display: none; }
+    .apk-sum code { font-family: var(--font-mono); word-break: break-all; color: var(--text); }
+    .conn-alt { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .conn-alt summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-bright); }
+    .conn-alt summary:hover { color: var(--accent); }
+    .conn-alt[open] summary { margin-bottom: 8px; }
     @keyframes conn-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     @keyframes conn-pulse {
       0%   { box-shadow: 0 0 0 0 rgba(255, 208, 77, .55); }
@@ -1739,7 +1751,7 @@
                   <circle cx="18" cy="40.5" r="1.1" fill="currentColor"/><circle cx="24" cy="40.5" r="1.1" fill="currentColor"/><circle cx="30" cy="40.5" r="1.1" fill="currentColor"/>
                 </svg>
               <span class="plat-name">Android</span>
-              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
+              <span class="plat-tag" data-i18n="conn-tag-app">App available</span>
             </button>
             <button class="plat-tile" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
               <span class="plat-glow" aria-hidden="true"></span>
@@ -1755,23 +1767,40 @@
           <div class="conn-empty" id="conn-empty" data-i18n="conn-pick">Pick your device to see how to connect it.</div>
             <div class="conn-panel" id="conn-panel-android" hidden>
               <div class="conn-status">
-                <span class="conn-pulse" aria-hidden="true"></span>
+                <span class="conn-pulse ready" aria-hidden="true"></span>
                 <div>
                   <div class="conn-status-title" data-i18n="conn-android-app"></div>
-                  <div class="conn-status-sub" data-i18n="conn-via-awg"></div>
+                  <div class="conn-status-sub" data-i18n="conn-android-sub"></div>
                 </div>
               </div>
-              <ol class="conn-steps">
-                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-android-1"></span></li>
-                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-android-2"></span></li>
-                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-android-3"></span></li>
-                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-android-4"></span></li>
-                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-android-5"></span></li>
-              </ol>
-              <div class="conn-note" data-i18n="dev-one-file"></div>
-              <div class="actions">
-                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              <div class="apk-box" id="apk-box">
+                <a class="btn-full apk-btn" id="apk-btn" href="/download/android" hidden data-i18n="apk-download">Download the app</a>
+                <div class="apk-meta" id="apk-meta"></div>
+                <div class="apk-sum" id="apk-sum" hidden><span data-i18n="apk-sha">SHA-256 of the file:</span> <code id="apk-sha"></code></div>
               </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-apk-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-apk-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-apk-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-apk-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-apk-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="conn-apk-update"></div>
+              <details class="conn-alt">
+                <summary data-i18n="conn-alt-awg">Another way: AmneziaWG</summary>
+                <div class="conn-status-sub" data-i18n="conn-alt-awg-sub"></div>
+                <ol class="conn-steps">
+                  <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-android-1"></span></li>
+                  <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-android-2"></span></li>
+                  <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-android-3"></span></li>
+                  <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-android-4"></span></li>
+                  <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-android-5"></span></li>
+                </ol>
+                <div class="conn-note" data-i18n="dev-one-file"></div>
+                <div class="actions">
+                  <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+                </div>
+              </details>
             </div>
             <div class="conn-panel" id="conn-panel-ios" hidden>
               <div class="conn-status">
@@ -2300,7 +2329,21 @@ const translations = {
     'page-connect-sub': 'Choose your device',
     'conn-tag-dev': 'App in development',
     'conn-pick': 'Pick your device to see how to connect it.',
-    'conn-android-app': 'The Sovereign app for Android is in development',
+    'conn-tag-app': 'App available',
+    'conn-android-app': 'The Sovereign app for Android',
+    'conn-android-sub': 'Sign in with the same username and password as here. Profiles and the connection are right in the app.',
+    'apk-download': 'Download the app',
+    'apk-meta': 'Version {v} · {size} MB · Android 8 and later',
+    'apk-soon': 'The app file will appear here shortly. Until then, connect through AmneziaWG below.',
+    'apk-sha': 'SHA-256 of the file:',
+    'conn-apk-1': 'Download the file with the button above',
+    'conn-apk-2': 'Open it from the notification or from Downloads. If Android asks, allow installing apps from this source (your browser)',
+    'conn-apk-3': 'If Google Play Protect warns about an unknown app, tap More details → Install anyway',
+    'conn-apk-4': 'Open Sovereign and sign in with your site username and password',
+    'conn-apk-5': 'Pick a profile and press the button in the middle. Allow the VPN connection when Android asks',
+    'conn-apk-update': 'When a new version is out, the app says so itself, and you download it here, over the old one — your sign-in and profile stay.',
+    'conn-alt-awg': 'Another way: AmneziaWG',
+    'conn-alt-awg-sub': 'A free app that opens your connection file in a couple of taps.',
     'conn-ios-app': 'The Sovereign app for iOS is in development',
     'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of taps.',
     'conn-android-1': 'Install AmneziaWG from Google Play or RuStore',
@@ -2660,7 +2703,21 @@ const translations = {
     'page-connect-sub': 'Выберите ваше устройство',
     'conn-tag-dev': 'Приложение в разработке',
     'conn-pick': 'Выберите устройство — покажем, как его подключить.',
-    'conn-android-app': 'Приложение Sovereign для Android в разработке',
+    'conn-tag-app': 'Приложение готово',
+    'conn-android-app': 'Приложение Sovereign для Android',
+    'conn-android-sub': 'Вход — тем же логином и паролем, что здесь. Профили и подключение — прямо в приложении.',
+    'apk-download': 'Скачать приложение',
+    'apk-meta': 'Версия {v} · {size} МБ · Android 8 и новее',
+    'apk-soon': 'Файл приложения появится здесь совсем скоро. Пока подключиться можно через AmneziaWG — инструкция ниже.',
+    'apk-sha': 'SHA-256 файла:',
+    'conn-apk-1': 'Скачайте файл кнопкой выше',
+    'conn-apk-2': 'Откройте его из уведомления или из «Загрузок». Если Android спросит — разрешите установку приложений из этого источника (вашего браузера)',
+    'conn-apk-3': 'Если Google Play Защита предупредит о неизвестном приложении — нажмите «Подробнее» → «Всё равно установить»',
+    'conn-apk-4': 'Откройте Sovereign и войдите тем же логином и паролем, что на сайте',
+    'conn-apk-5': 'Выберите профиль и нажмите кнопку в центре экрана. Разрешите VPN-подключение, когда Android спросит',
+    'conn-apk-update': 'Когда выйдет новая версия, приложение само об этом скажет, а скачать её можно здесь же — поверх старой, вход и профиль сохранятся.',
+    'conn-alt-awg': 'Другой способ: AmneziaWG',
+    'conn-alt-awg-sub': 'Бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
     'conn-ios-app': 'Приложение Sovereign для iOS в разработке',
     'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
     'conn-android-1': 'Установите AmneziaWG из Google Play или RuStore',
@@ -3294,7 +3351,33 @@ function choosePlatform(plat) {
   try { localStorage.setItem('sov_platform', plat); } catch (e) { /* private mode */ }
 }
 
+// The APK the portal offers (api/android.py). Asked each time the page opens:
+// it is one small request, and a release reaches the page without a deploy.
+async function loadAndroidRelease() {
+  const btn = document.getElementById('apk-btn');
+  const meta = document.getElementById('apk-meta');
+  const sum = document.getElementById('apk-sum');
+  if (!btn || !meta || !sum) return;
+  let r = null;
+  try {
+    const res = await fetch(API + '/api/public/android', { cache: 'no-store' });
+    if (res.ok) r = await res.json();
+  } catch (e) { /* offline: say it is not there yet */ }
+  if (r && r.available) {
+    btn.hidden = false;
+    const mb = (r.size / 1048576).toFixed(1);
+    meta.textContent = t('apk-meta').replace('{v}', r.version_name).replace('{size}', currentLang === 'ru' ? mb.replace('.', ',') : mb);
+    document.getElementById('apk-sha').textContent = r.sha256;
+    sum.hidden = false;
+  } else {
+    btn.hidden = true;
+    meta.textContent = t('apk-soon');
+    sum.hidden = true;
+  }
+}
+
 function initConnectPage() {
+  loadAndroidRelease();
   let saved = null;
   try { saved = localStorage.getItem('sov_platform'); } catch (e) { /* private mode */ }
   if (saved === 'android' || saved === 'ios') choosePlatform(saved);
