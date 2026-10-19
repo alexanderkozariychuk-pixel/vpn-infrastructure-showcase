@@ -1313,7 +1313,11 @@
     .dev-msg.bad { color: var(--red); }
 
     /* ── CONNECT ── */
-    .plat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .plat-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+    .plat-tile.phone { grid-column: span 3; }
+    .plat-tile.desk { grid-column: span 2; padding: 18px 8px 14px; }
+    .plat-tile.desk .plat-icon { width: 42px; height: 42px; }
+    .plat-tile.desk .plat-name { font-size: 14px; }
     .plat-tile {
       position: relative; overflow: hidden;
       display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -1378,6 +1382,7 @@
     .apk-sum { margin-top: 6px; font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
     .apk-sum[hidden] { display: none; }
     .apk-sum code { font-family: var(--font-mono); word-break: break-all; color: var(--text); }
+    a.btn-sm { display: inline-block; text-decoration: none; }
     .conn-alt { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
     .conn-alt summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-bright); }
     .conn-alt summary:hover { color: var(--accent); }
@@ -1742,26 +1747,30 @@
         </div>
         <div class="card">
           <div class="plat-grid" role="tablist">
-            <button class="plat-tile" role="tab" aria-selected="false" data-plat="android" onclick="choosePlatform('android')">
+            <button class="plat-tile phone" role="tab" aria-selected="false" data-plat="android" onclick="choosePlatform('android')">
               <span class="plat-glow" aria-hidden="true"></span>
-              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
-                  <rect x="12" y="4" width="24" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/>
-                  <line x1="12" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.6"/>
-                  <line x1="12" y1="37" x2="36" y2="37" stroke="currentColor" stroke-width="1.6"/>
-                  <circle cx="18" cy="40.5" r="1.1" fill="currentColor"/><circle cx="24" cy="40.5" r="1.1" fill="currentColor"/><circle cx="30" cy="40.5" r="1.1" fill="currentColor"/>
-                </svg>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="4" width="24" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="24" cy="8.6" r="1.4" fill="currentColor"/><path d="M18.6 38.3 L16.2 39.9 L18.6 41.5 Z" fill="currentColor"/><circle cx="24" cy="39.9" r="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="29.2" y="38.5" width="2.8" height="2.8" rx=".4" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
               <span class="plat-name">Android</span>
-              <span class="plat-tag" data-i18n="conn-tag-app">App available</span>
             </button>
-            <button class="plat-tile" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
+            <button class="plat-tile phone" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
               <span class="plat-glow" aria-hidden="true"></span>
-              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
-                  <rect x="12" y="4" width="24" height="40" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
-                  <rect x="20" y="7.5" width="8" height="2.6" rx="1.3" fill="currentColor"/>
-                  <line x1="20" y1="40.5" x2="28" y2="40.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                </svg>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="4" width="24" height="40" rx="7" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="19.3" y="7.4" width="9.4" height="3" rx="1.5" fill="currentColor"/><line x1="19.5" y1="40.2" x2="28.5" y2="40.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               <span class="plat-name">iOS</span>
-              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="windows" onclick="choosePlatform('windows')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><line x1="5" y1="28" x2="43" y2="28" stroke="currentColor" stroke-width="1.4"/><rect x="20" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="23.4" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="26.8" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="10" y="12.5" width="15" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="10" y1="15" x2="25" y2="15" stroke="currentColor" stroke-width="1.1"/><line x1="19" y1="33" x2="17" y2="40" stroke="currentColor" stroke-width="2"/><line x1="29" y1="33" x2="31" y2="40" stroke="currentColor" stroke-width="2"/><line x1="14" y1="40" x2="34" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              <span class="plat-name">Windows</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="macos" onclick="choosePlatform('macos')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="9" width="30" height="21" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><line x1="9" y1="12.6" x2="39" y2="12.6" stroke="currentColor" stroke-width="1.2"/><rect x="17" y="24.3" width="14" height="3.4" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 34 L43.5 34 L41 37.5 Q40.5 38 39.5 38 L8.5 38 Q7.5 38 7 37.5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="21" y1="34" x2="27" y2="34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              <span class="plat-name">macOS</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="linux" onclick="choosePlatform('linux')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 15 L16 19 L11 23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="19" y1="23.5" x2="26" y2="23.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" stroke-width="2"/><line x1="16" y1="40" x2="32" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              <span class="plat-name">Linux</span>
             </button>
           </div>
           <div class="conn-empty" id="conn-empty" data-i18n="conn-pick">Pick your device to see how to connect it.</div>
@@ -1820,6 +1829,67 @@
               <div class="conn-note" data-i18n="conn-ios-note"></div>
               <div class="conn-note" data-i18n="dev-one-file"></div>
               <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-windows" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-windows-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-desk-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-windows-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-windows-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-windows-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-windows-4"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <a class="btn-sm" href="https://github.com/amnezia-vpn/amneziawg-windows-client/releases" target="_blank" rel="noopener" data-i18n="conn-dl-awg"></a>
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-macos" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-macos-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-desk-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-macos-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-macos-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-macos-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-macos-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-macos-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-linux" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-linux-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-linux-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-linux-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-linux-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-linux-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-linux-4"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="conn-linux-note"></div>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <a class="btn-sm" href="https://docs.amnezia.org/" target="_blank" rel="noopener" data-i18n="conn-awg-docs"></a>
                 <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
               </div>
             </div>
@@ -2327,9 +2397,28 @@ const translations = {
     'nav-connect': 'Connect',
     'page-connect': 'Connect',
     'page-connect-sub': 'Choose your device',
-    'conn-tag-dev': 'App in development',
     'conn-pick': 'Pick your device to see how to connect it.',
-    'conn-tag-app': 'App available',
+    'conn-dl-awg': 'Download AmneziaWG ↗',
+    'conn-awg-docs': 'AmneziaWG documentation ↗',
+    'conn-desk-sub': 'For now, you connect through AmneziaWG — a free app that opens your connection file. No sign-in there: the file is enough.',
+    'conn-windows-title': 'The Sovereign app for Windows is in development',
+    'conn-windows-1': 'Download the AmneziaWG installer (.msi for your system, usually x64) with the button below and install it',
+    'conn-windows-2': 'In My Config, pick a device and download its .conf file',
+    'conn-windows-3': 'In AmneziaWG click Add Tunnel → Import tunnel(s) from file and choose the file',
+    'conn-windows-4': 'Click Activate — done',
+    'conn-macos-title': 'The Sovereign app for macOS is in development',
+    'conn-macos-1': 'Install AmneziaWG from the Mac App Store',
+    'conn-macos-2': 'In My Config, pick a device and download its .conf file',
+    'conn-macos-3': 'In AmneziaWG click Import tunnel(s) from file and choose the file',
+    'conn-macos-4': 'If macOS asks to add VPN configurations, click Allow',
+    'conn-macos-5': 'Select the tunnel and click Activate — done',
+    'conn-linux-title': 'The Sovereign app for Linux is in development',
+    'conn-linux-sub': 'For now, you connect through AmneziaWG: its kernel module and the awg-quick tool — your connection file and two commands.',
+    'conn-linux-1': 'Install the AmneziaWG kernel module and amneziawg-tools — the documentation has steps for your distribution',
+    'conn-linux-2': 'In My Config, download the .conf file and save it under a short name, e.g. sovrn.conf',
+    'conn-linux-3': 'Put it in place, readable by root only: sudo install -m 600 sovrn.conf /etc/amnezia/amneziawg/',
+    'conn-linux-4': 'Connect: sudo awg-quick up sovrn — disconnect: sudo awg-quick down sovrn',
+    'conn-linux-note': 'The file holds your device key: do not leave copies of it in shared folders.',
     'conn-android-app': 'The Sovereign app for Android',
     'conn-android-sub': 'Sign in with the same username and password as here. Profiles and the connection are right in the app.',
     'apk-download': 'Download the app',
@@ -2343,9 +2432,9 @@ const translations = {
     'conn-apk-5': 'Pick a profile and press the button in the middle. Allow the VPN connection when Android asks',
     'conn-apk-update': 'When a new version is out, the app says so itself, and you download it here, over the old one — your sign-in and profile stay.',
     'conn-alt-awg': 'Another way: AmneziaWG',
-    'conn-alt-awg-sub': 'A free app that opens your connection file in a couple of taps.',
-    'conn-ios-app': 'The Sovereign app for iOS is in development',
-    'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of taps.',
+    'conn-alt-awg-sub': 'A free app that opens your connection file in a couple of clicks.',
+    'conn-ios-app': 'The Sovereign app for iPhone and iPad is in development',
+    'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of clicks.',
     'conn-android-1': 'Install AmneziaWG from Google Play or RuStore',
     'conn-android-2': 'In My Config, pick a device and download its .conf file',
     'conn-android-3': 'Open AmneziaWG → tap + → Import from file, and choose the file',
@@ -2701,9 +2790,28 @@ const translations = {
     'nav-connect': 'Подключение',
     'page-connect': 'Подключение',
     'page-connect-sub': 'Выберите ваше устройство',
-    'conn-tag-dev': 'Приложение в разработке',
     'conn-pick': 'Выберите устройство — покажем, как его подключить.',
-    'conn-tag-app': 'Приложение готово',
+    'conn-dl-awg': 'Скачать AmneziaWG ↗',
+    'conn-awg-docs': 'Документация AmneziaWG ↗',
+    'conn-desk-sub': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, которое открывает ваш файл подключения. Входить в него не нужно — достаточно файла.',
+    'conn-windows-title': 'Приложение Sovereign для Windows в разработке',
+    'conn-windows-1': 'Скачайте установщик AmneziaWG кнопкой ниже (файл .msi для вашей системы, обычно x64) и установите его',
+    'conn-windows-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-windows-3': 'В AmneziaWG нажмите Add Tunnel → Import tunnel(s) from file и выберите файл',
+    'conn-windows-4': 'Нажмите Activate — готово',
+    'conn-macos-title': 'Приложение Sovereign для macOS в разработке',
+    'conn-macos-1': 'Установите AmneziaWG из Mac App Store',
+    'conn-macos-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-macos-3': 'В AmneziaWG нажмите Import tunnel(s) from file и выберите файл',
+    'conn-macos-4': 'Если macOS спросит про добавление VPN-конфигурации — нажмите «Разрешить»',
+    'conn-macos-5': 'Выберите туннель и нажмите Activate — готово',
+    'conn-linux-title': 'Приложение Sovereign для Linux в разработке',
+    'conn-linux-sub': 'Сейчас подключение идёт через AmneziaWG: модуль ядра и утилита awg-quick — ваш файл подключения и две команды.',
+    'conn-linux-1': 'Установите модуль ядра AmneziaWG и amneziawg-tools — шаги для вашего дистрибутива есть в документации',
+    'conn-linux-2': 'В разделе «Мой конфиг» скачайте файл .conf и сохраните под коротким именем, например sovrn.conf',
+    'conn-linux-3': 'Положите его на место, доступным только root: sudo install -m 600 sovrn.conf /etc/amnezia/amneziawg/',
+    'conn-linux-4': 'Подключиться: sudo awg-quick up sovrn — отключиться: sudo awg-quick down sovrn',
+    'conn-linux-note': 'В файле — ключ вашего устройства: не оставляйте его копии в общих папках.',
     'conn-android-app': 'Приложение Sovereign для Android',
     'conn-android-sub': 'Вход — тем же логином и паролем, что здесь. Профили и подключение — прямо в приложении.',
     'apk-download': 'Скачать приложение',
@@ -2717,9 +2825,9 @@ const translations = {
     'conn-apk-5': 'Выберите профиль и нажмите кнопку в центре экрана. Разрешите VPN-подключение, когда Android спросит',
     'conn-apk-update': 'Когда выйдет новая версия, приложение само об этом скажет, а скачать её можно здесь же — поверх старой, вход и профиль сохранятся.',
     'conn-alt-awg': 'Другой способ: AmneziaWG',
-    'conn-alt-awg-sub': 'Бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
-    'conn-ios-app': 'Приложение Sovereign для iOS в разработке',
-    'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
+    'conn-alt-awg-sub': 'Бесплатное приложение, в котором ваш файл подключения открывается в пару нажатий.',
+    'conn-ios-app': 'Приложение Sovereign для iPhone и iPad в разработке',
+    'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару нажатий.',
     'conn-android-1': 'Установите AmneziaWG из Google Play или RuStore',
     'conn-android-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
     'conn-android-3': 'Откройте AmneziaWG → нажмите + → Импорт из файла и выберите файл',
@@ -3380,7 +3488,7 @@ function initConnectPage() {
   loadAndroidRelease();
   let saved = null;
   try { saved = localStorage.getItem('sov_platform'); } catch (e) { /* private mode */ }
-  if (saved === 'android' || saved === 'ios') choosePlatform(saved);
+  if (['android', 'ios', 'windows', 'macos', 'linux'].includes(saved)) choosePlatform(saved);
 }
 
 function showPayTab(tab) {
