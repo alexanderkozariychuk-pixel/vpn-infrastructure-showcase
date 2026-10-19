@@ -1296,6 +1296,18 @@
     }
     .dev-ok { border-color: var(--accent); color: var(--accent); }
     .dev-ok:disabled, .dev-cancel:disabled, .dev-input:disabled { opacity: .6; cursor: progress; }
+    .dev-del {
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-dim); padding: 7px 10px; cursor: pointer; font-family: var(--font-body); font-size: 13px;
+    }
+    .dev-del:hover { border-color: var(--red); color: var(--red); }
+    .dev-confirm { font-size: 13px; color: var(--text); max-width: 260px; line-height: 1.4; }
+    .dev-del-yes {
+      background: transparent; border: 1px solid var(--red); border-radius: 6px;
+      color: var(--red); padding: 7px 10px; cursor: pointer; font-family: var(--font-body); font-size: 13px;
+      white-space: nowrap;
+    }
+    .dev-del:disabled, .dev-del-yes:disabled { opacity: .6; cursor: progress; }
     .dev-msg { margin-top: 10px; font-size: 13px; color: var(--text-dim); min-height: 0; }
     .dev-msg:empty { display: none; }
     .dev-msg.bad { color: var(--red); }
@@ -2312,6 +2324,12 @@ const translations = {
     'dev-add-first': 'Add a device to get its connection file.',
     'dev-create': 'Create',
     'dev-rename': 'Rename',
+    'dev-delete': 'Delete',
+    'dev-del-confirm': 'Delete “{name}”? Its file stops working at once, and the slot is freed for another device.',
+    'dev-del-yes': 'Yes, delete',
+    'dev-deleted': 'Device deleted. The slot is free.',
+    'dev-err-remove': 'Could not delete the device right now. Try again in a minute, or write to support.',
+    'dev-err-trial': 'The trial device is removed when the trial ends.',
     'dev-cancel': 'Cancel',
     'dev-name-label': 'Device name',
     'dev-name-rule': 'A device name is up to 6 characters: Latin letters, digits, - and _. The connection file downloads under this name.',
@@ -2664,6 +2682,12 @@ const translations = {
     'dev-add-first': 'Добавьте устройство, чтобы получить его файл подключения.',
     'dev-create': 'Создать',
     'dev-rename': 'Переименовать',
+    'dev-delete': 'Удалить',
+    'dev-del-confirm': 'Удалить «{name}»? Его файл сразу перестанет работать, а место освободится для другого устройства.',
+    'dev-del-yes': 'Да, удалить',
+    'dev-deleted': 'Устройство удалено, место свободно.',
+    'dev-err-remove': 'Не получилось удалить устройство. Попробуйте через минуту или напишите в поддержку.',
+    'dev-err-trial': 'Пробное устройство удалится само, когда закончится пробный период.',
     'dev-cancel': 'Отмена',
     'dev-name-label': 'Имя устройства',
     'dev-name-rule': 'Имя устройства — до 6 символов: латиница, цифры, «-» и «_». Под этим именем скачивается файл подключения.',
@@ -4060,14 +4084,38 @@ function _devMsg(text, bad) {
 }
 
 // One inline form, used for both naming a new device and renaming one.
-function _devForm(value, submitLabel, onSubmit) {
+// `onDelete`, when given, adds a Delete button that asks first, in place.
+function _devForm(value, submitLabel, onSubmit, onDelete) {
   const form = document.createElement('form');
   form.className = 'dev-form';
   form.innerHTML = `
     <input class="dev-input" maxlength="6" autocomplete="off" spellcheck="false"
            placeholder="phone" aria-label="${t('dev-name-label')}">
     <button type="submit" class="dev-ok">${submitLabel}</button>
+    ${onDelete ? `<button type="button" class="dev-del">${t('dev-delete')}</button>` : ''}
     <button type="button" class="dev-cancel" aria-label="${t('dev-cancel')}">✕</button>`;
+  if (onDelete) {
+    form.querySelector('.dev-del').addEventListener('click', () => {
+      if (_devBusy) return;
+      _devMsg('');
+      // A second step on the same spot: one click never deletes.
+      form.innerHTML = `
+        <span class="dev-confirm">${t('dev-del-confirm').replace('{name}', escHtml(String(value || '')))}</span>
+        <button type="button" class="dev-del-yes">${t('dev-del-yes')}</button>
+        <button type="button" class="dev-cancel" aria-label="${t('dev-cancel')}">✕</button>`;
+      form.querySelector('.dev-cancel').addEventListener('click', () => { _devMsg(''); renderDevices(); });
+      const yes = form.querySelector('.dev-del-yes');
+      yes.addEventListener('click', async () => {
+        if (_devBusy) return;
+        _devBusy = true;
+        form.querySelectorAll('button').forEach(el => el.disabled = true);
+        _devMsg(t('dev-saving'));
+        try { await onDelete(); }
+        finally { _devBusy = false; }
+      });
+      setTimeout(() => yes.focus(), 0);
+    });
+  }
   const input = form.querySelector('input');
   input.value = value || '';
   form.addEventListener('click', e => e.stopPropagation());
@@ -4140,8 +4188,29 @@ function startDeviceEdit(id) {
       _devMsg('');
       renderDevices();
     } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
-  });
+  }, cfg.kind === 'trial' ? null : () => deleteDevice(id));
   chip.replaceWith(form);
+}
+
+// The node takes the peer off first; the server frees the slot only after
+// that, so a 503 here means the device still works and still counts.
+async function deleteDevice(id) {
+  try {
+    const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: hdrs(),
+    });
+    if (res.status === 401) { doLogout(); return; }
+    if (res.status === 404) { _devMsg(''); await loadClientConfigPage(); return; }  // already gone
+    if (!res.ok) {
+      _devMsg(t(res.status === 409 ? 'dev-err-trial' : res.status === 503 ? 'dev-err-remove' : 'dev-err-generic'), true);
+      renderDevices();
+      return;
+    }
+    if (_configId === id) { _configId = null; _configName = null; _configText = null; }
+    _devMsg(t('dev-deleted'));
+    await loadClientConfigPage();
+  } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
 }
 
 // `fromCode` is the page's own reload after adding a device — that runs while

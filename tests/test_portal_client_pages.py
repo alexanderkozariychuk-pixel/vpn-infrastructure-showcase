@@ -182,3 +182,43 @@ def test_the_reload_after_adding_is_not_blocked_by_the_add_in_flight():
     assert "selectDevice(keep, true)" in load
     sel = html[html.index("async function selectDevice("):]
     assert sel.index("if (_devBusy && !fromCode) return;") < sel.index("\n}\n")
+
+
+def test_a_device_can_be_deleted_from_the_page_after_a_second_click():
+    """
+    The server could delete a device (the Android app used it); the page had
+    no way to, so a customer at the plan's limit could not free a slot, and a
+    lost phone kept a working key. Deleting is offered in the rename form and
+    asks again in place: one click never deletes.
+    """
+    html = _html()
+    form = html[html.index("function _devForm("):]
+    form = form[:form.index("\n}\n")]
+    assert form.index("'.dev-del'") < form.index("'.dev-del-yes'"), \
+        "the delete button must lead to a confirmation, not to the request"
+    yes = form[form.index("yes.addEventListener('click'"):]
+    yes = yes[:yes.index("\n      });")]
+    assert "await onDelete()" in yes, "the confirmation does not run the delete"
+    assert form.count("onDelete()") == 1, "the delete runs from somewhere other than the confirmation"
+
+    edit = html[html.index("function startDeviceEdit("):]
+    edit = edit[:edit.index("\n}\n")]
+    # The trial device is not offered: the server refuses it (409), and it
+    # cannot be replaced.
+    assert "cfg.kind === 'trial' ? null : () => deleteDevice(id)" in edit
+
+    delete = html[html.index("async function deleteDevice("):]
+    delete = delete[:delete.index("\n}\n")]
+    assert "/api/client/configs/${encodeURIComponent(id)}" in delete and "method: 'DELETE'" in delete
+    # A refusal by the node (503) says so and keeps the device on screen.
+    assert "'dev-err-remove'" in delete and "renderDevices();" in delete
+
+
+def test_the_delete_texts_exist_in_both_languages_and_name_the_device():
+    html = _html()
+    for lang in ("en", "ru"):
+        table = _dict(html, lang)
+        for key in ("dev-delete", "dev-del-confirm", "dev-del-yes", "dev-deleted", "dev-err-remove", "dev-err-trial"):
+            assert f"'{key}':" in table, f"{key} missing in {lang}"
+        confirm = re.search(r"'dev-del-confirm': '([^']*)'", table).group(1)
+        assert "{name}" in confirm, f"the {lang} confirmation does not say which device"

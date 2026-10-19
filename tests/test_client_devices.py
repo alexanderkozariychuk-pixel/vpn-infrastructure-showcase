@@ -128,3 +128,78 @@ def test_a_name_longer_than_six_is_refused_before_the_handler_runs():
         config_api.RenameConfigRequest(name="laptop1")
     with pytest.raises(ValidationError):
         config_api.RenameConfigRequest(name="")
+
+
+# ── removing ─────────────────────────────────────────────────────────────────
+#
+# The portal's device list now has a delete button; until then only the
+# Android app called this. What the customer relies on: the slot is freed
+# only when the node confirmed the peer is gone, and no one else's device can
+# be touched.
+
+@pytest.fixture
+def node(monkeypatch):
+    """The entry node: records removals; .ok = False makes it refuse."""
+    class Node:
+        ok = True
+        removed: list = []
+    n = Node()
+    n.removed = []
+
+    def _remove(public_key):
+        if not n.ok:
+            return False, "node unreachable"
+        n.removed.append(public_key)
+        return True, ""
+
+    monkeypatch.setattr(config_api, "_remove_peer_from_bridge", _remove)
+    return n
+
+
+def test_removing_a_device_frees_its_slot(account, node):
+    db, user, first, issued = account
+    second = db.run(config_api.add_config(config_api.NewConfigRequest(name="phone"), db, _payload(user)))
+    db.run(config_api.delete_config(first.id, db, _payload(user)))
+    db.run(db.refresh(first))
+    assert first.is_active is False and node.removed == [first.public_key]
+    listed = db.run(config_api.list_configs(db, _payload(user)))
+    assert [c["id"] for c in listed["configs"]] == [second["config"]["id"]]
+    # The freed slot can be filled again.
+    db.run(config_api.add_config(config_api.NewConfigRequest(name="laptop"), db, _payload(user)))
+    assert issued == ["phone", "laptop"]
+
+
+def test_a_device_the_node_did_not_remove_keeps_its_slot(account, node):
+    """Freeing the slot on an unconfirmed removal would trade one working
+    tunnel for another and keep both."""
+    db, user, first, _ = account
+    node.ok = False
+    with pytest.raises(HTTPException) as e:
+        db.run(config_api.delete_config(first.id, db, _payload(user)))
+    assert e.value.status_code == 503
+    db.run(db.refresh(first))
+    assert first.is_active is True
+
+
+def test_someone_elses_device_reads_as_missing(account, node):
+    db, user, first, _ = account
+    other = User(id=str(uuid.uuid4()), username="test2", email="o@x.test", password_hash="h",
+                 plan="basic-1m", is_subscribed=True,
+                 subscribed_until=datetime.now(timezone.utc) + timedelta(days=30))
+    db.add(other)
+    db.run(db.commit())
+    with pytest.raises(HTTPException) as e:
+        db.run(config_api.delete_config(first.id, db, _payload(other)))
+    assert e.value.status_code == 404 and node.removed == []
+    db.run(db.refresh(first))
+    assert first.is_active is True
+
+
+def test_the_accounts_address_moves_to_a_device_that_remains(account, node):
+    db, user, first, _ = account
+    user.peer_ip = first.peer_ip
+    db.run(db.commit())
+    second = db.run(config_api.add_config(config_api.NewConfigRequest(name="phone"), db, _payload(user)))
+    db.run(config_api.delete_config(first.id, db, _payload(user)))
+    db.run(db.refresh(user))
+    assert user.peer_ip == second["config"]["peer_ip"]
