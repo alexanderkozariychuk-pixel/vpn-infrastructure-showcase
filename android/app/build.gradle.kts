@@ -33,6 +33,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // VERSION_CODE, compared with the site's /api/public/android.
+        buildConfig = true
     }
     packaging {
         jniLibs {

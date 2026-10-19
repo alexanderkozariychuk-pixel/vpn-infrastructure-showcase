@@ -82,6 +82,10 @@ fun DevicesScreen(model: AccountModel, onBack: () -> Unit) {
     var newName by rememberSaveable { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
     var acting by remember { mutableStateOf<Device?>(null) }
+    val profile = ui.profile
+    val noAccess = profile != null && !profile.hasAccessAt(java.time.Instant.now())
+    val trialAlone = profile != null && trialOnly(profile)
+    val openPayment = { runCatching { uriHandler.openUri(PAYMENT_URL) }; Unit }
 
     LaunchedEffect(Unit) { model.load() }
 
@@ -106,13 +110,15 @@ fun DevicesScreen(model: AccountModel, onBack: () -> Unit) {
             if (list != null) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text("${list.used} из ${list.limit}", fontFamily = JetBrainsMono, fontSize = 15.sp, color = Sov.TextBright)
-                    Text(" в тарифе", fontSize = 15.sp, color = Sov.TextDim)
+                    Text(if (trialAlone) " на пробном периоде" else " в тарифе", fontSize = 15.sp, color = Sov.TextDim)
                 }
             }
         }
 
         Spacer(Modifier.height(20.dp))
-        if (list == null && ui.error == null) {
+        if (noAccess) {
+            NoteBlock(NO_ACCESS_PROFILES, paymentLabel(profile!!), openPayment)
+        } else if (list == null && ui.error == null) {
             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         }
 
@@ -129,7 +135,10 @@ fun DevicesScreen(model: AccountModel, onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(16.dp))
-            if (list.hasRoom) {
+            if (trialAlone) {
+                // Adding is paid-only on the server (402): the trial's one profile is all there is.
+                NoteBlock(TRIAL_ONE_PROFILE, paymentLabel(profile!!), openPayment)
+            } else if (list.hasRoom) {
                 AddBlock(
                     name = newName,
                     error = addError,
@@ -166,6 +175,7 @@ fun DevicesScreen(model: AccountModel, onBack: () -> Unit) {
         ) {
             ActionsSheet(
                 device = d,
+                removable = !d.isTrial,
                 onThisPhone = ui.selected?.id == d.id,
                 busy = busy,
                 onRename = { name ->
@@ -297,10 +307,30 @@ private fun FullBlock(plan: String?, onPlans: () -> Unit) {
     }
 }
 
+/** A plain card with a line of explanation and the way to the site's payment. */
+@Composable
+private fun NoteBlock(text: String, action: String, onAction: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Sov.Bg2)
+            .border(BorderStroke(1.dp, Sov.Border), RoundedCornerShape(8.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Sov.Text)
+        TextButton(onClick = onAction, modifier = Modifier.heightIn(min = 44.dp)) {
+            Text("$action ›", color = Sov.Accent, fontSize = 15.sp)
+        }
+    }
+}
+
 /** Behind «⋯»: rename, and remove only after a second, explicit step. */
 @Composable
 private fun ActionsSheet(
     device: Device,
+    removable: Boolean,
     onThisPhone: Boolean,
     busy: Boolean,
     onRename: (String) -> Unit,
@@ -347,13 +377,18 @@ private fun ActionsSheet(
                 style = MaterialTheme.typography.bodySmall, color = Sov.TextDim,
             )
             HorizontalDivider(color = Sov.Border, modifier = Modifier.padding(vertical = 6.dp))
-            OutlinedButton(
-                onClick = { confirming = true },
-                enabled = !busy,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, Sov.Red),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Удалить профиль", color = Sov.Red, fontSize = 17.sp, fontWeight = FontWeight(600)) }
+            if (removable) {
+                OutlinedButton(
+                    onClick = { confirming = true },
+                    enabled = !busy,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Sov.Red),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text("Удалить профиль", color = Sov.Red, fontSize = 17.sp, fontWeight = FontWeight(600)) }
+            } else {
+                // The server refuses it (409 trial_device): it could not be replaced.
+                Text(TRIAL_PROFILE_NOTE, style = MaterialTheme.typography.bodyMedium, color = Sov.TextDim)
+            }
         } else {
             Text(DELETE_QUESTION, fontFamily = Unbounded, fontSize = 20.sp, lineHeight = 26.sp, color = Sov.TextBright)
             Text(deleteExplanation(onThisPhone), style = MaterialTheme.typography.bodyMedium, color = Sov.Text)

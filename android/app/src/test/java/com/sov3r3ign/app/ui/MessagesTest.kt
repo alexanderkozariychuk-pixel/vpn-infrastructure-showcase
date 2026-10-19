@@ -275,4 +275,117 @@ class MessagesTest {
         assertEquals("Сохранённый профиль не читается. Выберите профиль заново.", tunnelFailure("BAD_CONFIG"))
         assertEquals("Не удалось включить VPN (IllegalStateException)", tunnelFailure("IllegalStateException"))
     }
+
+    // --- trial, access, update ------------------------------------------------
+
+    private fun trialUser(state: String, until: String? = null, verified: Boolean = true) =
+        Profile("new", null, false, null, null, false, verified, com.sov3r3ign.app.api.TrialInfo(state, until))
+
+    @Test
+    fun `a running trial is said with its end, in the phone's zone`() {
+        val p = trialUser("active", "2026-09-28T22:30:00+00:00")
+        assertEquals("Пробный период до 29 сентября 2026", subscriptionLine(p, moscow, sept26))
+        assertTrue(p.hasAccessAt(sept26))
+    }
+
+    @Test
+    fun `a trial that is over is no access and offers nothing`() {
+        val p = trialUser("used", "2026-09-20T10:00:00+00:00")
+        assertFalse(p.hasAccessAt(sept26))
+        assertEquals("Подписки нет", subscriptionLine(p, moscow, sept26))
+        assertEquals(TrialOfferKind.NONE, trialOffer(p, enabled = true, now = sept26))
+    }
+
+    @Test
+    fun `a paid period wins over a trial in the status line`() {
+        val p = Profile("paid", null, true, "2026-10-12T09:26:42", "basic-1m", true, true,
+            com.sov3r3ign.app.api.TrialInfo("active", "2026-09-28T10:00:00+00:00"))
+        assertEquals("Подписка до 12 октября 2026", subscriptionLine(p, moscow, sept26))
+    }
+
+    @Test
+    fun `the trial's end is said only on its last two days`() {
+        assertNull(expiryWarning(trialUser("active", "2026-09-28T12:00:00Z"), moscow, sept26))
+        assertEquals("Пробный период заканчивается завтра. Оформите подписку на сайте, чтобы связь не прервалась.",
+            expiryWarning(trialUser("active", "2026-09-27T12:00:00Z"), moscow, sept26))
+        assertEquals("Пробный период заканчивается сегодня. Оформите подписку на сайте, чтобы связь не прервалась.",
+            expiryWarning(trialUser("active", "2026-09-26T18:00:00Z"), moscow, sept26))
+    }
+
+    @Test
+    fun `a trial is offered only when it can lead somewhere`() {
+        assertEquals(TrialOfferKind.START, trialOffer(trialUser("available"), enabled = true, now = sept26))
+        assertEquals(TrialOfferKind.CONFIRM_EMAIL, trialOffer(trialUser("needs_verify", verified = false), enabled = true, now = sept26))
+        assertEquals(TrialOfferKind.NONE, trialOffer(trialUser("available"), enabled = false, now = sept26))
+        assertEquals(TrialOfferKind.NONE, trialOffer(trialUser("off"), enabled = true, now = sept26))
+        assertEquals(TrialOfferKind.NONE, trialOffer(trialUser("something-new"), enabled = true, now = sept26))
+        // Someone with access is never offered one, whatever the state says.
+        val paid = Profile("paid", null, true, "2026-10-12T09:26:42", "basic-1m", true, true,
+            com.sov3r3ign.app.api.TrialInfo("available", null))
+        assertEquals(TrialOfferKind.NONE, trialOffer(paid, enabled = true, now = sept26))
+        assertEquals(TrialOfferKind.NONE, trialOffer(trialUser("active", "2026-09-28T12:00:00Z"), enabled = true, now = sept26))
+    }
+
+    @Test
+    fun `the pay button subscribes the new and renews the customer`() {
+        assertEquals("Оформить подписку на сайте", paymentLabel(trialUser("available"), sept26))
+        assertEquals("Оформить подписку на сайте", paymentLabel(trialUser("active", "2026-09-28T12:00:00Z"), sept26))
+        assertEquals("Продлить на сайте", paymentLabel(Profile("old", null, false, "2026-09-01T00:00:00Z"), sept26))
+    }
+
+    @Test
+    fun `the trial button says how long`() {
+        assertEquals("Попробовать бесплатно — 3 дня", trialButton(3))
+        assertEquals("Попробовать бесплатно — 5 дней", trialButton(5))
+        assertEquals("Попробовать бесплатно", trialButton(0))
+    }
+
+    @Test
+    fun `a username follows the server's rule`() {
+        assertNull(validateRegistration("ivan_99", "a@b.ru", "12345678", "12345678"))
+        val rule = "Имя пользователя — от 3 до 27 символов: латинские буквы, цифры, - и _"
+        assertEquals(rule, validateRegistration("iv", "a@b.ru", "12345678", "12345678"))
+        assertEquals(rule, validateRegistration("иван", "a@b.ru", "12345678", "12345678"))
+        assertEquals(rule, validateRegistration("ivan petrov", "a@b.ru", "12345678", "12345678"))
+        assertEquals(rule, validateRegistration("a".repeat(28), "a@b.ru", "12345678", "12345678"))
+        assertNull(validateRegistration("a".repeat(27), "a@b.ru", "12345678", "12345678"))
+    }
+
+    @Test
+    fun `the server's trial and limit refusals read in Russian`() {
+        assertEquals("Слишком много попыток. Подождите 15 минут и попробуйте снова.", describe(ApiError.TooMany, Action.SIGN_IN))
+        // Each limit has its own window; none of the others is 15 minutes.
+        assertTrue(describe(ApiError.TooMany, Action.REGISTER).endsWith("через час."))
+        assertTrue(describe(ApiError.TooMany, Action.RESEND).endsWith("через час."))
+        assertTrue(describe(ApiError.TooMany, Action.TRIAL).endsWith("завтра."))
+        assertEquals("Пробный профиль нельзя удалить — он закончится вместе с пробным периодом.",
+            describe(ApiError.Conflict("trial_device"), Action.DELETE))
+        assertEquals("Пробный период уже был на этом аккаунте или этой почте.", describe(ApiError.Conflict("trial_used"), Action.TRIAL))
+        assertTrue(describe(ApiError.Forbidden("email_not_verified"), Action.TRIAL).startsWith("Сначала подтвердите почту"))
+        assertEquals("Сейчас нет свободных мест для пробного периода. Попробуйте позже.", describe(ApiError.Server(503), Action.TRIAL))
+        assertEquals("Сервер временно недоступен (503). Попробуйте позже.", describe(ApiError.Server(503), Action.LOAD))
+        // A full plan is still a full plan.
+        assertEquals("В тарифе больше нет мест.", describe(ApiError.Conflict("Plan allows 2 device(s); remove one first"), Action.LOAD))
+    }
+
+    @Test
+    fun `a newer release is only one with a higher code that is published`() {
+        val r = com.sov3r3ign.app.api.AppRelease(available = true, versionCode = 3, versionName = "1.2")
+        assertTrue(updateAvailable(2, r))
+        assertFalse(updateAvailable(3, r))
+        assertFalse(updateAvailable(4, r))
+        assertFalse(updateAvailable(1, r.copy(available = false)))
+        assertFalse(updateAvailable(1, null))
+        assertEquals("Доступна новая версия приложения 1.2", updateLine(r))
+    }
+
+    @Test
+    fun `only a trial without a paid period counts as trial only`() {
+        val trial = Profile("t", null, false, null, null, false, true, com.sov3r3ign.app.api.TrialInfo("active", "2026-09-28T10:00:00+00:00"))
+        val paid = Profile("p", null, true, "2026-10-12T09:26:42", "basic-1m", true, true, com.sov3r3ign.app.api.TrialInfo("active", "2026-09-28T10:00:00+00:00"))
+        val none = Profile("n", null, false, null, null, false, true, com.sov3r3ign.app.api.TrialInfo("used", null))
+        assertTrue(trialOnly(trial, sept26))
+        assertFalse(trialOnly(paid, sept26))
+        assertFalse(trialOnly(none, sept26))
+    }
 }

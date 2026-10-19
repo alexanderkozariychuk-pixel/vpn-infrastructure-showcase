@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -59,15 +61,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sov3r3ign.app.BuildConfig
 import com.sov3r3ign.app.session.Session
 import com.sov3r3ign.app.state.AccountModel
+import com.sov3r3ign.app.ui.CONFIRM_EMAIL_TEXT
+import com.sov3r3ign.app.ui.DOWNLOAD_URL
 import com.sov3r3ign.app.ui.Link
 import com.sov3r3ign.app.ui.PAYMENT_URL
+import com.sov3r3ign.app.ui.TrialOfferKind
 import com.sov3r3ign.app.ui.expiryWarning
 import com.sov3r3ign.app.ui.needsPayment
+import com.sov3r3ign.app.ui.paymentLabel
 import com.sov3r3ign.app.ui.subscriptionLine
+import com.sov3r3ign.app.ui.trialButton
+import com.sov3r3ign.app.ui.trialOffer
+import com.sov3r3ign.app.ui.updateAvailable
+import com.sov3r3ign.app.ui.updateLine
 import com.sov3r3ign.app.ui.theme.Sov
 import kotlinx.coroutines.launch
+import java.time.Instant
 import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.math.min
@@ -107,7 +119,15 @@ fun MainScreen(
         while (true) withFrameMillis { value = it - start }
     }
 
-    LaunchedEffect(Unit) { model.load() }
+    LaunchedEffect(Unit) {
+        model.load()
+        model.checkRelease()
+    }
+    val now = Instant.now()
+    val access = ui.profile?.hasAccessAt(now)
+    val offer = ui.profile?.let { trialOffer(it, ui.trialOffer?.enabled == true, now) } ?: TrialOfferKind.NONE
+    val openPayment = { runCatching { uriHandler.openUri(PAYMENT_URL) }; Unit }
+    val startTrial: () -> Unit = { if (!ui.busy) scope.launch { model.startTrial() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val unit: Dp = min(maxWidth.value / Mesh.WIDTH, maxHeight.value / Mesh.HEIGHT).dp
@@ -117,7 +137,7 @@ fun MainScreen(
         Column(Modifier.fillMaxSize()) {
             TopBar(
                 onDevices = onOpenDevices,
-                onPay = { runCatching { uriHandler.openUri(PAYMENT_URL) } },
+                onPay = openPayment,
                 onSignOut = { scope.launch { model.signOut() } },
             )
             Hero(
@@ -126,7 +146,13 @@ fun MainScreen(
                 action = status.action,
                 clock = clock,
                 still = still,
-                onPress = if (ui.selected == null) onOpenDevices else connection.press,
+                onPress = when {
+                    ui.selected != null -> connection.press
+                    // Nothing to connect with yet: the button leads where the next step is.
+                    access == false && offer == TrialOfferKind.START -> startTrial
+                    access == false -> openPayment
+                    else -> onOpenDevices
+                },
             )
             Column(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 16.dp),
@@ -143,7 +169,12 @@ fun MainScreen(
                     },
                     textAlign = TextAlign.Center,
                 )
-                val detail = if (ui.selected == null) "Выберите профиль, чтобы подключиться." else status.detail
+                val detail = when {
+                    ui.selected != null -> status.detail
+                    access == false && offer == TrialOfferKind.START -> "Начните пробный период, чтобы подключиться."
+                    access == false -> "Чтобы подключиться, нужна подписка."
+                    else -> "Выберите профиль, чтобы подключиться."
+                }
                 if (detail.isNotEmpty()) {
                     Text(detail, style = MaterialTheme.typography.bodyMedium, color = Sov.TextDim, textAlign = TextAlign.Center)
                 }
@@ -159,10 +190,37 @@ fun MainScreen(
                 ui.notice?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = Sov.Yellow, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
-                DeviceRow(ui.selected?.name, onOpenDevices)
+                ui.release?.takeIf { updateAvailable(BuildConfig.VERSION_CODE, it) }?.let { r ->
+                    UpdateRow(updateLine(r)) { runCatching { uriHandler.openUri(DOWNLOAD_URL) } }
+                }
+                when (offer) {
+                    TrialOfferKind.START -> Button(
+                        onClick = startTrial,
+                        enabled = !ui.busy,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Sov.Accent, contentColor = Sov.OnAccent,
+                            disabledContainerColor = Sov.Accent.copy(alpha = 0.45f), disabledContentColor = Sov.OnAccent,
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text(trialButton(ui.trialOffer?.days ?: 0), style = MaterialTheme.typography.labelLarge) }
+                    TrialOfferKind.CONFIRM_EMAIL -> {
+                        Text(CONFIRM_EMAIL_TEXT, style = MaterialTheme.typography.bodySmall, color = Sov.Text, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            TextButton(onClick = { scope.launch { model.resendConfirmation() } }, enabled = !ui.busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text("Отправить письмо ещё раз", color = Sov.Accent)
+                            }
+                            TextButton(onClick = { scope.launch { model.load() } }, enabled = !ui.busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text("Я подтвердил почту", color = Sov.Accent)
+                            }
+                        }
+                    }
+                    TrialOfferKind.NONE -> Unit
+                }
+                if (access != false) DeviceRow(ui.selected?.name, onOpenDevices)
                 ui.profile?.let { p ->
                     val warning = expiryWarning(p)
-                    val lapsed = warning == null && needsPayment(p)
+                    val lapsed = warning == null && !p.hasAccessAt(now)
                     Text(
                         warning ?: subscriptionLine(p),
                         style = MaterialTheme.typography.bodySmall,
@@ -178,7 +236,7 @@ fun MainScreen(
                         TextButton(
                             onClick = { runCatching { uriHandler.openUri(PAYMENT_URL) } },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        ) { Text("Оплатить на сайте", color = Sov.Accent) }
+                        ) { Text(paymentLabel(p), color = Sov.Accent) }
                     }
                 }
             }
@@ -418,6 +476,25 @@ private fun PowerButton(centre: Offset, diameter: Dp, link: Link, action: String
             }
             Text(action, style = MaterialTheme.typography.labelLarge, color = ink)
         }
+    }
+}
+
+/** The site has a newer APK: one line, and the tap opens the download. */
+@Composable
+private fun UpdateRow(text: String, onOpen: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.dp, Sov.AccentDim), RoundedCornerShape(8.dp))
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Sov.TextBright, modifier = Modifier.weight(1f))
+        Text("Скачать ›", style = MaterialTheme.typography.bodyMedium, color = Sov.Accent)
     }
 }
 

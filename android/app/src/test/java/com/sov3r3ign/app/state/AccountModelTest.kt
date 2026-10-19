@@ -179,4 +179,109 @@ class AccountModelTest {
         assertEquals(listOf("POST /api/client/configs"), log)
         assertFalse(m.ui.value.busy)
     }
+
+    // ── the trial ────────────────────────────────────────────────────────────
+
+    private fun noAccess(state: String) = HttpReply(200,
+        """{"ok":true,"username":"new","is_subscribed":false,"plan":null,"active":false,"subscribed_until":null,""" +
+            """"email_verified":${state != "needs_verify"},"trial":{"state":"$state","until":null}}""")
+    private val trialProfile = HttpReply(200,
+        """{"ok":true,"username":"new","is_subscribed":false,"plan":null,"active":false,"subscribed_until":null,""" +
+            """"email_verified":true,"trial":{"state":"active","until":"2026-10-22T18:00:00+00:00"}}""")
+    private val offer = HttpReply(200, """{"enabled":true,"days":3}""")
+    private val trialId = "7f0c2b8e-5b1d-4f4e-9a57-0c8d2f1e6a11"
+
+    /** Signed in, nothing chosen yet: a new customer. */
+    private fun fresh(vararg replies: HttpReply): Pair<AccountModel, Store> {
+        val store = Store().apply { put("token", "T1") }
+        return AccountModel(Session(ApiClient(Server(*replies)), store), Tunnel(false), Dispatchers.Unconfined) to store
+    }
+
+    @Test
+    fun `an account without access is not asked for its list, and is shown the offer`() = runBlocking {
+        val (m, _) = fresh(noAccess("available"), offer)
+        m.load()
+        assertEquals(listOf("GET /api/client/me", "GET /api/public/trial"), log)
+        assertNull(m.ui.value.devices)
+        assertNull(m.ui.value.error)
+        assertEquals(3, m.ui.value.trialOffer?.days)
+    }
+
+    @Test
+    fun `the offer is asked once, and not at all when the trial was used`() = runBlocking {
+        val (m, _) = fresh(noAccess("available"), offer, noAccess("available"))
+        m.load(); m.load()
+        assertEquals(1, log.count { it == "GET /api/public/trial" })
+        val (used, _) = fresh(noAccess("used"))
+        log.clear()
+        used.load()
+        assertEquals(listOf("GET /api/client/me"), log)
+    }
+
+    @Test
+    fun `a started trial becomes this phone's profile`() = runBlocking {
+        val (m, store) = fresh(noAccess("available"), offer,
+            HttpReply(201, """{"ok":true,"trial_until":"2026-10-22T18:00:00+00:00","config":{"id":"$trialId","name":"trial","kind":"trial"}}"""),
+            HttpReply(200, "[Interface] trial\nPrivateKey = <K>\n"),
+            trialProfile,
+            HttpReply(200, """{"ok":true,"plan":null,"limit":1,"used":1,"configs":[{"id":"$trialId","name":"trial","kind":"trial"}]}"""))
+        m.load(); log.clear()
+        m.startTrial()
+        assertEquals(listOf("POST /api/client/trial", "GET /api/client/configs/$trialId/raw",
+            "GET /api/client/me", "GET /api/client/configs"), log)
+        assertEquals(trialId, store.map["device_id"])
+        assertEquals(trialId, m.ui.value.selected?.id)
+        assertTrue(m.ui.value.devices!!.configs.single().isTrial)
+        assertNull(m.ui.value.error)
+    }
+
+    @Test
+    fun `a trial already running reloads the profile and keeps the reason`() = runBlocking {
+        val (m, _) = fresh(noAccess("available"), offer,
+            HttpReply(409, """{"detail":"trial_active"}"""),
+            trialProfile, HttpReply(200, """{"ok":true,"plan":null,"limit":1,"used":0,"configs":[]}"""))
+        m.load()
+        m.startTrial()
+        assertEquals("Пробный период уже идёт.", m.ui.value.error)
+        assertEquals("active", m.ui.value.profile?.trial?.state)
+    }
+
+    @Test
+    fun `no free trial places is said as such, with nothing stored`() = runBlocking {
+        val (m, store) = fresh(noAccess("available"), offer, HttpReply(503, """{"detail":"trial_busy"}"""))
+        m.load()
+        m.startTrial()
+        assertEquals("Сейчас нет свободных мест для пробного периода. Попробуйте позже.", m.ui.value.error)
+        assertNull(store.map["device_id"])
+    }
+
+    @Test
+    fun `the letter goes again, and a confirmed address reloads instead`() = runBlocking {
+        val (m, _) = fresh(noAccess("needs_verify"), offer,
+            HttpReply(200, """{"ok":true,"already_verified":false}"""))
+        m.load()
+        m.resendConfirmation()
+        assertEquals(com.sov3r3ign.app.ui.LETTER_SENT, m.ui.value.notice)
+
+        val (c, _) = fresh(noAccess("needs_verify"), offer,
+            HttpReply(200, """{"ok":true,"already_verified":true}"""), noAccess("available"))
+        c.load(); log.clear()
+        c.resendConfirmation()
+        assertEquals(listOf("POST /api/auth/resend-verification", "GET /api/client/me"), log)
+        assertNull(c.ui.value.notice)
+    }
+
+    // ── the update check ─────────────────────────────────────────────────────
+
+    @Test
+    fun `the site's release is asked once, and a failure is silent`() = runBlocking {
+        val (m, _) = fresh(HttpReply(502, "<html>"),
+            HttpReply(200, """{"available":true,"version_code":2,"version_name":"1.1","size":1,"sha256":"ab","url":"/download/android"}"""))
+        m.checkRelease()
+        assertNull(m.ui.value.release)
+        assertNull(m.ui.value.error)
+        m.checkRelease(); m.checkRelease()
+        assertEquals(2, m.ui.value.release?.versionCode)
+        assertEquals(2, log.count { it == "GET /api/public/android" })
+    }
 }

@@ -3,9 +3,11 @@ package com.sov3r3ign.app.session
 import com.sov3r3ign.app.api.ApiClient
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
+import com.sov3r3ign.app.api.AppRelease
 import com.sov3r3ign.app.api.Device
 import com.sov3r3ign.app.api.DeviceList
 import com.sov3r3ign.app.api.Profile
+import com.sov3r3ign.app.api.TrialOffer
 import com.sov3r3ign.app.storage.Secrets
 
 /**
@@ -84,6 +86,18 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
     }
 
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
+
+    /** Starts the account's trial; the server answers with the trial's device. */
+    fun startTrial(): ApiResult<Device> = authorized { api.startTrial(it) }
+
+    /** Sends the confirmation letter again. True: the address was confirmed already. */
+    fun resendVerification(): ApiResult<Boolean> = authorized { api.resendVerification(it) }
+
+    /** Whether the site offers a trial now, and for how many days. No token needed. */
+    fun trialOffer(): ApiResult<TrialOffer> = api.trialOffer()
+
+    /** The APK the site offers for download. No token needed. */
+    fun latestRelease(): ApiResult<AppRelease> = api.latestRelease()
 
     /**
      * Renames a device on the account. When it is the one this phone uses,

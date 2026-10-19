@@ -19,14 +19,17 @@ import java.util.Locale
  */
 
 /** What the customer was doing when the error came back; the same code means different things. */
-enum class Action { SIGN_IN, REGISTER, LOAD }
+enum class Action { SIGN_IN, REGISTER, LOAD, TRIAL, RESEND, DELETE }
+
+/** The server's own minimum (pwa/api/register.py, PASSWORD_MIN). */
+const val MIN_PASSWORD = 8
 
 /**
- * At least this long for accounts created in the app. The server does not
- * enforce a minimum yet; with one login shared across a family's phones, the
- * app should not wait for it to.
+ * The server's rule for a username (pwa/api/register.py, USERNAME_RE): it
+ * becomes part of the peer's name on the entry node. Checked here first, so
+ * the form says why instead of the server's English.
  */
-const val MIN_PASSWORD = 8
+val USERNAME = Regex("[A-Za-z0-9_-]{3,27}")
 
 private val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")
 
@@ -36,6 +39,7 @@ fun validateSignIn(username: String, password: String): String? =
 fun validateRegistration(username: String, email: String, password: String, confirm: String): String? =
     when {
         username.isBlank() -> "Введите имя пользователя"
+        !USERNAME.matches(username.trim()) -> "Имя пользователя — от 3 до 27 символов: латинские буквы, цифры, - и _"
         !EMAIL.matches(email.trim()) -> "Проверьте email"
         password.length < MIN_PASSWORD -> "Пароль — не короче $MIN_PASSWORD символов"
         password != confirm -> "Пароли не совпадают"
@@ -73,9 +77,33 @@ fun describe(error: ApiError, action: Action, tunnelUp: Boolean = false): String
 
     ApiError.NotFound -> "Профиль не найден — возможно, его удалили на сайте. Список обновлён."
 
+    // The windows are the portal's (services/ratelimit.py): sign-in 15 minutes,
+    // registration and the letter an hour, the trial a day.
+    ApiError.TooMany -> when (action) {
+        Action.SIGN_IN -> "Слишком много попыток. Подождите 15 минут и попробуйте снова."
+        Action.REGISTER -> "Слишком много регистраций с этого адреса. Попробуйте через час."
+        Action.RESEND -> "Письмо уже отправляли несколько раз. Попробуйте через час."
+        Action.TRIAL -> "Слишком много попыток. Попробуйте завтра."
+        else -> "Слишком много запросов. Попробуйте позже."
+    }
+
+    is ApiError.Forbidden -> when {
+        error.message == "email_not_verified" ->
+            "Сначала подтвердите почту — ссылка в письме, которое пришло после регистрации."
+        error.message == "trial_off" -> "Пробный период сейчас недоступен. Оформить подписку можно на сайте."
+        error.message == "trial_unavailable" ->
+            "Для этой почты пробный период недоступен. Оформить подписку можно на сайте."
+        error.message.contains("disabled", ignoreCase = true) -> "Аккаунт отключён. Напишите в поддержку на сайте."
+        else -> "Сервер отказал в доступе. Попробуйте позже."
+    }
+
     // The server's reasons are in English and name the field; the app says
     // it in Russian rather than showing them raw.
     is ApiError.Conflict -> when {
+        error.message == "trial_device" ->
+            "Пробный профиль нельзя удалить — он закончится вместе с пробным периодом."
+        error.message == "trial_used" -> "Пробный период уже был на этом аккаунте или этой почте."
+        error.message == "trial_active" -> "Пробный период уже идёт."
         action != Action.REGISTER -> "В тарифе больше нет мест."
         error.message.contains("email", ignoreCase = true) -> "Этот email уже зарегистрирован"
         else -> "Такое имя пользователя уже занято"
@@ -84,8 +112,12 @@ fun describe(error: ApiError, action: Action, tunnelUp: Boolean = false): String
     is ApiError.Rejected -> when (action) {
         // The only refusal sign-in produces: an account that is not a customer's.
         Action.SIGN_IN -> "Этот аккаунт нельзя использовать в приложении"
-        Action.REGISTER -> "Проверьте email и остальные поля"
-        Action.LOAD -> "Сервер отклонил запрос"
+        Action.REGISTER -> if (error.message.contains("reserved", ignoreCase = true)) {
+            "Это имя пользователя занято — выберите другое"
+        } else {
+            "Проверьте имя пользователя, email и пароль"
+        }
+        else -> "Сервер отклонил запрос"
     }
 
     is ApiError.Network -> networkLine(error.cause) + if (tunnelUp) {
@@ -93,7 +125,11 @@ fun describe(error: ApiError, action: Action, tunnelUp: Boolean = false): String
     } else {
         ""
     }
-    is ApiError.Server -> "Сервер временно недоступен (${error.code}). Попробуйте позже."
+    is ApiError.Server -> if (action == Action.TRIAL && error.code == 503) {
+        "Сейчас нет свободных мест для пробного периода. Попробуйте позже."
+    } else {
+        "Сервер временно недоступен (${error.code}). Попробуйте позже."
+    }
     is ApiError.Malformed -> "Сервер ответил неожиданно — возможно, пора обновить приложение."
 }
 
@@ -126,6 +162,11 @@ fun subscriptionLine(
 ): String {
     val until = profile.subscribedUntil
     val date = until?.let { DATE.withZone(zone).format(it) }
+    // A trial is said only while no paid period runs; paying ends the trial anyway.
+    if (profile.activeAt(now) != true && profile.trialActiveAt(now)) {
+        val end = profile.trialUntil?.let { DATE.withZone(zone).format(it) }
+        return if (end != null) "Пробный период до $end" else "Пробный период"
+    }
     return when (profile.activeAt(now)) {
         // The server's word stands even when the phone's clock disagrees.
         true -> if (date != null) "Подписка до $date" else "Подписка действует"
@@ -172,7 +213,19 @@ fun expiryWarning(
     now: Instant = Instant.now(),
     warnDays: Long = WARN_DAYS,
 ): String? {
-    if (profile.activeAt(now) != true) return null
+    if (profile.activeAt(now) != true) {
+        // A trial lasts days, not months: three days' notice would be the whole
+        // trial. Its end is said only on its last day and the one before.
+        if (!profile.trialActiveAt(now)) return null
+        val end = profile.trialUntil ?: return null
+        val left = ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), end.atZone(zone).toLocalDate())
+        val tail = " Оформите подписку на сайте, чтобы связь не прервалась."
+        return when {
+            left > 1L -> null
+            left == 1L -> "Пробный период заканчивается завтра." + tail
+            else -> "Пробный период заканчивается сегодня." + tail
+        }
+    }
     val until = profile.subscribedUntil ?: return null
     val left = ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), until.atZone(zone).toLocalDate())
     val tail = " Продлите на сайте, чтобы связь не прервалась."
@@ -191,6 +244,66 @@ fun needsPayment(
     zone: ZoneId = ZoneId.systemDefault(),
     now: Instant = Instant.now(),
 ): Boolean = profile.activeAt(now) != true || expiryWarning(profile, zone, now) != null
+
+/** What the pay button says: someone who never paid subscribes, a customer renews. */
+fun paymentLabel(profile: Profile, now: Instant = Instant.now()): String =
+    if (profile.subscribedUntilRaw == null || profile.trialActiveAt(now)) "Оформить подписку на сайте"
+    else "Продлить на сайте"
+
+/** What the app offers someone with no access, from the trial's state. */
+enum class TrialOfferKind { START, CONFIRM_EMAIL, NONE }
+
+/**
+ * A trial is offered only to someone with no access at all, and only in the
+ * two states that can lead to one; [enabled] is the site's switch
+ * (/api/public/trial). Anything else — used, off, a state this app does not
+ * know — offers nothing and leaves the pay button.
+ */
+fun trialOffer(profile: Profile, enabled: Boolean, now: Instant = Instant.now()): TrialOfferKind = when {
+    !enabled || profile.hasAccessAt(now) -> TrialOfferKind.NONE
+    profile.trial?.state == "available" -> TrialOfferKind.START
+    profile.trial?.state == "needs_verify" -> TrialOfferKind.CONFIRM_EMAIL
+    else -> TrialOfferKind.NONE
+}
+
+fun trialButton(days: Int): String =
+    if (days > 0) "Попробовать бесплатно — ${days.toLong().let { "$it ${plural(it, "день", "дня", "дней")}" }}"
+    else "Попробовать бесплатно"
+
+/** After the confirmation letter went out again. */
+const val LETTER_SENT = "Письмо отправлено ещё раз. Откройте ссылку из него, затем нажмите «Я подтвердил почту»."
+
+const val CONFIRM_EMAIL_TEXT =
+    "Чтобы начать пробный период, подтвердите почту — ссылка в письме, которое пришло после регистрации."
+
+/** On the profiles page during a trial alone: one profile is the whole allowance, and adding is paid. */
+const val TRIAL_ONE_PROFILE =
+    "На пробном периоде доступен один профиль. Чтобы подключить больше устройств, оформите подписку на сайте."
+
+/** A trial and nothing paid: the profiles page shows the trial's one profile and no adding. */
+fun trialOnly(profile: Profile, now: Instant = Instant.now()): Boolean =
+    profile.activeAt(now) != true && profile.trialActiveAt(now)
+
+/** The profiles page of an account with no access: the server lists nothing then. */
+const val NO_ACCESS_PROFILES =
+    "Профили появятся после оформления подписки или начала пробного периода."
+
+/** The site's page for the APK; the app never follows a link the server sends. */
+const val DOWNLOAD_URL = "https://sov3r3ign.com/download/android"
+
+/** In the sheet of the trial's profile, in place of removal. */
+const val TRIAL_PROFILE_NOTE = "Пробный профиль удалится сам, когда закончится пробный период."
+
+/**
+ * Whether the site offers a newer APK than this one. Compared by versionCode,
+ * which grows with every release; a release that is not available, or reads
+ * as zero, is never newer.
+ */
+fun updateAvailable(currentCode: Int, release: com.sov3r3ign.app.api.AppRelease?): Boolean =
+    release != null && release.available && release.versionCode > currentCode
+
+fun updateLine(release: com.sov3r3ign.app.api.AppRelease): String =
+    "Доступна новая версия приложения ${release.versionName}"
 
 /*
  * What the app calls the account's configs: "профиль" (decided 2026-09-30 on
