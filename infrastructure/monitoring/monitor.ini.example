@@ -59,9 +59,18 @@ clients = awg0
 links = awg1
 pools = paid:10.88.88.42-199, trial:10.88.89.10-250
 
+# The standby entry. No pools: they are counted on A, where the portal hands
+# out addresses; once B carries the same peers it would only repeat A's alarms.
+# The section's place is the card's place on the panel: keep it after A's.
+[host:entry-b]
+ssh = sovmon@<entry-B>
+clients = awg0
+links = awg1
+
+# awg0 is the link from A, awg2 the link from B.
 [host:exit]
 ssh = sovmon@<exit>
-links = awg0
+links = awg0 awg2
 
 [host:am1]
 ssh = local
