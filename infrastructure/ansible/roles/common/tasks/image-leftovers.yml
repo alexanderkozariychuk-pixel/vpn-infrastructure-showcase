@@ -3,11 +3,13 @@
 # cause trouble. Removed only when they have been seen to: the rest of the
 # image is left alone (docs/entry-spec.md, "Comparing B with A").
 #
-# fwupd: firmware updates, with no firmware on a virtual machine. On B
-# (fwupd 2.0.20, VDSina's image) its hourly fwupd-refresh began failing on
-# 2026-10-21 with no reason in the journal, while the same download from B
-# took 0.8 s: a failed unit every hour, so the monitor's "services down"
-# alert flapped for nothing. A (fwupd 1.9) is changed by hand only.
+# fwupd: firmware updates, with no firmware on a virtual machine. On
+# 2026-10-21 its hourly fwupd-refresh began failing on every host that had it
+# (portal, A, am1, B; fwupd 1.9 and 2.0 alike): the LVFS CDN answered 503
+# "Timed out while waiting". Not our network, but a failed unit every hour
+# on four hosts made the monitor's "services down" alert flap for nothing.
+# The timer was disabled by hand on all of them that day; on B the role
+# removes the package. A is changed by hand only.
 - name: Provider-image packages a VPN node does without
   ansible.builtin.apt:
     name: "{{ common_unwanted_packages }}"
