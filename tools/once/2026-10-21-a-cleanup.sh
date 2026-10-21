@@ -62,11 +62,14 @@ guard_files() {
     awg show awg0 peers >/dev/null 2>&1 || die "awg0 is not running"
     if [[ -e $D/privatekey && -s $D/privatekey ]]; then die "$D/privatekey is not empty"; fi
     if pgrep -x udp2raw >/dev/null; then die "udp2raw is running"; fi
+    # node-exporter is not guarded: it runs, and nothing reads it (its Grafana
+    # host is gone, its ufw rule was removed 2026-10-07). Running for nobody
+    # is the reason it goes; apt stops it.
     local u
-    for u in awg-quick@awg-ru nginx prometheus-node-exporter; do
+    for u in awg-quick@awg-ru nginx; do
         if systemctl is-active --quiet "$u"; then die "$u is active"; fi
     done
-    if ss -ltn 2>/dev/null | grep -qE ':(80|443|9100)\s'; then die "something listens on 80/443/9100"; fi
+    if ss -ltn 2>/dev/null | grep -qE ':(80|443)\s'; then die "something listens on 80/443"; fi
 }
 
 guard_docker() {
