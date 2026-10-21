@@ -169,7 +169,10 @@ roles or in this specification.
 - Users: `sovmon` has `/bin/bash` on B, `/bin/sh` on A (its key is
   `command=`-restricted either way). Root has no `authorized_keys` on either.
 - Provider-image leftovers on B not touched by the roles: `snapd`,
-  `gpu-manager`, `thermald`, `upower`, `fwupd`.
+  `gpu-manager`, `thermald`, `upower`. `fwupd` was among them until its
+  hourly refresh began failing on B (2026-10-21); the role purges it now
+  (`roles/common/tasks/image-leftovers.yml`). A keeps its `fwupd` 1.9, which
+  does not fail.
 
 First diff, 2026-10-13: 738 lines, every one accounted for by this list, and
 `awg0 key-id b15a1462aaac, listen 8443` on both.

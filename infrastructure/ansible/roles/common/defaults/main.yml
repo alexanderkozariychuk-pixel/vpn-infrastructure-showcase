@@ -21,6 +21,10 @@ common_sshd_want:
 common_pubkey_re: '^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{43}( \S+)?$'
 common_addr_re: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'
 
+# Removed if present (image-leftovers.yml): seen to misbehave on a node.
+common_unwanted_packages:
+  - fwupd
+
 # Removed if present (no-containers.yml). Both Ubuntu's and Docker's own
 # package names.
 common_container_packages:

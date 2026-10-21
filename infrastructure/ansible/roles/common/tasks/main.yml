@@ -26,6 +26,9 @@
 - name: No Docker on a VPN node
   ansible.builtin.import_tasks: no-containers.yml
 
+- name: Provider-image leftovers that misbehave
+  ansible.builtin.import_tasks: image-leftovers.yml
+
 - name: Admin user
   ansible.builtin.import_tasks: users.yml
 

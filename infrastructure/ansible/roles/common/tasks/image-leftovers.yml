@@ -1,0 +1,24 @@
+---
+# Packages a provider image ships that a VPN node has no use for and that
+# cause trouble. Removed only when they have been seen to: the rest of the
+# image is left alone (docs/entry-spec.md, "Comparing B with A").
+#
+# fwupd: firmware updates, with no firmware on a virtual machine. On B
+# (fwupd 2.0.20, VDSina's image) its hourly fwupd-refresh began failing on
+# 2026-10-21 with no reason in the journal, while the same download from B
+# took 0.8 s: a failed unit every hour, so the monitor's "services down"
+# alert flapped for nothing. A (fwupd 1.9) is changed by hand only.
+- name: Provider-image packages a VPN node does without
+  ansible.builtin.apt:
+    name: "{{ common_unwanted_packages }}"
+    state: absent
+    purge: true
+  register: common_leftovers_purge
+
+# A failed unit whose files are gone stays in `systemctl --failed` (and in the
+# monitor's alert) until it is reset. Only after a real purge: never in --check.
+- name: No failed unit left behind by them  # noqa: no-handler — belongs with the purge, not at the end of the play
+  ansible.builtin.command: systemctl reset-failed fwupd-refresh.service fwupd.service
+  changed_when: true
+  failed_when: false
+  when: common_leftovers_purge is changed
