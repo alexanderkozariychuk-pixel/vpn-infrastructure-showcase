@@ -690,6 +690,53 @@ restored from it.
 Afterwards, run the reconcile again: labels whose peer is gone are listed
 with the `DELETE` that removes them, to run on the portal's database.
 
+### Two entries: the standby (B) follows A
+
+With `ENTRY_B_IP` set in the portal's `.env`, every portal peer added to or
+removed from A is also owed to B (`pwa/services/entry_sync.py`). A is still
+written in the request and still decides; B is written from the `entry_sync`
+table by `/etc/cron.d/pwa-entry-sync` once a minute, oldest job first. A job
+older than an hour is a letter ("резервный вход отстаёт") and a red card in
+the admin panel, «Состояние» → «Резервный вход: пиры». Hand-made peers are
+never carried to B.
+
+What is waiting, and why:
+
+```bash
+echo "SELECT id, action, peer_ip, left(public_key,8), attempts, created_at, last_error FROM entry_sync WHERE done_at IS NULL ORDER BY id;" \
+  | ssh sov-app "$Q"
+sudo tail -n 20 /var/log/pwa/entry-sync.log          # on the portal
+```
+
+`unreachable` — the portal cannot reach B by SSH: B down, its address
+changed, or its host key not in `/opt/pwa/ssh_keys/known_hosts`. Anything
+else is the wrapper's own refusal, in its words. The jobs are safe to repeat:
+a key already on B, or already gone from it, closes the job.
+
+Filling a standby that missed changes (first connection, or the reconcile
+below shows portal peers missing on B). It only adds, never removes:
+
+```bash
+ssh sov-app 'cd /opt/pwa/vpn-infrastructure-showcase/pwa && sudo docker compose exec -T pwa python fill_entry.py --entry b --dry-run'
+ssh sov-app 'cd /opt/pwa/vpn-infrastructure-showcase/pwa && sudo docker compose exec -T pwa python fill_entry.py --entry b'
+```
+
+Reconcile B the same way as A, with B's dump and an empty labels file
+(B holds no hand-made peers, so anything the database does not know is
+"Unknown"). Expected: the portal peers on A, on B and active in the
+database are the same set.
+
+```bash
+ssh -t sov-entry-b "sudo awg show awg0 dump | awk 'NR>1{print \$1, \$4, \$5}' > /tmp/sov-node.txt"
+scp -q sov-entry-b:/tmp/sov-node.txt /tmp/sov-node-b.txt && ssh sov-entry-b 'rm /tmp/sov-node.txt'
+: > /tmp/sov-labels-b.txt
+python3 tools/peer_reconcile.py /tmp/sov-node-b.txt /tmp/sov-db.txt /tmp/sov-labels-b.txt
+```
+
+Removing peers by hand with `peer-remove.sh` touches only the node it runs
+on. A portal peer removed that way from A must be removed from B with the
+same list, and its row ended in the database, or the next fill puts it back.
+
 ---
 
 ## Administrator access
