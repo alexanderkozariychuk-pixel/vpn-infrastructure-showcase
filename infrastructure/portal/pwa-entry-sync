@@ -1,0 +1,10 @@
+# /etc/cron.d/pwa-entry-sync on the portal host — changes to portal peers
+# carried to the standby entry (pwa/entry_sync.py): a device added or removed
+# on entry A reaches entry B within a minute; a backlog older than an hour is
+# a letter. Does nothing while ENTRY_B_IP is unset in the portal's .env.
+#
+# A run that outlasts the minute (filling a new standby) is not started twice:
+# flock skips the next one; the jobs are safe to repeat anyway.
+#
+# Install: sudo install -m 644 infrastructure/portal/pwa-entry-sync /etc/cron.d/
+* * * * * root cd /opt/pwa/vpn-infrastructure-showcase/pwa && /usr/bin/flock -n /run/pwa-entry-sync.lock /usr/bin/docker compose exec -T pwa python entry_sync.py >> /var/log/pwa/entry-sync.log 2>&1

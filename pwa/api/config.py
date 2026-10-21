@@ -28,6 +28,7 @@ from services.provisioner import (
     issue_config,
     render_config,
 )
+from services import entry_sync
 from services.subscriptions import has_access, has_active_subscription
 
 logger = logging.getLogger(__name__)
@@ -270,6 +271,8 @@ async def delete_config(
         raise HTTPException(status_code=503, detail="Could not remove the device")
 
     config.is_active = False
+    # Owed to the standby entry, in this transaction (services/entry_sync.py).
+    entry_sync.enqueue(db, config, "remove")
     if user.peer_ip == config.peer_ip:
         remaining = [c for c in await active_configs(user, db) if c.id != config.id]
         user.peer_ip = remaining[0].peer_ip if remaining else None

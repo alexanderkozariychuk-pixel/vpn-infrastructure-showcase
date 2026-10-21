@@ -290,3 +290,35 @@ class AppSession(Base):
     last_used_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EntrySync(Base):
+    """
+    A change still owed to a standby entry (entry B): add or remove one
+    portal peer there.
+
+    The primary entry (A) is written synchronously, in the request, exactly as
+    before: a device exists once A confirms it, and is gone once A confirms
+    that. The standby has to end up with the same set — additions and, just
+    as much, removals, or an unpaid customer keeps working through B — but it
+    carries no traffic until a switch, so it is written from here instead, by
+    pwa/entry_sync.py from cron (services/entry_sync.py). A job is written in
+    the same transaction as the Config change it follows, so a rolled-back
+    request leaves no job behind, and a committed one cannot lose its job.
+
+    The PSK and private key are not copied here: an add job reads them from
+    its Config row when it runs.
+    """
+    __tablename__ = "entry_sync"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    entry: Mapped[str] = mapped_column(String(8), nullable=False)
+    action: Mapped[str] = mapped_column(String(8), nullable=False)  # "add" | "remove"
+    config_id: Mapped[str] = mapped_column(String, ForeignKey("configs.id"), nullable=False, index=True)
+    public_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    peer_ip: Mapped[str] = mapped_column(String(20), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

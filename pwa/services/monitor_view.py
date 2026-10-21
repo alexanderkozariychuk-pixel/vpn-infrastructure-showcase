@@ -142,8 +142,33 @@ def _card(cid: str, title: str, lines: list[str], problems: list[dict], status: 
             "problems": [pr["text"] for pr in problems], "raw": raw or {}}
 
 
-def build(payload: dict | None, received_at: datetime | None, now: datetime) -> dict:
-    """The admin page's state block: banner, cards, overall colour."""
+def sync_card(backlog: dict) -> dict:
+    """
+    The standby entry's queue (services/entry_sync.backlog): does B have every
+    change A has. Pending for a few minutes is normal (cron, once a minute);
+    pending past the letter's threshold is broken.
+    """
+    lines, problems = [], []
+    for name, b in backlog.items():
+        title = f"Вход {name.upper()}"
+        if not b["pending"]:
+            lines.append(f"{title}: все изменения пиров переданы")
+            continue
+        lines.append(f"{title}: ждут {b['pending']}, самое старое — {ago(b['oldest_s'])}")
+        if b["last_error"]:
+            lines.append(f"Последняя ошибка: {b['last_error']}")
+        if b["stale"]:
+            problems.append({"level": "bad", "text": f"{title} отстаёт больше часа: при переключении "
+                                                     "набор пиров не совпадёт с A"})
+        elif b["oldest_s"] and b["oldest_s"] > 300:
+            problems.append({"level": "warn", "text": f"{title}: изменения ждут дольше 5 минут"})
+    return _card("entry-sync", "Резервный вход: пиры", lines, problems, raw=backlog)
+
+
+def build(payload: dict | None, received_at: datetime | None, now: datetime,
+          extra_cards: list[dict] | None = None) -> dict:
+    """The admin page's state block: banner, cards, overall colour.
+    `extra_cards` are the portal's own (the standby entry's queue)."""
     received_at = aware(received_at)
     if not payload or received_at is None:
         return {"received_at": None, "age_s": None, "stale": True, "status": "unknown",
@@ -219,6 +244,8 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
         unknown = all(hosts.get(n) is None for n in links)
         cards.insert(1, _card("links", "Связка вход ↔ выход", link_lines, link_problems, raw=link_raw,
                               status="unknown" if unknown and not link_problems else None))
+
+    cards += extra_cards or []
 
     if age > STALE_AFTER_S:
         status = "unknown"

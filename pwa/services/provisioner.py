@@ -17,6 +17,7 @@ import os
 import base64
 import subprocess
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
@@ -28,7 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from db.models import User, Config, Payment
 from config import plan_info
-from services import credit, mailer
+from services import credit, entry_sync, mailer
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,9 @@ async def _find_free_ip(
     # authority — this query is the mirror, and the mirror can be stale.
     result = await db.execute(select(Config.peer_ip).where(Config.is_active.is_(True)))
     used = {row[0] for row in result.fetchall() if row[0]}
+    # A standby entry (B) can still hold a peer the database has already
+    # ended: its removal waits in entry_sync. Its address is not free yet.
+    used |= await entry_sync.pending_ips(db)
     if exclude:
         used |= exclude
     for i in range(start, end + 1):
@@ -317,6 +321,8 @@ async def issue_config(
         return None
 
     config = Config(
+        # Set here rather than at flush: the standby entry's job below needs it.
+        id=str(uuid.uuid4()),
         user_id=user.id,
         name=name,
         peer_ip=peer_ip,
@@ -327,6 +333,8 @@ async def issue_config(
         kind=kind,
     )
     db.add(config)
+    # Owed to the standby entry, in the caller's transaction (services/entry_sync.py).
+    entry_sync.enqueue(db, config, "add")
     logger.info("Issued config '%s' for %s → %s", name, user.username, peer_ip)
     return config
 
@@ -427,6 +435,7 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
             )
             if ok:
                 c.is_active = False
+                entry_sync.enqueue(db, c, "remove")
             else:
                 logger.error("Trial peer %s for %s not removed: %s", c.peer_ip, user.username, reason)
         except Exception as e:

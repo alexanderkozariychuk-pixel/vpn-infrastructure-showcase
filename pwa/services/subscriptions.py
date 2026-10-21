@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import User, Config
 from services.provisioner import _remove_peer_from_bridge
-from services import notify
+from services import entry_sync, notify
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,7 @@ async def expire_due_trials(db: AsyncSession, now: datetime | None = None) -> di
         )
         if ok:
             config.is_active = False
+            entry_sync.enqueue(db, config, "remove")
             stats["trial_peers_removed"] += 1
             # A trial cut short by a purchase is not news to the customer.
             if not has_active_subscription(user, now):
@@ -157,6 +158,7 @@ async def expire_due_subscriptions(db: AsyncSession, now: datetime | None = None
             )
             if ok:
                 config.is_active = False
+                entry_sync.enqueue(db, config, "remove")
                 stats["peers_removed"] += 1
             else:
                 all_removed = False

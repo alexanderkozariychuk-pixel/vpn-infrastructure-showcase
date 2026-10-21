@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt import require_admin
 from db.base import get_db
 from db.models import MonitorEvent, MonitorReport
-from services import monitor_view, monitor_watch
+from services import entry_sync, monitor_view, monitor_watch
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,10 +92,11 @@ async def receive(report: Report, db: AsyncSession = Depends(get_db),
     else:
         row.received_at, row.payload = now, payload
 
-    # The portal's own event (the monitor fell silent) is opened and closed by
-    # services/monitor_watch.py, which must send the all-clear first.
+    # The portal's own events ("portal:" keys — the monitor fell silent, the
+    # standby entry lags) are opened and closed by services/monitor_watch.py and
+    # services/entry_sync.py, which must send the all-clear first.
     open_rows = (await db.execute(select(MonitorEvent).where(
-        MonitorEvent.ended_at.is_(None), MonitorEvent.key != monitor_watch.SILENT_KEY))).scalars().all()
+        MonitorEvent.ended_at.is_(None), ~MonitorEvent.key.startswith("portal:")))).scalars().all()
     open_by_key = {e.key: e for e in open_rows}
     current = {p.key: p for p in report.problems}
     for key, p in current.items():
@@ -132,7 +133,10 @@ async def state(db: AsyncSession = Depends(get_db), _: dict = Depends(require_ad
         payload = json.loads(row.payload) if row else None
     except ValueError:
         payload = None
-    view = monitor_view.build(payload, row.received_at if row else None, now)
+    extra = []
+    if entry_sync.standby_entries():
+        extra.append(monitor_view.sync_card(await entry_sync.backlog(db, now)))
+    view = monitor_view.build(payload, row.received_at if row else None, now, extra_cards=extra)
     events = (await db.execute(
         select(MonitorEvent).order_by(MonitorEvent.started_at.desc(), MonitorEvent.id.desc()).limit(HISTORY_SIZE)
     )).scalars().all()
