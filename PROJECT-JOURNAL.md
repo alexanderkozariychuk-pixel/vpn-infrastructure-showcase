@@ -4897,6 +4897,90 @@ described a layout that no longer exists. Removed with `/api/status`,
 
 ---
 
+## 2026-10-10
+
+### 🔍 The entry's peers against the database
+`tools/peer_reconcile.py`, read-only: configs active in the database but
+missing on the node, ended configs still on the node, labelled hand-made
+peers, unknown peers, duplicate addresses, and how full the paid
+(`.42–.199`, 158 addresses) and trial pools are. The node's PSK column is cut
+on the node, before the file leaves it. The collection commands are in
+runbook §9. This is the tool the peers audit of 2026-10-15/16 ran on.
+
+---
+
+## 2026-10-12
+
+Groundwork for the standby entry: first describe what an entry *is*, then
+build a second one from that description.
+
+### 🔐 No root over SSH, anywhere
+Root login is off on the portal and the backup host as well (entry and exit
+had it off already); every root `authorized_keys` is empty; the workstation
+key was rotated. Commands that ran as root now carry `sudo`, and `deploy.sh`
+runs the receiving rsync under `sudo`, so a non-root admin user can still
+write the root-owned app directory. Runbook updated. The exit's monitor config
+lost `awg-de`, the interface that no longer exists.
+
+### 🧾 What an entry is made of
+- **`tools/node-inventory.sh`** — a read-only report of a node: system,
+  packages, DKMS, AmneziaWG interfaces (interface sections only, key-ids
+  instead of keys), config files against runtime peers, routing, ipsets,
+  sysctl, firewall, units, scripts with checksums, cron, users and their
+  pinned keys, sshd, fail2ban, unattended upgrades. The specification the
+  Ansible roles are written against, and the diff a rebuilt node is checked
+  with.
+- **`docs/entry-spec.md`** — entry A layer by layer and, for each, whether B
+  must match it (awg0 key, port, obfuscation, peers), has its own (the link,
+  on a separate exit interface) or leaves it out; which secrets B needs and
+  where they come from.
+- The files that lived only on A went into the repository as found
+  (`infrastructure/entry/as-found-2026-10-12/`): split-tunnel scripts, unit,
+  cron, logrotate, fail2ban jail, sysctl. `pwa-awg-show` and `pwa-logs` joined
+  the other wrappers, sha256 equal to the node's.
+
+Three things found on A: a peer block in `awg0.conf` whose `PresharedKey` and
+`AllowedIPs` lines have no `[Peer]` header (inside `client18`'s block);
+`ip rule 100`, which nothing visible created — it lives in `rc.local`; Docker
+on the VPN node.
+
+**`tools/awg-conf-check.sh`** compares every peer of `awg0.conf` with the
+running interface — public key, PSK, addresses — and prints fingerprints
+only; written for mawk, and it refuses to call an empty read a match. Beside
+it, the one-off fix for the headerless pair: found by its key's fingerprint,
+written only if the result is the old file minus exactly those two lines and
+the file did not change meanwhile. (Applied 2026-10-16, after the audit
+showed `client18` is in use.)
+
+### 📊 How full the address pools are
+The probe lists each peer's first address; `sov-monitor` counts them against
+the pools in its config (paid `.42–.199`, trial `.10–.250`), warns at 70 %,
+alarms at 95 %. The entry card shows "Платный пул: занято 27 из 158 (17%)".
+A bug on the way: `level()` read the alert kind from everything after the
+host, so `entry:pool:paid` counted as broken instead of a warning.
+
+### 🎟 Promo codes in the admin panel
+Campaign codes (discount up to 60 %, optional limit of paid orders, optional
+days of validity, optional readable code, a note for whom), each with its
+uses, copy with a tap, switch off. Referral codes are counted, not listed.
+Open access names plans in words ("Расширенный · 6 месяцев · до 5 устройств").
+
+### 📡 Choosing the second entry's provider
+Ruled out: the current provider (no free VPS, and one refusal would take both
+entries), the large Russian clouds, and the address range that had already
+failed mobile DPI. **`tools/dpi-test-node.sh`** answers the one question that
+matters before anything is built on an address: bare AmneziaWG with the
+entry's port, obfuscation and client MTU, own keys, one test peer, local exit
+— does it get through. The candidate in Moscow passed on Wi-Fi the same
+evening, on mobile in St. Petersburg the next day; the test server was then
+wiped to a clean image, the address kept.
+
+### 📋 Next
+- Build entry B with Ansible from `entry-spec.md`, compare with A.
+- Peers audit on A with `peer_reconcile.py`.
+
+---
+
 ## 2026-10-13
 
 ### 🏗 A second entry, built by Ansible
@@ -5274,3 +5358,217 @@ unpushed settings commit from 2026-10-15; rebased onto the remote, pushed.
 - The kill switch for paying clients when `awg1` is down — model on B.
 - B: remove `conntrack`, `tcpdump` and the `.252` test peer before stage 4's
   first reconcile, with `.251`.
+
+---
+
+## 2026-10-19
+
+### 👁 Monitoring: entry B on the panel, and a watch on the watcher
+- The panel names the entries A and B; B has its own card, its link and the
+  exit's `awg2`. A keeps the key `entry`, which the monitor's state and the
+  problem history use.
+- **`monitor-watch`.** The monitor's alerts come from the backup host itself:
+  if that host dies, monitoring goes silent and nothing says so
+  (healthchecks.io was meant to cover it; its sign-up letter never came). The
+  portal already receives a report every two minutes, so a cron job every
+  five minutes mails when the last report is over ten minutes old, and again
+  when reports return — one letter per silence, a failed letter retried. The
+  first real test (the monitor's timer stopped on purpose, 16:23–16:39 MSK)
+  logged the silence from the moment the threshold was crossed; it now starts
+  at the last report, because what matters is how long nothing was watched.
+
+### 🗑 Customers can delete a device
+The server's DELETE existed for the app; the page had no way to call it, so a
+customer at the plan's limit could not free a slot and a lost phone kept a
+working key. Delete sits in the rename form and asks again in place, naming
+the device. A node that does not confirm the removal (503) leaves the device
+listed. With that in place, a hole closed in payments: renewing early from
+Extended (5 devices) to Basic (2) kept all five on the Basic price, period
+after period. An order for a plan smaller than the devices held is now
+refused (409 `too_many_devices`) until the extra devices are deleted, and the
+checkout says how many the plan allows and how many are held.
+
+### 📱 Android 1.0, served by the portal
+The redesigned app merged and released:
+- Trial, rate limits and an update check, as the server has them now; the
+  sign-in screen in the design system; the launcher icon from the mark.
+- **The app stays signed in.** The access token lasts 24 hours and there was
+  nothing to renew it with, so the app asked for the password daily. Sign-in
+  from the app now also returns a refresh token (256 random bits, only its
+  SHA-256 stored). It does not rotate — a trade whose answer is lost on a
+  mobile network would cost the sign-in — and its expiry slides 90 days from
+  each use. A password reset ends every app session, signing out ends its
+  own, a disabled account cannot renew, an admin never gets one, ten per
+  account at most. A refusal signs the app out; an unreachable portal does
+  not. Migration `e2a7c5d91f04`.
+- **Release signing** from a key outside the repository (backed up, restore
+  checked by fingerprint); the public fingerprint is committed.
+  `tools/android-release.sh` checks a release APK — our key, not debuggable,
+  no private key, only allowed native libraries (Compose's own turned out to
+  be one), version above the portal's — and publishes it.
+- **`/download/android`** serves the APK and `/api/public/android` describes
+  it (version, size, SHA-256), both from a directory the container mounts
+  read-only: a release is two files copied to the app server, not a deploy.
+  The description is believed only while it matches the file beside it.
+- **Connect** leads with the app on Android; Windows, macOS and Linux get
+  their own tiles and AmneziaWG steps (taken from Amnezia's documentation,
+  not yet walked through on a real PC). Device pictures without anyone's
+  logo.
+
+Tested on the release build: sign-in, choosing a profile, connect, reconnect,
+deleting the active profile on the site (the tunnel goes down and says why).
+
+Two lines for `CLAUDE.md`: a glob under `/root` is expanded by the admin
+user's shell before `sudo`; a command that reads stdin inside `bash -s`
+swallows the rest of the script, silently.
+
+### 📋 Next
+- Merge `main` into `cluster-b` after the night's work on A, not before.
+- App 1.1: a smaller APK (two ABIs, R8 with keep rules for the tunnel library).
+
+---
+
+## 2026-10-21
+
+### 🧹 A's leftovers, and a cost of `pwa-del-peer`
+`entry-spec.md` lists what is not carried to B and is to go from A. A read
+today found it all still there — and more: three `awg1.conf` backups holding
+the link's key, and seven more `awg0.conf` backups than the spec counted.
+**`pwa-del-peer` leaves a full copy of the file, every client's keys in it,
+at each removal.** With delete buttons on the site and in the app, those
+copies will multiply; the wrapper should keep the last few or rotate them.
+
+`tools/once/2026-10-21-a-cleanup.sh`: `check` / `files` / `docker` /
+`rollback`. `files` moves 28 files into a root-only backup directory, paths
+kept, and purges node-exporter (running for nobody since its Grafana host
+went) and the old portal's nginx; `docker` removes the old portal's volume
+and Docker itself. Each step stops before changing anything if what it
+removes is still in use. Every `apt-get` and `docker` call reads `/dev/null`
+— the `bash -s` lesson of two days before. Not yet run on A.
+
+### 🚨 The exit had a half-installed kernel since about 10-10
+Reading the exit for its reboot: kernel `7.0.0-38` is in state `iF` — its
+package was unpacked but never configured, because AmneziaWG 1.0.0's DKMS
+build fails against it. Unattended upgrades have stopped at that error each
+time since, so the exit got no updates for about two weeks. The
+reboot-readiness check of 2026-10-15 counted only packages in state `ii` and
+did not see it; a reboot could have started a kernel with no AmneziaWG
+module. **The readiness check must read every dpkg state,
+`dpkg --audit`, and which kernel GRUB's default entry boots — with its initrd
+and the AmneziaWG module.** Plan for the night: purge 38 (27 keeps running),
+run the pending upgrades, move `udp2raw` away, reboot under the console.
+
+### 🔩 fwupd: LVFS, not B
+B's hourly `fwupd-refresh` began failing with nothing in its journal, and the
+monitor's "services down" alert flapped. The first reading blamed B's newer
+fwupd and the role now purges it (a VM has no firmware to update). Within the
+hour the portal, A and am1 failed the same way; a verbose refresh on B showed
+the LVFS CDN answering 503. The timer was disabled by hand on the portal, am1
+and B; the exit has no fwupd; A's timer goes on the night list.
+
+### 🔀 Stage 4, in its own branch
+`stage4`, branched from `main`: every portal peer change on A is owed to B.
+A is still written in the request and still decides; nothing new runs in a
+request.
+- An `entry_sync` job per change, written in the same transaction as the
+  config change — every issue and the four removals (device delete, paid
+  expiry, trial expiry, trial ended by a purchase). A rolled-back request
+  leaves no job; a commit cannot lose one.
+- A cron job every minute runs the jobs oldest first, so a removal reaches B
+  before its address is handed to someone else. The wrappers are not
+  idempotent: "peer exists (key)" and "peer not found" close a job, so a
+  retry after a lost answer is not an error. An unreachable B costs one try
+  per run.
+- Addresses: inside the portal pool B holds portal peers only, so an address a
+  pending job still holds is not handed out — no question to B in the request
+  path.
+- A backlog older than an hour: one letter, a history row, one all-clear; a
+  card in the panel. `fill_entry.py --entry b` owes B the active peers it
+  lacks, adds only, lists unknown peers for a person.
+
+With `ENTRY_B_IP` unset nothing is written and nothing runs. 20 new tests,
+670 in all, 18 mutations, all caught; the migration up, down and up again.
+The servers were read against the plan: the provisioner's key, sudoers and
+wrapper hashes on B match. Not merged, not deployed.
+
+### 📋 Next
+- The night: exit, then client isolation on A, A's cleanup, A's reboot.
+- Stage 4 rollout (six steps, the first deploy with `ENTRY_B_IP` unset).
+
+---
+
+## 2026-10-22
+
+The night's programme did not run; it moves to a later night. Read again in
+the evening: the exit unchanged (27 running, 38 in `iF`); unattended upgrades
+failed again that morning (`dpkg` exit 1); A has 49 peers, no isolation yet.
+
+Reading a window of a node's journal: the monitor logs in every two minutes
+and each visit writes a dozen systemd lines. A noise filter followed by
+`tail -40` showed only the window's last five minutes — twice. Count the
+sources in the window first, then read what is not the monitor.
+
+### 🔑 Hand-made peers on B
+Four peers on B outside the portal pool (`.241–.244`), as a standby way in
+with `Endpoint = n2…`. Client keys made in memory on B and written only to
+mode-600 files on the workstation; the server key on B checked against the
+portal's before the config was printed; the obfuscation read from B's running
+`awg0`. Afterwards `awg-conf-check`: file 6 = running 6.
+**Hand-made addresses on B stay outside `.42–.199`**: stage 4 hands out
+addresses on the assumption that inside the pool B holds portal peers only.
+For the rollout: remove only the test peers `.251`/`.252`; `fill_entry
+--dry-run` should list exactly these four as unknown; B's reconcile needs a
+labels file with them. Changes on B are measured before and after from now
+on, as on A.
+
+---
+
+## 2026-10-23
+
+### 🧱 B's link cut on the path — one pair of ports
+The monitor: B's link and the exit's `awg2` silent for 472 minutes, A's link
+fine. B's peers still shook hands with B, but foreign traffic went into a dead
+link (no kill switch yet). Silence since about 22:08 UTC; nothing in either
+node's journal around it, no reboot, no restart.
+
+Narrowed down, read-only, from both ends at once:
+
+| from B to the exit | the exit sees it |
+|---|---|
+| link packets `B:51821 → :51823` (15 in 15 s, handshake retries) | **none** |
+| ICMP | yes (one of three lost) |
+| TCP 22 | yes |
+| plain UDP to `51823`, `51824`, `443`, `53` from random source ports | yes |
+
+ufw on the exit blocked nothing and its rule for B was in place. Not the
+exit's address, not its port, not UDP — **that one flow** was dropped
+somewhere between the two providers.
+
+The test that separated "this flow" from "this kind of packet": `awg set awg1
+listen-port 51831` on B, in memory only. The exit was not touched — its rule
+admits B on its port from any source port, and AmneziaWG takes the peer's new
+address from the first authenticated packet. Handshake within 21 s, ping over
+the link without loss. Made permanent by hand rather than by the role (the
+role must not run on B before `main` is merged into `cluster-b`): `awg1.conf`
+`ListenPort = 51831` with a copy of the file beforehand, a ufw rule for the
+new port named as the role names it, and `entry_link.port` in the inventory,
+so the role's check and template agree with the node.
+
+What triggered it is unknown. The link carried little — test devices only.
+
+**Lessons.**
+- A link can be dropped on the path while both ends are healthy and their
+  journals are empty. The way to see it is a capture on both ends at once:
+  one side sends, the other sees nothing.
+- The cure for a dropped flow is a different source port on the entry's side
+  only. That holds for A's link too, and goes into the runbook.
+- Without a kill switch, a dead link leaves the entry's clients connected with
+  no foreign traffic. That task moves up.
+
+### 📋 Next
+- The night's programme (`exit`, then A) — overdue.
+- B: remove the old ufw rule for `51821`; `shred` the copy of `awg1.conf`.
+- Runbook: the dropped-flow check and the port change.
+- Kill switch for paying clients when the link is down, modelled on B.
+- To decide: change the link's port automatically when it stays silent (on B
+  in the role; on A it would be automation on the live node).
