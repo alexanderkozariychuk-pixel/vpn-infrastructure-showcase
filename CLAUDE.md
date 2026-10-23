@@ -44,9 +44,16 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
 - Commits carry Alexander as author:
   `--author="Alexander Kozariychuk <alexanderkozariychuk@gmail.com>"`,
   with a `Co-Authored-By:` trailer for Claude.
-- Branch `cluster-b` holds the standby-cluster work (stage 4 next: the portal
-  writes peers to both entries, `tools/peer_reconcile.py` against both). Merge
-  `main` into it before stage 4. The journal is written in `cluster-b`.
+- Branch `cluster-b` holds the entry-B work. The journal is written in
+  `cluster-b`. Merge `main` into it before running the Ansible role on B again.
+- **Direction since 2026-10-23: two independent clusters**, not a standby copy
+  of A. Cluster 1 ("Germany"): clients → entry A → current exit, AmneziaWG 1.0.
+  Cluster 2: clients → entry B → a new exit of its own (provider being chosen),
+  AmneziaWG 3.x on both legs. The portal will offer a location per device.
+  Stage 4 (the portal writing every peer to A and B; branch `stage4`) is on
+  hold — its code stays, nothing of it is merged or deployed. The full
+  decision record and provider shortlist are in the private context repo
+  (`sovereign-context`, `docs/cluster-2.md`), not here: this repo is public.
 - Do not commit half-done work. Push only after tests pass.
 - Anything that depends on the branch must stop on the wrong branch, not just
   print it.
