@@ -5647,3 +5647,85 @@ then a second run: `changed=0`, no findings.
 - B: awg0 rebuilt for 3.x (own key, `n2`), the four hand-made peers reissued,
   `entry_link` moved to `awg3`, `awg1` removed.
 - Portal: a location per device, and the device limit across two locations.
+
+### 📱 3.x on real phones, straight to the exit
+Before rebuilding B for 3.x, the clients were tested: a temporary client
+interface on exit-2 with its own random S1–S4, H ranges and I1, and one test
+peer each. An iPhone and a Samsung A71 connected over home Wi-Fi and two
+mobile operators, straight to the foreign address with no entry in between,
+and pages loaded. Both apps take every 3.x parameter. The interface, its
+keys and its firewall rule were removed afterwards. The first attempt
+"failed" only because the phone still held the old tunnel.
+
+### 🧹 B rebuilt from a clean image, by the role
+B carried every stage of its history: a link to the first exit, a hand-made
+link to exit-2, rules for three ports, a copy of a config with a key, test
+and hand-made peers. It was reinstalled from the provider's image and built
+by `roles/entry` from `cluster-2`, now with an awg0 of its own (own key, 3.x
+obfuscation with I1, set as host vars; Germany's values stay the group's)
+and its link to exit-2. The link's key and PSK were piped from the old B into
+the vault before the wipe, so exit-2 needed no change. Third run:
+`changed=0`. The one person really using B (one hand-made peer, ~12 GB a day)
+was asked first and got a 3.x config right after.
+
+### 🧱 The link's flow cut again — on the other exit
+The first run reported no handshake on the link. Same AmneziaWG build on
+both ends, same PSK (compared by hash), clocks in sync. With the module's
+debug output on, exit-2 logged `Unknown message` for every packet from B, and
+counting on both ends showed why: B sent 31 packets, exit-2 received 16 — the
+handshake was always among the lost. A new source port on B: handshake in
+17 seconds. That flow had worked all day before the reinstall. Two flow cuts
+in two days, on two different exits, both cured by the same move: that is no
+longer an incident, it is a property of the path, and it gets automated
+(below).
+
+### 🗺️ The portal gets locations
+A device now belongs to a location for life: Germany (entry A) or the
+Netherlands (entry B). `services/locations.py` holds them; the Netherlands
+exists only when every `NL_*` setting is in the portal's `.env`, its
+obfuscation included — the repository is public, and the 3.x ranges and I1
+next to the code would be a pattern to match. Every node operation (issue,
+remove, expiry, the free-address lookup) goes to the device's own entry; the
+plan's device limit holds in each location separately (Basic 2 + 2); trials
+stay in Germany; a device whose location is no longer configured gets a 503,
+never a file with the wrong key. The page groups devices by location, the
+Netherlands first and recommended, with a dismissible notice; the admin's
+peer list got a tab per location. 22 + 4 new tests, each rule seen to fail
+under a mutation. Deployed; the whole client path (issue, download,
+connect, delete) checked by hand; a notice sent to every account.
+
+### 👁️ The monitor sees cluster 2
+am1 learned B's new host key and exit-2's (each compared from a second
+network), watches B's link to exit-2 and exit-2's end of it, and counts B's
+address pool. The first exit no longer expects B's old link. On the first
+exit that link was removed by hand: interface down and disabled, its config
+(with its key) to `/root/sov-backup`, its firewall rule gone — three rules
+less, entry A's link untouched (handshake fresh, traffic flowing, measured
+before and after).
+
+### 🔁 Port hopping and traffic (code; rolling out)
+`sovrn-link-hop` on the entry: every minute, if the link has had no
+handshake for 3 minutes, move it to the next of its ports (each open in
+ufw); the exit learns the new one by itself. Only the running interface
+changes — the file keeps the inventory's port, and the link's PostUp
+restores the port in use from a state file — so the role still owns the
+file and a reboot does not fall back to a blocked port. sov-probe reports
+the hops; sov-monitor sends one message per hop. sov-probe also reports the
+uplink's byte counters, and sov-monitor sums them per day and month for the
+admin's status cards.
+
+**Lessons.**
+- Rebuilding from the role after a day of hand work is the cheapest audit
+  there is: everything the role does not know about disappears, on purpose.
+- "No handshake" has three causes worth checking in order — versions and
+  keys, clocks, the path — and counting packets on both ends settles the
+  last one in a minute.
+- A setting that would give away the protocol (obfuscation of a new
+  location) belongs in the deployment's environment, not in a public
+  repository, even when the old one is already public.
+
+### 📋 Next (evening)
+- Roll out hopping on B and the new monitor on am1; test a hop by blocking
+  the link's port on B for a few minutes.
+- `shred` the old exit's copy of B's link config after a few quiet days.
+- Android app: devices in the Netherlands (it adds Germany only).

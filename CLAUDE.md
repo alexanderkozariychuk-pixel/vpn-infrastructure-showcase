@@ -49,8 +49,11 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
   now. `cluster-b` is kept as it was; B's role is run from `cluster-2`.
 - **Direction since 2026-10-23: two independent clusters**, not a standby copy
   of A. Cluster 1 ("Germany"): clients → entry A → current exit, AmneziaWG 1.0.
-  Cluster 2: clients → entry B → exit-2 (its own exit, built 2026-10-24 by
-  `roles/exit`), AmneziaWG 3.x on both legs. The portal will offer a location per device.
+  Cluster 2 ("Netherlands"): clients → entry B → exit-2 (its own exit, built
+  2026-10-24 by `roles/exit`; B rebuilt the same day by `roles/entry`),
+  AmneziaWG 3.x on both legs. The portal has a location per device
+  (`pwa/services/locations.py`); the Netherlands' settings, its obfuscation
+  included, live only in the portal's `.env` — never put them in this repo. The portal will offer a location per device.
   Stage 4 (the portal writing every peer to A and B; branch `stage4`) is on
   hold — its code stays, nothing of it is merged or deployed. The full
   decision record and provider shortlist are in the private context repo
