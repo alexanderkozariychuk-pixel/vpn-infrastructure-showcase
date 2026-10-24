@@ -91,7 +91,10 @@ ssh sov-entry-b "sudo sovrn-trial-net $S && sudo sovrn-trial-net check"
 ## Building exit-2
 
 exit-2 was first built by hand (2026-10-24); the role reproduces it. Its
-private key and PSK go from the node into the vault without passing through
+host entry can sit in `inventory/hosts.yml` (as in the example) or in a file
+of its own outside the repository, given as a second inventory:
+`-i inventory/hosts.yml -i ~/.sovereign/inventory-exit2.yml` (shared vars
+come from the first, `group_vars/exit` still applies). Its private key and PSK go from the node into the vault without passing through
 a terminal or the chat:
 
 ```bash
