@@ -1,17 +1,23 @@
-# Ansible — entry nodes
+# Ansible — entry and exit nodes
 
 Builds an entry node from `docs/entry-spec.md` and checks a running one
 against it. Written in October 2026 for entry B; the July roles it replaces
-are in `archive/ansible-2026-07/` with the reasons.
+are in `archive/ansible-2026-07/` with the reasons. Since 2026-10-24 it also
+builds the exit of cluster 2 (exit-2: entry B's own exit, AmneziaWG 3.x).
 
 ```
 ansible.cfg                  run from this directory
 playbooks/entry.yml          common + entry, then read-only checks
+playbooks/exit.yml           common + exit, then read-only checks
 roles/common/                admin user, sshd, ufw, fail2ban, updates, swap, sov-probe
-roles/entry/                 AmneziaWG, awg0, link, split tunnel, trial subnet, wrappers
+roles/amneziawg/             the Amnezia PPA (by fingerprint) and packages; used by both
+roles/entry/                 awg0, link, split tunnel, trial subnet, wrappers
+roles/exit/                  forwarding, one link interface per entry, NAT, BitTorrent block
 inventory/hosts.yml.example  copy to hosts.yml (git-ignored)
 inventory/group_vars/entry/  what every entry shares (port, obfuscation, subnets)
-vault.yml.example            what the vault holds; the vault itself lives outside the repo
+inventory/group_vars/exit/   ufw forward policy DROP
+vault.yml.example            what an entry's vault holds; the vault itself lives outside the repo
+vault-exit.yml.example       the same for an exit
 ```
 
 ## Two rules the roles are built around
@@ -31,7 +37,14 @@ read-only commands on the node and is one forgotten flag away from a real
 one. B is compared with A by `tools/node-inventory.sh` (a diff of the two
 reports), and what B does differently on purpose is listed in
 `docs/entry-spec.md`. As a second fence the playbook refuses any non-check
-run against a host in the `live` group, which is kept empty.
+run against a host in the `live` group, which is kept empty. The same holds
+for the exit of cluster 1 (the one A uses).
+
+**An exit's link files are the role's.** Unlike awg0 on an entry, a link
+interface on an exit has a single peer, the entry, so `roles/exit` owns the
+whole file and restarts a link whose file changed (only that one; a restart
+drops that entry's clients for a second). The obfuscation is the same on both
+ends of a link; the entry's end is in that entry's `entry_link`.
 
 ## Setup on the workstation
 
@@ -75,9 +88,38 @@ S=$(ssh sov-entry 'cat /etc/sovereign/trial.state 2>/dev/null || echo off')
 ssh sov-entry-b "sudo sovrn-trial-net $S && sudo sovrn-trial-net check"
 ```
 
+## Building exit-2
+
+exit-2 was first built by hand (2026-10-24); the role reproduces it. Its
+private key and PSK go from the node into the vault without passing through
+a terminal or the chat:
+
+```bash
+ssh sov-exit2 'sudo awk -F" = " "/^PrivateKey/{k=\$2} /^PresharedKey/{p=\$2} END{print k; print p}" /etc/amnezia/amneziawg/awg0.conf' \
+  | { read -r k; read -r p; printf 'exit_link_keys:\n  awg0:\n    private_key: "%s"\n    psk: "%s"\n' "$k" "$p"; } \
+  | ansible-vault encrypt --output ~/.sovereign/vault-exit2.yml
+```
+
+Then a check run, read through before the real one:
+
+```bash
+ansible-playbook playbooks/exit.yml --limit exit-2 -e @~/.sovereign/vault-exit2.yml --ask-vault-pass --check --diff
+ansible-playbook playbooks/exit.yml --limit exit-2 -e @~/.sovereign/vault-exit2.yml --ask-vault-pass
+```
+
+A second real run must report `changed=0`.
+
+On entry B the end of this link (`awg3`) is still the hand-made file: B's
+clients go out through `awg1` until awg0 on B is rebuilt for AmneziaWG 3.x.
+At that switch `entry_link` moves to `awg3` and `awg1` is removed; until then
+the role must not template `awg3`, because `link.conf.j2` also routes the
+clients into the link.
+
 ## Tests
 
 `tests/infrastructure/test_entry_verify.sh` runs the read-only checks against
-stubbed commands: a correct entry must give no findings, and each of 23
-single breakages must give exactly its own. `ansible-lint` passes at the
+stubbed commands: a correct entry must give no findings, and each of 28
+single breakages must give exactly its own. `test_exit_verify.sh` does the
+same for the exit (19 breakages), `test_sovrn_bt.sh` runs `sovrn-bt` against
+a fake iptables. `ansible-lint` passes at the
 `production` profile (`.ansible-lint` says which two rules are skipped and why).

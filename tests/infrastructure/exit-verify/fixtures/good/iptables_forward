@@ -1,0 +1,8 @@
+-P FORWARD DROP
+-N ufw-before-forward
+-N SOVRN_BT
+-A FORWARD -i awg0 -j SOVRN_BT
+-A FORWARD -i eth0 -o awg0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i awg0 -o eth0 -j ACCEPT
+-A FORWARD -j ufw-before-logging-forward
+-A FORWARD -j ufw-before-forward

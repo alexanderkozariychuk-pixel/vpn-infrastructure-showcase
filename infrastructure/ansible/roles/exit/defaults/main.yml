@@ -1,0 +1,38 @@
+---
+# exit_links (list) comes from the inventory, one item per entry that sends
+# its clients through this exit; exit_link_keys (dict, by interface) from the
+# vault. See inventory/hosts.yml.example and vault-exit.yml.example.
+exit_links: []
+
+# Interface the exit reaches the internet through; link traffic is
+# masqueraded out of it.
+exit_uplink_if: "{{ ansible_facts['default_ipv4']['interface'] }}"
+
+# Room for the S4 padding on data packets (AmneziaWG 2.0+).
+exit_link_mtu: 1380
+
+# Drop plain BitTorrent from the links (infrastructure/exit/sovrn-bt).
+exit_bt_block: true
+# Rules sovrn-bt builds; verify.yml checks the chain has exactly this many.
+exit_bt_rules: 8
+
+exit_conntrack_max: 262144
+
+# What awg reports for a parameter it does not print (the protocol default).
+exit_awg_obf_defaults:
+  jc: "0"
+  jmin: "0"
+  jmax: "0"
+  s1: "0"
+  s2: "0"
+  s3: "0"
+  s4: "0"
+  h1: "1"
+  h2: "2"
+  h3: "3"
+  h4: "4"
+
+# Order the obfuscation keys are written in, and the only keys accepted.
+exit_awg_obf_keys: [jc, jmin, jmax, s1, s2, s3, s4, h1, h2, h3, h4, i1, i2, i3, i4, i5]
+
+exit_key_re: '^[A-Za-z0-9+/]{43}=$'

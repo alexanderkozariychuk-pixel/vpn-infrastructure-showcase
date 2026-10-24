@@ -1,0 +1,23 @@
+interface: awg0
+  public key: QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=
+  private key: (hidden)
+  listening port: 40001
+  jc: 8
+  jmin: 60
+  jmax: 300
+  s1: 40
+  s2: 77
+  s3: 30
+  s4: 8
+  h1: 100000000-100100000
+  h2: 200000000-200200000
+  h3: 300000000-300300000
+  h4: 400000000-400400000
+  i1: <b 0xc30000000108><r 8><b 0x000044b0><r 1000><r 200>
+  random trailers: off
+  disable cookies: off
+
+peer: RERERERERERERERERERERERERERERERERERERERERERE=
+  endpoint: 203.0.113.20:40003
+  jc: 99
+  allowed ips: 10.77.77.10/32

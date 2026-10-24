@@ -1,0 +1,9 @@
+-N SOVRN_BT
+-A SOVRN_BT -m string --string "BitTorrent protocol" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "info_hash=" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "peer_id=" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "d1:ad2:id20:" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "find_node" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "get_peers" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -m string --string "announce_peer" --algo bm --to 65535 -j DROP
+-A SOVRN_BT -p udp -m string --hex-string "|0000041727101980|" --algo bm --to 65535 -j DROP

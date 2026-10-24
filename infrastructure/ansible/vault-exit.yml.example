@@ -1,0 +1,12 @@
+# The real file lives OUTSIDE the repository, encrypted, one per exit:
+#   ~/.sovereign/vault-exit2.yml
+# passed to a run against that exit with
+#   -e @~/.sovereign/vault-exit2.yml --ask-vault-pass
+# Filled from the node itself, never typed or pasted (README.md, "Exit").
+# Back it up in Bitwarden.
+
+# Per link interface on the exit (exit_links[].if in the inventory).
+exit_link_keys:
+  awg0:
+    private_key: "<44 chars>"
+    psk: "<44 chars>"

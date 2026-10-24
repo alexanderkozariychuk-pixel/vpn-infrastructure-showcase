@@ -1,0 +1,65 @@
+---
+- name: sovrn-bt installed
+  ansible.builtin.copy:
+    src: "{{ sovereign_repo }}/infrastructure/exit/sovrn-bt"
+    dest: /usr/local/sbin/sovrn-bt
+    owner: root
+    group: root
+    mode: "0755"
+  register: exit_bt_script
+
+- name: AmneziaWG config directory
+  ansible.builtin.file:
+    path: /etc/amnezia/amneziawg
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# diff: false — the file carries the link's private key and PSK.
+- name: Link configs
+  ansible.builtin.template:
+    src: link.conf.j2
+    dest: "/etc/amnezia/amneziawg/{{ item.if }}.conf"
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }} <- {{ item.name }}"
+  register: exit_link_conf
+  tags: [keyfiles]
+
+# Before the restart: the port has to be open when the link comes back.
+- name: Link ports open, each to its entry only
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item.from }}"
+    to_port: "{{ item.port | string }}"
+    proto: udp
+    comment: "{{ item.if }} link from {{ item.name }}"
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }} :{{ item.port }} from {{ item.name }}"
+
+- name: Links enabled and running
+  ansible.builtin.systemd_service:
+    name: "awg-quick@{{ item.if }}"
+    enabled: true
+    state: started
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }}"
+
+# Not a handler: only the links whose file changed are bounced, or every link
+# when sovrn-bt changed (its rules are built on PostUp). A link carries one
+# entry's clients; a restart drops them for a second.
+- name: Changed links restarted
+  ansible.builtin.systemd_service:
+    name: "awg-quick@{{ item.item.if }}"
+    state: restarted
+  loop: "{{ exit_link_conf.results }}"
+  loop_control:
+    label: "{{ item.item.if }}"
+  when: item is changed or exit_bt_script is changed

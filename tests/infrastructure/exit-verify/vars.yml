@@ -1,0 +1,24 @@
+---
+exit_uplink_if: eth0
+exit_bt_block: true
+exit_bt_rules: 8
+exit_conntrack_max: 262144
+exit_links:
+  - if: awg0
+    name: entry-B
+    subnet: 10.77.77.8/30
+    port: 40001
+    public_key: "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI="
+    obfuscation:
+      jc: "8"
+      jmin: "60"
+      jmax: "300"
+      s1: "40"
+      s2: "77"
+      s3: "30"
+      s4: "8"
+      h1: "100000000-100100000"
+      h2: "200000000-200200000"
+      h3: "300000000-300300000"
+      h4: "400000000-400400000"
+      i1: "<b 0xc30000000108><r 8><b 0x000044b0><r 1000><r 200>"

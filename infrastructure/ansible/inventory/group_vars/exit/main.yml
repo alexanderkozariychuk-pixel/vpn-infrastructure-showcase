@@ -1,0 +1,7 @@
+---
+# An exit forwards only what its link interfaces accept (their PostUp rules);
+# everything else arriving to be forwarded is dropped.
+common_ufw_forward_policy: DROP
+
+# exit-2 was set up with chrony; systemd-timesyncd would make apt remove it.
+common_time_service: chrony

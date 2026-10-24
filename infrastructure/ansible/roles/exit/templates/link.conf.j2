@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Exit end of the link from {{ item.name }}. One interface per entry: own keys,
+# own /30, own port. The entry masquerades its clients into {{ item.peer_address }},
+# so that address is the only one the peer may send from.
+[Interface]
+Address = {{ item.address }}
+ListenPort = {{ item.port }}
+MTU = {{ item.mtu | default(exit_link_mtu) }}
+PrivateKey = {{ exit_link_keys[item.if].private_key }}
+{% for k in exit_awg_obf_keys if k in (item.obfuscation | default({})) %}
+{{ k | capitalize }} = {{ item.obfuscation[k] }}
+{% endfor %}
+PostUp = iptables -C FORWARD -i %i -o {{ exit_uplink_if }} -j ACCEPT 2>/dev/null || iptables -I FORWARD -i %i -o {{ exit_uplink_if }} -j ACCEPT
+PostUp = iptables -C FORWARD -i {{ exit_uplink_if }} -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -I FORWARD -i {{ exit_uplink_if }} -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+PostUp = iptables -t nat -C POSTROUTING -s {{ item.subnet }} -o {{ exit_uplink_if }} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s {{ item.subnet }} -o {{ exit_uplink_if }} -j MASQUERADE
+{% if exit_bt_block %}
+# Plain BitTorrent dropped (infrastructure/exit/sovrn-bt). After the ACCEPTs:
+# its jump is inserted at the top, so it lands ahead of them.
+PostUp = /usr/local/sbin/sovrn-bt up %i
+{% endif %}
+PostDown = iptables -D FORWARD -i %i -o {{ exit_uplink_if }} -j ACCEPT
+PostDown = iptables -D FORWARD -i {{ exit_uplink_if }} -o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s {{ item.subnet }} -o {{ exit_uplink_if }} -j MASQUERADE
+PostDown = /usr/local/sbin/sovrn-bt down %i
+
+[Peer]
+PublicKey = {{ item.peer_public_key }}
+PresharedKey = {{ exit_link_keys[item.if].psk }}
+AllowedIPs = {{ item.peer_address }}/32

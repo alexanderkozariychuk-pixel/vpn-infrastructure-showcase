@@ -3,8 +3,14 @@
 # inventory; there are no safe defaults for them.
 common_admin_sudoers_file: "90-{{ admin_user }}"
 common_timezone: Etc/UTC
+# systemd-timesyncd or chrony. The two exclude each other in apt: installing
+# one removes the other. exit-2 was set up with chrony (group_vars/exit).
+common_time_service: systemd-timesyncd
 common_swap_mb: 2048
 common_ssh_port: 22
+# ufw's FORWARD policy. ACCEPT on an entry (roles/common/tasks/firewall.yml);
+# an exit sets DROP in group_vars/exit.
+common_ufw_forward_policy: ACCEPT
 common_f2b_maxretry: 6
 common_f2b_bantime: 600
 

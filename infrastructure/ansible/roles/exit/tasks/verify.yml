@@ -1,0 +1,159 @@
+---
+# Read-only checks of what the exit is actually running, in the manner of
+# roles/entry/tasks/verify.yml: every command only reads and runs with
+# check_mode: false; findings go into verify_problems.
+
+- name: Interfaces present
+  ansible.builtin.command: awg show interfaces
+  register: exit_v_ifs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Links that should be up are up
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [item.if ~ ': interface not up'] }}"
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }}"
+  when: item.if not in exit_v_ifs.stdout.split()
+
+- name: Interface sections (no peers)
+  ansible.builtin.shell: |
+    set -o pipefail
+    awg show {{ item.if }} | sed '/^peer: /,$d'
+  args:
+    executable: /bin/bash
+  register: exit_v_show
+  changed_when: false
+  check_mode: false
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }}"
+  when: item.if in exit_v_ifs.stdout.split()
+
+- name: Parse the running interfaces
+  vars:
+    # "  jc: 3" -> {"jc": "3"}; a header range printed as "N-N" is N.
+    _v_parsed: >-
+      {{ dict(item.stdout_lines | select('match', '^\s+\S')
+              | map('trim') | map('regex_replace', '^(.*?): (\d+)-\2$', '\1: \2')
+              | map('split', ': ', 1)) }}
+  ansible.builtin.set_fact:
+    exit_v_have: "{{ exit_v_have | default({}) | combine({item.item.if: _v_parsed}) }}"
+  loop: "{{ exit_v_show.results | selectattr('stdout_lines', 'defined') }}"
+  loop_control:
+    label: "{{ item.item.if }}"
+
+- name: Expected interface values
+  ansible.builtin.set_fact:
+    exit_v_want: >-
+      {{ exit_v_want | default([])
+         + ({'public key': item.public_key, 'listening port': item.port | string}
+            | combine(exit_awg_obf_defaults | combine(item.obfuscation | default({})))
+            | dict2items | map('combine', {'if': item.if}) | list) }}
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }}"
+
+- name: Running interfaces match
+  vars:
+    _v_have: "{{ exit_v_have[item.if][item.key] | default(exit_awg_obf_defaults[item.key] | default('absent')) | string }}"
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [item.if ~ ': ' ~ item.key ~ ' is ' ~ _v_have ~ ', want ' ~ item.value] }}"
+  loop: "{{ exit_v_want }}"
+  loop_control:
+    label: "{{ item.if }} {{ item.key }}"
+  when:
+    - item.if in (exit_v_have | default({}))
+    - _v_have != (item.value | string)
+
+- name: Link handshakes
+  ansible.builtin.shell: |
+    date +%s
+    awg show {{ item.if }} latest-handshakes
+  register: exit_v_hs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if }}"
+  when: item.if in exit_v_ifs.stdout.split()
+
+- name: Links are carrying traffic
+  vars:
+    # line 1: now; line 2: "<peer key>\t<last handshake, 0 = never>"
+    _v_now: "{{ item.stdout_lines[0] | default(0) | int }}"
+    _v_last: "{{ ((item.stdout_lines[1] | default('')).split() + ['', '0'])[1] | int }}"
+  ansible.builtin.set_fact:
+    verify_problems: "{{ verify_problems | default([]) + [item.item.if ~ ': no handshake in the last 180 s'] }}"
+  loop: "{{ exit_v_hs.results | selectattr('stdout_lines', 'defined') }}"
+  loop_control:
+    label: "{{ item.item.if }}"
+  when: (_v_now | int) - (_v_last | int) > 180
+
+- name: Firewall, sysctl, units
+  ansible.builtin.shell: |
+    set -o pipefail
+    echo "== forward";  iptables -S FORWARD
+    echo "== nat";      iptables -t nat -S POSTROUTING
+    echo "== bt";       iptables -S SOVRN_BT 2>/dev/null || true
+    echo "== sysctl"
+    for k in net.ipv4.ip_forward net.netfilter.nf_conntrack_max; do
+      echo "$k=$(sysctl -n "$k" 2>/dev/null)"
+    done
+    echo "== units"
+    for u in {% for l in exit_links %}awg-quick@{{ l.if }} {% endfor %}; do
+      echo "$u=$(systemctl is-active "$u") $(systemctl is-enabled "$u" 2>/dev/null)"
+    done
+  args:
+    executable: /bin/bash
+  register: exit_v_state
+  changed_when: false
+  check_mode: false
+
+- name: Compare firewall, sysctl and units
+  vars:
+    _v_sec: "{{ dict(exit_v_state.stdout.split('== ')[1:] | map('split', '\n', 1)) }}"
+    _v_fwd: "{{ (_v_sec['forward'] | default('')).splitlines() }}"
+    _v_nat: "{{ _v_sec['nat'] | default('') }}"
+    _v_sysctl: "{{ dict((_v_sec['sysctl'] | default('')).splitlines() | select('match', '^\\S+=') | map('split', '=', 1)) }}"
+    _v_bt_rules: "{{ (_v_sec['bt'] | default('')).splitlines() | select('match', '^-A SOVRN_BT .* -j DROP$') | list | length }}"
+    _v_link_checks: >-
+      {%- set out = [] -%}
+      {%- for l in exit_links -%}
+      {%- set acc = '-A FORWARD -i ' ~ l.if ~ ' -o ' ~ exit_uplink_if ~ ' -j ACCEPT' -%}
+      {%- set ret = '-A FORWARD -i ' ~ exit_uplink_if ~ ' -o ' ~ l.if ~ ' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT' -%}
+      {%- set bt = '-A FORWARD -i ' ~ l.if ~ ' -j SOVRN_BT' -%}
+      {%- set nat = '-A POSTROUTING -s ' ~ l.subnet ~ ' -o ' ~ exit_uplink_if ~ ' -j MASQUERADE' -%}
+      {%- if acc not in _v_fwd -%}
+      {%- set _ = out.append('FORWARD: ' ~ l.if ~ ' -> ' ~ exit_uplink_if ~ ' not accepted, the link has no internet') -%}
+      {%- endif -%}
+      {%- if ret not in _v_fwd -%}{%- set _ = out.append('FORWARD: replies ' ~ exit_uplink_if ~ ' -> ' ~ l.if ~ ' not accepted') -%}{%- endif -%}
+      {%- if nat not in _v_nat.splitlines() -%}{%- set _ = out.append('nat: no MASQUERADE of ' ~ l.subnet ~ ' out of ' ~ exit_uplink_if) -%}{%- endif -%}
+      {%- if exit_bt_block -%}
+      {%- if bt not in _v_fwd -%}{%- set _ = out.append('FORWARD: no SOVRN_BT jump for ' ~ l.if ~ ', BitTorrent passes') -%}
+      {%- elif acc in _v_fwd and _v_fwd.index(bt) > _v_fwd.index(acc) -%}
+      {%- set _ = out.append('FORWARD: SOVRN_BT jump for ' ~ l.if ~ ' after its ACCEPT, BitTorrent passes') -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+    _v_checks:
+      - ok: "{{ '-P FORWARD DROP' in _v_fwd }}"
+        msg: "FORWARD policy is not DROP"
+      - ok: "{{ not exit_bt_block or (_v_bt_rules | int) == exit_bt_rules }}"
+        msg: "SOVRN_BT: {{ _v_bt_rules }} DROP rules, want {{ exit_bt_rules }}"
+      - ok: "{{ _v_sysctl['net.ipv4.ip_forward'] | default('') == '1' }}"
+        msg: "ip_forward = {{ _v_sysctl['net.ipv4.ip_forward'] | default('?') }}"
+      - ok: "{{ (_v_sysctl['net.netfilter.nf_conntrack_max'] | default(0) | int) >= exit_conntrack_max }}"
+        msg: "nf_conntrack_max = {{ _v_sysctl['net.netfilter.nf_conntrack_max'] | default('?') }}, want >= {{ exit_conntrack_max }}"
+  ansible.builtin.set_fact:
+    verify_problems: >-
+      {{ verify_problems | default([])
+         + (_v_checks | rejectattr('ok') | map(attribute='msg') | list)
+         + _v_link_checks
+         + ((_v_sec['units'] | default('')).splitlines() | select('match', '^\S+=')
+            | reject('match', '^\S+=active enabled$')
+            | map('regex_replace', '^(\S+)=(.*)$', 'unit \1: \2') | list) }}

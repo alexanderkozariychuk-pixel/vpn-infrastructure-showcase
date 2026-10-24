@@ -11,7 +11,8 @@
     quiet: true
 
 - name: AmneziaWG
-  ansible.builtin.import_tasks: amneziawg.yml
+  ansible.builtin.import_role:
+    name: amneziawg
 
 - name: Kernel settings
   ansible.builtin.import_tasks: sysctl.yml

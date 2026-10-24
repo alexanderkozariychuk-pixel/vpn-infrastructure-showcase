@@ -50,6 +50,42 @@ all:
           #     h3: "<random>"
           #     h4: "<random>"
 
+    exit:
+      # The exit of cluster 1 (the one entry A uses) is deliberately not
+      # here: it carries paying clients and is changed by hand.
+      hosts:
+        exit-2:
+          ansible_host: sov-exit2
+          ansible_user: sovadmin
+          admin_user: sovadmin
+          # One item per entry whose clients leave through this exit. Each
+          # has its own interface, /30, port and keys; the private key and
+          # PSK go into the vault as exit_link_keys.<if>.private_key / .psk.
+          # The obfuscation is the same on both ends of a link.
+          exit_links:
+            - if: awg0
+              name: entry-B                  # in the ufw comment
+              address: 10.77.77.9/30         # this end
+              subnet: 10.77.77.8/30          # masqueraded out of the uplink
+              peer_address: 10.77.77.10      # the entry's end
+              from: "<entry address>"        # ufw: the port is open to it only
+              port: "<link port>"            # the entry's Endpoint points here
+              public_key: "<this end's public key>"   # checked against awg0
+              peer_public_key: "<the entry's link public key>"
+              obfuscation:                   # AmneziaWG 2.0+ (S3/S4, H ranges, I1)
+                jc: "8"
+                jmin: "50"
+                jmax: "300"
+                s1: "<15-150>"
+                s2: "<15-150, not s1+56>"
+                s3: "<15-64>"
+                s4: "<1-16>"
+                h1: "<a-b>"                  # four ranges, not overlapping
+                h2: "<a-b>"
+                h3: "<a-b>"
+                h4: "<a-b>"
+                i1: "<b 0xc30000000108><r 8><b 0x000044b0><r 1000><r 200>"
+
     # Hosts that carry paying clients. playbooks/entry.yml refuses to run
     # against these except with --check. A second fence: no live host
     # belongs in this inventory in the first place.

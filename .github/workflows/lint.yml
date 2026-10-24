@@ -41,7 +41,13 @@ jobs:
       # to fire on a fixture broken in exactly that place.
       - name: Verify-task tests
         working-directory: .
-        run: bash tests/infrastructure/test_entry_verify.sh
+        run: |
+          bash tests/infrastructure/test_entry_verify.sh
+          bash tests/infrastructure/test_exit_verify.sh
+
+      - name: sovrn-bt test
+        working-directory: .
+        run: bash tests/infrastructure/test_sovrn_bt.sh
 
   shell:
     name: Shellcheck

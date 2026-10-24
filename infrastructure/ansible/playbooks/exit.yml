@@ -1,0 +1,51 @@
+---
+# Build or check an exit node.
+#
+# From infrastructure/ansible/:
+#
+#   ansible-playbook playbooks/exit.yml --limit exit-2 -e @~/.sovereign/vault-exit2.yml --ask-vault-pass
+#
+# The exit of cluster 1 (the one entry A uses) is not in the inventory: it is
+# changed by hand, as entry A is (README.md).
+#
+# The last task lists everything the read-only checks found. In check mode
+# that list is the answer; in a real run it is fatal.
+
+- name: Exit node
+  hosts: exit
+  become: true
+  # See playbooks/entry.yml: handlers notified before a failure still run.
+  force_handlers: true
+
+  pre_tasks:
+    - name: Hosts in `live` are never changed
+      ansible.builtin.assert:
+        that: ansible_check_mode or inventory_hostname not in groups.get('live', [])
+        fail_msg: "{{ inventory_hostname }} is in the live group: run with --check"
+        quiet: true
+
+  roles:
+    - common
+    - exit
+
+  post_tasks:
+    - name: Check the base system
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: verify
+
+    - name: Check the exit
+      ansible.builtin.include_role:
+        name: exit
+        tasks_from: verify
+
+    - name: Findings
+      ansible.builtin.debug:
+        msg: "{{ verify_problems | default([]) if verify_problems | default([]) else 'none' }}"
+
+    - name: Stop on findings (outside check mode)
+      ansible.builtin.fail:
+        msg: "{{ verify_problems | length }} finding(s) above"
+      when:
+        - verify_problems | default([]) | length > 0
+        - not ansible_check_mode

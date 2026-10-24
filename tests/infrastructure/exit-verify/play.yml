@@ -1,0 +1,23 @@
+---
+# Runs roles/exit/tasks/verify.yml on localhost with every command it calls
+# replaced by a stub (stubs/) answering from a fixture directory. Driven by
+# ../test_exit_verify.sh; not meant to be run by hand.
+- name: Exit verify tasks against a fixture
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  environment:
+    PATH: "{{ stub_dir }}:/usr/bin:/bin"
+    FIXTURE: "{{ fixture }}"
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Exit checks
+      ansible.builtin.include_role:
+        name: exit
+        tasks_from: verify
+    - name: Write findings, one per line
+      ansible.builtin.copy:
+        dest: "{{ out }}"
+        content: "{{ (verify_problems | default([]) | sort | join('\n')) ~ '\n' }}"
+        mode: "0644"

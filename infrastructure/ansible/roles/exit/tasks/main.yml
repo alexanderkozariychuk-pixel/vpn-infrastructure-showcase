@@ -1,0 +1,47 @@
+---
+- name: Inventory and vault provide every link
+  ansible.builtin.assert:
+    that:
+      - exit_links | length > 0
+      - exit_links | map(attribute='if') | unique | length == exit_links | length
+      - exit_links | map(attribute='port') | unique | length == exit_links | length
+    fail_msg: "exit_links is empty, or two links share an interface or a port"
+    quiet: true
+
+- name: Each link is filled in
+  ansible.builtin.assert:
+    that:
+      - item.if is match('^awg[0-9]+$')
+      - item.name is defined and item.name is match('^[A-Za-z0-9-]+$')
+      - item.address is match('^[0-9.]+/30$')
+      - item.subnet is match('^[0-9.]+/30$')
+      - item.peer_address is match(common_addr_re)
+      - item.from is match(common_addr_re)
+      - item.port | int > 1024
+      - item.peer_public_key is match(exit_key_re)
+      - item.public_key is match(exit_key_re)
+      - item.obfuscation | default({}) | dict2items | map(attribute='key') | difference(exit_awg_obf_keys) | length == 0
+      # Numbers or a-b ranges for J/S/H; I1-I5 are tag strings, checked by awg.
+      - item.obfuscation | default({}) | dict2items | rejectattr('key', 'match', '^i')
+        | map(attribute='value') | map('string') | reject('match', '^[0-9]+(-[0-9]+)?$') | list | length == 0
+      - exit_link_keys[item.if].private_key | default('') is match(exit_key_re)
+      - exit_link_keys[item.if].psk | default('') is match(exit_key_re)
+    fail_msg: >-
+      link {{ item.if | default('?') }}: a field is missing or still an example
+      value (if, name, address, subnet, peer_address, from, port,
+      peer_public_key, public_key, obfuscation keys), or the vault has no
+      exit_link_keys.{{ item.if | default('?') }}.private_key / psk
+    quiet: true
+  loop: "{{ exit_links }}"
+  loop_control:
+    label: "{{ item.if | default('?') }}"
+
+- name: AmneziaWG
+  ansible.builtin.import_role:
+    name: amneziawg
+
+- name: Kernel settings
+  ansible.builtin.import_tasks: sysctl.yml
+
+- name: Links from the entries
+  ansible.builtin.import_tasks: links.yml

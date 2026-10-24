@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# sovrn-bt — drop plain BitTorrent on an exit, for traffic arriving from a link.
+#
+#   sovrn-bt up <if>     chain SOVRN_BT (re)built, jump for -i <if> first in FORWARD
+#   sovrn-bt down <if>   jump for <if> removed; the chain goes with the last jump
+#   sovrn-bt down        every jump and the chain removed
+#   sovrn-bt check       prints the chain's rule count and the jumps (read-only)
+#
+# Called from the link's PostUp/PostDown (roles/exit, templates/link.conf.j2),
+# so it comes and goes with the interface. Installed to /usr/local/sbin.
+#
+# What it catches: the BitTorrent handshake, HTTP tracker announces, DHT
+# queries and the UDP tracker protocol, all in clear text. Without trackers
+# and DHT a client finds no peers, and those are where copyright complaints
+# come from. What it does not catch: encrypted BitTorrent (MSE/PE) after the
+# peers are known. HTTPS is encrypted, so the strings below do not appear in
+# it by accident.
+
+set -eu
+CH=SOVRN_BT
+
+jumps() { iptables -S FORWARD | grep -c -- "-j $CH\$" || true; }
+
+build() {
+    iptables -N "$CH" 2>/dev/null || iptables -F "$CH"
+    for s in "BitTorrent protocol" "info_hash=" "peer_id=" "d1:ad2:id20:" \
+             "find_node" "get_peers" "announce_peer"; do
+        iptables -A "$CH" -m string --algo bm --string "$s" -j DROP
+    done
+    # UDP tracker "connect": the protocol id 0x41727101980 at the start.
+    iptables -A "$CH" -p udp -m string --algo bm --hex-string '|00 00 04 17 27 10 19 80|' -j DROP
+}
+
+drop_chain() {
+    iptables -F "$CH" 2>/dev/null || true
+    iptables -X "$CH" 2>/dev/null || true
+}
+
+case "${1:-}" in
+up)
+    [ -n "${2:-}" ] || { echo "usage: $0 up <interface>" >&2; exit 2; }
+    build
+    iptables -C FORWARD -i "$2" -j "$CH" 2>/dev/null || iptables -I FORWARD 1 -i "$2" -j "$CH"
+    ;;
+down)
+    if [ -n "${2:-}" ]; then
+        while iptables -D FORWARD -i "$2" -j "$CH" 2>/dev/null; do :; done
+    else
+        iptables -S FORWARD | grep -- "-j $CH\$" | sed 's/^-A /-D /' | while read -r rule; do
+            # shellcheck disable=SC2086 # the rule is split into iptables arguments on purpose
+            iptables $rule
+        done
+    fi
+    [ "$(jumps)" -gt 0 ] || drop_chain
+    ;;
+check)
+    echo "rules=$(iptables -S "$CH" 2>/dev/null | grep -c -- '-j DROP$' || true)"
+    iptables -S FORWARD | grep -- "-j $CH\$" || true
+    ;;
+*)
+    echo "usage: $0 up <interface> | down [<interface>] | check" >&2
+    exit 2
+    ;;
+esac

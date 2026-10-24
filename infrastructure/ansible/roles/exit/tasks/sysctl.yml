@@ -1,0 +1,26 @@
+---
+- name: nf_conntrack loaded at boot (its sysctl does not exist before)
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/sovereign.conf
+    content: "nf_conntrack\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: nf_conntrack loaded now
+  community.general.modprobe:
+    name: nf_conntrack
+    state: present
+
+# The name the exit was first set up with by hand (2026-10-24).
+- name: Forwarding, conntrack size
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-sovrn-forward.conf
+    content: |
+      # Installed by Ansible (roles/exit).
+      net.ipv4.ip_forward = 1
+      net.netfilter.nf_conntrack_max = {{ exit_conntrack_max }}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl

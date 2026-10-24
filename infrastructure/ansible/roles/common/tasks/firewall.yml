@@ -1,11 +1,12 @@
 ---
-# ufw owns INPUT. FORWARD stays ACCEPT by default: what an entry forwards is
+# ufw owns INPUT. On an entry FORWARD stays ACCEPT: what it forwards is
 # decided by its own rules (awg0 PostUp, SOVRN-TRIAL) and by policy routing.
-- name: Forward policy ACCEPT
+# An exit forwards only what its link interfaces accept (group_vars/exit).
+- name: Forward policy
   ansible.builtin.lineinfile:
     path: /etc/default/ufw
     regexp: '^DEFAULT_FORWARD_POLICY='
-    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+    line: 'DEFAULT_FORWARD_POLICY="{{ common_ufw_forward_policy }}"'
   notify: Reload ufw
 
 # SSH is allowed before ufw is enabled, never after: the other order cuts the
