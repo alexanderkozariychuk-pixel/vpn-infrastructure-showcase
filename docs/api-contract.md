@@ -54,6 +54,15 @@ subscription.
 **The `.conf` is plain text, not JSON.** `Content-Type: text/plain`. It is
 handed to the tunnel as-is.
 
+**The app stays signed in with a refresh token (since 2026-10-19).** Sign-in
+with `"refresh": true` in the body also returns `refresh_token`. When the
+day-long access token answers 401, the app posts it to `/api/auth/refresh`
+(`{"refresh_token": "..."}`, no `Authorization`) and gets a new
+`access_token`; the refresh token stays the same and stays valid while it is
+used at least every 90 days. 401 from `/api/auth/refresh` means it is gone —
+a password reset, a disabled account, 90 days unused — and the app signs in.
+`/api/auth/logout` with the same body ends it; the site never asks for one.
+
 
 ## Вход
 

@@ -651,7 +651,7 @@ Q='sudo docker exec -i sovereign-postgres psql -U sre_user -d vpn_sre -At -F"|"'
 echo "SELECT c.public_key, c.peer_ip, c.is_active, c.kind, u.username, c.name FROM configs c JOIN users u ON u.id = c.user_id;" \
   | ssh sov-app "$Q" > /tmp/sov-db.txt
 echo "SELECT public_key, label FROM peer_labels;" | ssh sov-app "$Q" > /tmp/sov-labels.txt
-python3 tools/peer_reconcile.py /tmp/sov-node.txt /tmp/sov-db.txt /tmp/sov-labels.txt
+python3 tools/peer_reconcile.py /tmp/sov-node.txt /tmp/sov-db.txt /tmp/sov-labels.txt /tmp/sov-candidates.txt
 ```
 
 | Section | Means | Usually |
@@ -663,6 +663,32 @@ python3 tools/peer_reconcile.py /tmp/sov-node.txt /tmp/sov-db.txt /tmp/sov-label
 
 The pool lines at the end are the capacity check: the paid pool is .42–.199,
 158 addresses, not the whole /24.
+
+### Removing peers
+
+`tools/peer-remove.sh` takes a list of `<address> <first 8 characters of the
+key> [note]` — the form `peer_reconcile.py` prints, and the candidates file it
+writes with every line commented out. Uncomment the peers to remove, then:
+
+```bash
+scp tools/peer-remove.sh /tmp/sov-candidates.txt sov-entry:/tmp/
+ssh -t sov-entry 'sudo bash /tmp/peer-remove.sh /tmp/sov-candidates.txt'           # dry run
+ssh -t sov-entry 'sudo bash /tmp/peer-remove.sh /tmp/sov-candidates.txt --apply'
+ssh sov-entry 'sudo bash -s' < tools/awg-conf-check.sh                            # OK: file == running
+```
+
+It checks the whole list against the running interface before changing
+anything and stops on any mismatch. A peer with a handshake in the last three
+minutes is refused unless `--allow-live` is given. `--apply` snapshots
+`awg0.conf` and the running peers into `/root/peer-audit-<time>/` (mode 700),
+removes through `pwa-del-peer` one by one, and stops at the first refusal; when
+all went through, it shreds the config copies the wrapper made during the run.
+One peer comes back with `--restore <address>`, from the newest snapshot. The
+snapshot holds every client's preshared key: delete it when nothing will be
+restored from it.
+
+Afterwards, run the reconcile again: labels whose peer is gone are listed
+with the `DELETE` that removes them, to run on the portal's database.
 
 ---
 

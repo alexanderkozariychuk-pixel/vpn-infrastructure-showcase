@@ -3,30 +3,36 @@ package com.sov3r3ign.app.session
 import com.sov3r3ign.app.api.ApiClient
 import com.sov3r3ign.app.api.ApiError
 import com.sov3r3ign.app.api.ApiResult
+import com.sov3r3ign.app.api.AppRelease
 import com.sov3r3ign.app.api.Device
 import com.sov3r3ign.app.api.DeviceList
 import com.sov3r3ign.app.api.Profile
+import com.sov3r3ign.app.api.TrialOffer
 import com.sov3r3ign.app.storage.Secrets
 
 /**
  * Who is signed in, and the token that proves it.
  *
- * The password is used once and never stored. The token is: it lasts 24
- * hours and there is no refresh, so a 401 on a stored token means it expired,
- * and the session forgets it — the app then shows sign-in instead of failing
- * on every call.
+ * The password is used once and never stored. Two tokens are: the access
+ * token, which lasts a day, and the refresh token, which the portal keeps
+ * valid while it is used at least every 90 days (services/app_sessions.py).
+ * A 401 on the access token trades the refresh token for a new one, quietly,
+ * and the call is made again; only when the portal refuses the refresh token
+ * too — a password reset, a disabled account, three months unused — does the
+ * session forget both, and the app shows sign-in.
  *
  * Blocking: network and disk. Call it off the main thread.
  */
 class Session(private val api: ApiClient, private val secrets: Secrets) {
 
     val isSignedIn: Boolean
-        get() = secrets.get(TOKEN) != null
+        get() = secrets.get(TOKEN) != null || secrets.get(REFRESH) != null
 
     fun signIn(username: String, password: String): ApiResult<Unit> =
         when (val r = api.login(username.trim(), password)) {
             is ApiResult.Ok -> {
                 secrets.put(TOKEN, r.value.accessToken)
+                r.value.refreshToken?.let { secrets.put(REFRESH, it) } ?: secrets.remove(REFRESH)
                 ApiResult.Ok(Unit)
             }
             is ApiResult.Failed -> r
@@ -85,6 +91,18 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
 
     fun addDevice(name: String): ApiResult<Device> = authorized { api.addDevice(it, name) }
 
+    /** Starts the account's trial; the server answers with the trial's device. */
+    fun startTrial(): ApiResult<Device> = authorized { api.startTrial(it) }
+
+    /** Sends the confirmation letter again. True: the address was confirmed already. */
+    fun resendVerification(): ApiResult<Boolean> = authorized { api.resendVerification(it) }
+
+    /** Whether the site offers a trial now, and for how many days. No token needed. */
+    fun trialOffer(): ApiResult<TrialOffer> = api.trialOffer()
+
+    /** The APK the site offers for download. No token needed. */
+    fun latestRelease(): ApiResult<AppRelease> = api.latestRelease()
+
     /**
      * Renames a device on the account. When it is the one this phone uses,
      * the stored name follows; the stored config does not change, since the
@@ -135,22 +153,57 @@ class Session(private val api: ApiClient, private val secrets: Secrets) {
     /** The stored .conf of the selected device; what the tunnel starts from. */
     fun storedConfig(): String? = if (selected() != null) secrets.get(CONF) else null
 
-    /** Everything stored goes, including the key that could read it. */
-    fun signOut() = secrets.clear()
+    /**
+     * Everything stored goes, including the key that could read it. The
+     * portal is told first, so the refresh token stops working there too;
+     * if it cannot be reached, the phone forgets the token all the same.
+     */
+    fun signOut() {
+        secrets.get(REFRESH)?.let { api.logout(it) }
+        secrets.clear()
+    }
 
     private fun <T> authorized(call: (String) -> ApiResult<T>): ApiResult<T> {
-        val token = secrets.get(TOKEN) ?: return ApiResult.Failed(ApiError.Unauthorized)
-        val result = call(token)
-        if (result is ApiResult.Failed && result.error == ApiError.Unauthorized) {
+        val token = secrets.get(TOKEN)
+        if (token != null) {
+            val result = call(token)
+            if (result !is ApiResult.Failed || result.error != ApiError.Unauthorized) return result
             secrets.remove(TOKEN)
         }
-        return result
+        return when (val renewed = renew()) {
+            is ApiResult.Ok -> call(renewed.value).also { r ->
+                // A token the portal just issued, refused: nothing more to try.
+                if (r is ApiResult.Failed && r.error == ApiError.Unauthorized) secrets.remove(TOKEN)
+            }
+            is ApiResult.Failed -> renewed
+        }
+    }
+
+    /**
+     * A new access token from the refresh token. Refused (401): both are
+     * forgotten and the app signs in. Not reached (network, 5xx, 429): the
+     * refresh token stays for the next try, and the caller sees that failure,
+     * not a sign-out.
+     */
+    private fun renew(): ApiResult<String> {
+        val refresh = secrets.get(REFRESH) ?: return ApiResult.Failed(ApiError.Unauthorized)
+        return when (val r = api.refresh(refresh)) {
+            is ApiResult.Ok -> {
+                secrets.put(TOKEN, r.value.accessToken)
+                ApiResult.Ok(r.value.accessToken)
+            }
+            is ApiResult.Failed -> {
+                if (r.error == ApiError.Unauthorized) secrets.remove(REFRESH)
+                r
+            }
+        }
     }
 
     data class Selected(val id: String, val name: String)
 
     companion object {
         const val TOKEN = "token"
+        const val REFRESH = "refresh"
         const val CONF = "conf"
         const val DEVICE_ID = "device_id"
         const val DEVICE_NAME = "device_name"

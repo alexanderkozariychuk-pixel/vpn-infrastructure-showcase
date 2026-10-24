@@ -1296,12 +1296,28 @@
     }
     .dev-ok { border-color: var(--accent); color: var(--accent); }
     .dev-ok:disabled, .dev-cancel:disabled, .dev-input:disabled { opacity: .6; cursor: progress; }
+    .dev-del {
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-dim); padding: 7px 10px; cursor: pointer; font-family: var(--font-body); font-size: 13px;
+    }
+    .dev-del:hover { border-color: var(--red); color: var(--red); }
+    .dev-confirm { font-size: 13px; color: var(--text); max-width: 260px; line-height: 1.4; }
+    .dev-del-yes {
+      background: transparent; border: 1px solid var(--red); border-radius: 6px;
+      color: var(--red); padding: 7px 10px; cursor: pointer; font-family: var(--font-body); font-size: 13px;
+      white-space: nowrap;
+    }
+    .dev-del:disabled, .dev-del-yes:disabled { opacity: .6; cursor: progress; }
     .dev-msg { margin-top: 10px; font-size: 13px; color: var(--text-dim); min-height: 0; }
     .dev-msg:empty { display: none; }
     .dev-msg.bad { color: var(--red); }
 
     /* ── CONNECT ── */
-    .plat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .plat-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+    .plat-tile.phone { grid-column: span 3; }
+    .plat-tile.desk { grid-column: span 2; padding: 18px 8px 14px; }
+    .plat-tile.desk .plat-icon { width: 42px; height: 42px; }
+    .plat-tile.desk .plat-name { font-size: 14px; }
     .plat-tile {
       position: relative; overflow: hidden;
       display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -1358,6 +1374,19 @@
       font-size: 12px; font-weight: 700; font-family: var(--font-mono);
     }
     .conn-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+    .conn-pulse.ready { background: var(--green); animation: none; }
+    .apk-box { margin-top: 16px; }
+    a.apk-btn { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+    a.apk-btn[hidden] { display: none; }
+    .apk-meta { margin-top: 8px; font-size: 13px; color: var(--text-dim); text-align: center; }
+    .apk-sum { margin-top: 6px; font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
+    .apk-sum[hidden] { display: none; }
+    .apk-sum code { font-family: var(--font-mono); word-break: break-all; color: var(--text); }
+    a.btn-sm { display: inline-block; text-decoration: none; }
+    .conn-alt { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .conn-alt summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-bright); }
+    .conn-alt summary:hover { color: var(--accent); }
+    .conn-alt[open] summary { margin-bottom: 8px; }
     @keyframes conn-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     @keyframes conn-pulse {
       0%   { box-shadow: 0 0 0 0 rgba(255, 208, 77, .55); }
@@ -1718,48 +1747,69 @@
         </div>
         <div class="card">
           <div class="plat-grid" role="tablist">
-            <button class="plat-tile" role="tab" aria-selected="false" data-plat="android" onclick="choosePlatform('android')">
+            <button class="plat-tile phone" role="tab" aria-selected="false" data-plat="android" onclick="choosePlatform('android')">
               <span class="plat-glow" aria-hidden="true"></span>
-              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
-                  <rect x="12" y="4" width="24" height="40" rx="4" fill="none" stroke="currentColor" stroke-width="2.2"/>
-                  <line x1="12" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.6"/>
-                  <line x1="12" y1="37" x2="36" y2="37" stroke="currentColor" stroke-width="1.6"/>
-                  <circle cx="18" cy="40.5" r="1.1" fill="currentColor"/><circle cx="24" cy="40.5" r="1.1" fill="currentColor"/><circle cx="30" cy="40.5" r="1.1" fill="currentColor"/>
-                </svg>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="4" width="24" height="40" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="24" cy="8.6" r="1.4" fill="currentColor"/><path d="M18.6 38.3 L16.2 39.9 L18.6 41.5 Z" fill="currentColor"/><circle cx="24" cy="39.9" r="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="29.2" y="38.5" width="2.8" height="2.8" rx=".4" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
               <span class="plat-name">Android</span>
-              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
             </button>
-            <button class="plat-tile" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
+            <button class="plat-tile phone" role="tab" aria-selected="false" data-plat="ios" onclick="choosePlatform('ios')">
               <span class="plat-glow" aria-hidden="true"></span>
-              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true">
-                  <rect x="12" y="4" width="24" height="40" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
-                  <rect x="20" y="7.5" width="8" height="2.6" rx="1.3" fill="currentColor"/>
-                  <line x1="20" y1="40.5" x2="28" y2="40.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                </svg>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="4" width="24" height="40" rx="7" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="19.3" y="7.4" width="9.4" height="3" rx="1.5" fill="currentColor"/><line x1="19.5" y1="40.2" x2="28.5" y2="40.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               <span class="plat-name">iOS</span>
-              <span class="plat-tag" data-i18n="conn-tag-dev">App in development</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="windows" onclick="choosePlatform('windows')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><line x1="5" y1="28" x2="43" y2="28" stroke="currentColor" stroke-width="1.4"/><rect x="20" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="23.4" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="26.8" y="29.6" width="2.2" height="2.2" rx=".5" fill="currentColor"/><rect x="10" y="12.5" width="15" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="10" y1="15" x2="25" y2="15" stroke="currentColor" stroke-width="1.1"/><line x1="19" y1="33" x2="17" y2="40" stroke="currentColor" stroke-width="2"/><line x1="29" y1="33" x2="31" y2="40" stroke="currentColor" stroke-width="2"/><line x1="14" y1="40" x2="34" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              <span class="plat-name">Windows</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="macos" onclick="choosePlatform('macos')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="9" width="30" height="21" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><line x1="9" y1="12.6" x2="39" y2="12.6" stroke="currentColor" stroke-width="1.2"/><rect x="17" y="24.3" width="14" height="3.4" rx="1.7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 34 L43.5 34 L41 37.5 Q40.5 38 39.5 38 L8.5 38 Q7.5 38 7 37.5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="21" y1="34" x2="27" y2="34" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+              <span class="plat-name">macOS</span>
+            </button>
+            <button class="plat-tile desk" role="tab" aria-selected="false" data-plat="linux" onclick="choosePlatform('linux')">
+              <span class="plat-glow" aria-hidden="true"></span>
+              <svg class="plat-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="5" y="8" width="38" height="25" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 15 L16 19 L11 23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="19" y1="23.5" x2="26" y2="23.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" stroke-width="2"/><line x1="16" y1="40" x2="32" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              <span class="plat-name">Linux</span>
             </button>
           </div>
           <div class="conn-empty" id="conn-empty" data-i18n="conn-pick">Pick your device to see how to connect it.</div>
             <div class="conn-panel" id="conn-panel-android" hidden>
               <div class="conn-status">
-                <span class="conn-pulse" aria-hidden="true"></span>
+                <span class="conn-pulse ready" aria-hidden="true"></span>
                 <div>
                   <div class="conn-status-title" data-i18n="conn-android-app"></div>
-                  <div class="conn-status-sub" data-i18n="conn-via-awg"></div>
+                  <div class="conn-status-sub" data-i18n="conn-android-sub"></div>
                 </div>
               </div>
-              <ol class="conn-steps">
-                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-android-1"></span></li>
-                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-android-2"></span></li>
-                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-android-3"></span></li>
-                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-android-4"></span></li>
-                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-android-5"></span></li>
-              </ol>
-              <div class="conn-note" data-i18n="dev-one-file"></div>
-              <div class="actions">
-                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              <div class="apk-box" id="apk-box">
+                <a class="btn-full apk-btn" id="apk-btn" href="/download/android" hidden data-i18n="apk-download">Download the app</a>
+                <div class="apk-meta" id="apk-meta"></div>
+                <div class="apk-sum" id="apk-sum" hidden><span data-i18n="apk-sha">SHA-256 of the file:</span> <code id="apk-sha"></code></div>
               </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-apk-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-apk-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-apk-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-apk-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-apk-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="conn-apk-update"></div>
+              <details class="conn-alt">
+                <summary data-i18n="conn-alt-awg">Another way: AmneziaWG</summary>
+                <div class="conn-status-sub" data-i18n="conn-alt-awg-sub"></div>
+                <ol class="conn-steps">
+                  <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-android-1"></span></li>
+                  <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-android-2"></span></li>
+                  <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-android-3"></span></li>
+                  <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-android-4"></span></li>
+                  <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-android-5"></span></li>
+                </ol>
+                <div class="conn-note" data-i18n="dev-one-file"></div>
+                <div class="actions">
+                  <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+                </div>
+              </details>
             </div>
             <div class="conn-panel" id="conn-panel-ios" hidden>
               <div class="conn-status">
@@ -1779,6 +1829,67 @@
               <div class="conn-note" data-i18n="conn-ios-note"></div>
               <div class="conn-note" data-i18n="dev-one-file"></div>
               <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-windows" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-windows-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-desk-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-windows-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-windows-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-windows-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-windows-4"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <a class="btn-sm" href="https://github.com/amnezia-vpn/amneziawg-windows-client/releases" target="_blank" rel="noopener" data-i18n="conn-dl-awg"></a>
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-macos" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-macos-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-desk-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-macos-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-macos-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-macos-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-macos-4"></span></li>
+                <li class="conn-step" style="--i:5"><span class="conn-step-n">5</span><span data-i18n="conn-macos-5"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
+              </div>
+            </div>
+            <div class="conn-panel" id="conn-panel-linux" hidden>
+              <div class="conn-status">
+                <span class="conn-pulse" aria-hidden="true"></span>
+                <div>
+                  <div class="conn-status-title" data-i18n="conn-linux-title"></div>
+                  <div class="conn-status-sub" data-i18n="conn-linux-sub"></div>
+                </div>
+              </div>
+              <ol class="conn-steps">
+                <li class="conn-step" style="--i:1"><span class="conn-step-n">1</span><span data-i18n="conn-linux-1"></span></li>
+                <li class="conn-step" style="--i:2"><span class="conn-step-n">2</span><span data-i18n="conn-linux-2"></span></li>
+                <li class="conn-step" style="--i:3"><span class="conn-step-n">3</span><span data-i18n="conn-linux-3"></span></li>
+                <li class="conn-step" style="--i:4"><span class="conn-step-n">4</span><span data-i18n="conn-linux-4"></span></li>
+              </ol>
+              <div class="conn-note" data-i18n="conn-linux-note"></div>
+              <div class="conn-note" data-i18n="dev-one-file"></div>
+              <div class="actions">
+                <a class="btn-sm" href="https://docs.amnezia.org/" target="_blank" rel="noopener" data-i18n="conn-awg-docs"></a>
                 <button class="btn-sm" onclick="showPage('client','config')" data-i18n="conn-to-config">Open My Config →</button>
               </div>
             </div>
@@ -2286,11 +2397,44 @@ const translations = {
     'nav-connect': 'Connect',
     'page-connect': 'Connect',
     'page-connect-sub': 'Choose your device',
-    'conn-tag-dev': 'App in development',
     'conn-pick': 'Pick your device to see how to connect it.',
-    'conn-android-app': 'The Sovereign app for Android is in development',
-    'conn-ios-app': 'The Sovereign app for iOS is in development',
-    'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of taps.',
+    'conn-dl-awg': 'Download AmneziaWG ↗',
+    'conn-awg-docs': 'AmneziaWG documentation ↗',
+    'conn-desk-sub': 'For now, you connect through AmneziaWG — a free app that opens your connection file. No sign-in there: the file is enough.',
+    'conn-windows-title': 'The Sovereign app for Windows is in development',
+    'conn-windows-1': 'Download the AmneziaWG installer (.msi for your system, usually x64) with the button below and install it',
+    'conn-windows-2': 'In My Config, pick a device and download its .conf file',
+    'conn-windows-3': 'In AmneziaWG click Add Tunnel → Import tunnel(s) from file and choose the file',
+    'conn-windows-4': 'Click Activate — done',
+    'conn-macos-title': 'The Sovereign app for macOS is in development',
+    'conn-macos-1': 'Install AmneziaWG from the Mac App Store',
+    'conn-macos-2': 'In My Config, pick a device and download its .conf file',
+    'conn-macos-3': 'In AmneziaWG click Import tunnel(s) from file and choose the file',
+    'conn-macos-4': 'If macOS asks to add VPN configurations, click Allow',
+    'conn-macos-5': 'Select the tunnel and click Activate — done',
+    'conn-linux-title': 'The Sovereign app for Linux is in development',
+    'conn-linux-sub': 'For now, you connect through AmneziaWG: its kernel module and the awg-quick tool — your connection file and two commands.',
+    'conn-linux-1': 'Install the AmneziaWG kernel module and amneziawg-tools — the documentation has steps for your distribution',
+    'conn-linux-2': 'In My Config, download the .conf file and save it under a short name, e.g. sovrn.conf',
+    'conn-linux-3': 'Put it in place, readable by root only: sudo install -m 600 sovrn.conf /etc/amnezia/amneziawg/',
+    'conn-linux-4': 'Connect: sudo awg-quick up sovrn — disconnect: sudo awg-quick down sovrn',
+    'conn-linux-note': 'The file holds your device key: do not leave copies of it in shared folders.',
+    'conn-android-app': 'The Sovereign app for Android',
+    'conn-android-sub': 'Sign in with the same username and password as here. Profiles and the connection are right in the app.',
+    'apk-download': 'Download the app',
+    'apk-meta': 'Version {v} · {size} MB · Android 8 and later',
+    'apk-soon': 'The app file will appear here shortly. Until then, connect through AmneziaWG below.',
+    'apk-sha': 'SHA-256 of the file:',
+    'conn-apk-1': 'Download the file with the button above',
+    'conn-apk-2': 'Open it from the notification or from Downloads. If Android asks, allow installing apps from this source (your browser)',
+    'conn-apk-3': 'If Google Play Protect warns about an unknown app, tap More details → Install anyway',
+    'conn-apk-4': 'Open Sovereign and sign in with your site username and password',
+    'conn-apk-5': 'Pick a profile and press the button in the middle. Allow the VPN connection when Android asks',
+    'conn-apk-update': 'When a new version is out, the app says so itself, and you download it here, over the old one — your sign-in and profile stay.',
+    'conn-alt-awg': 'Another way: AmneziaWG',
+    'conn-alt-awg-sub': 'A free app that opens your connection file in a couple of clicks.',
+    'conn-ios-app': 'The Sovereign app for iPhone and iPad is in development',
+    'conn-via-awg': 'For now, you connect through AmneziaWG — a free app that opens your connection file in a couple of clicks.',
     'conn-android-1': 'Install AmneziaWG from Google Play or RuStore',
     'conn-android-2': 'In My Config, pick a device and download its .conf file',
     'conn-android-3': 'Open AmneziaWG → tap + → Import from file, and choose the file',
@@ -2312,6 +2456,12 @@ const translations = {
     'dev-add-first': 'Add a device to get its connection file.',
     'dev-create': 'Create',
     'dev-rename': 'Rename',
+    'dev-delete': 'Delete',
+    'dev-del-confirm': 'Delete “{name}”? Its file stops working at once, and the slot is freed for another device.',
+    'dev-del-yes': 'Yes, delete',
+    'dev-deleted': 'Device deleted. The slot is free.',
+    'dev-err-remove': 'Could not delete the device right now. Try again in a minute, or write to support.',
+    'dev-err-trial': 'The trial device is removed when the trial ends.',
     'dev-cancel': 'Cancel',
     'dev-name-label': 'Device name',
     'dev-name-rule': 'A device name is up to 6 characters: Latin letters, digits, - and _. The connection file downloads under this name.',
@@ -2326,6 +2476,7 @@ const translations = {
     'reg-sent': 'Account created. We sent a confirmation link to {e}.',
     'set-title': 'Settings', 'set-sub': 'Language, theme and account',
     'hist-granted': 'Gift',
+    'peer-no-hint': 'From the peer address: 33 is 10.88.88.33, 89.10 is 10.88.89.10',
     'src-col': 'Source', 'src-portal': 'portal', 'src-trial': 'trial', 'src-manual': 'by hand', 'src-unknown': 'unknown',
     'src-rename': 'Name this peer', 'src-prompt': 'Name for this peer (empty to clear):', 'src-fail': 'Could not save the name.',
     'grant-title': 'Open access', 'grant-user': 'Username', 'grant-plan': 'Plan',
@@ -2377,6 +2528,8 @@ const translations = {
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
     'vb-already': 'Your email is already confirmed.',
+    'pay-too-many': 'Devices on this plan: {limit}; on your account now: {held}. Delete the extra ones first, then pay.',
+    'pay-too-many-go': 'Go to my devices →',
     'pay-need-verify': 'Confirm your email first — the link is in the letter we sent after registration.',
     'verify-title-1': 'Email', 'verify-title-2': ' confirmation',
     'verify-wait': 'Confirming…',
@@ -2637,11 +2790,44 @@ const translations = {
     'nav-connect': 'Подключение',
     'page-connect': 'Подключение',
     'page-connect-sub': 'Выберите ваше устройство',
-    'conn-tag-dev': 'Приложение в разработке',
     'conn-pick': 'Выберите устройство — покажем, как его подключить.',
-    'conn-android-app': 'Приложение Sovereign для Android в разработке',
-    'conn-ios-app': 'Приложение Sovereign для iOS в разработке',
-    'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару касаний.',
+    'conn-dl-awg': 'Скачать AmneziaWG ↗',
+    'conn-awg-docs': 'Документация AmneziaWG ↗',
+    'conn-desk-sub': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, которое открывает ваш файл подключения. Входить в него не нужно — достаточно файла.',
+    'conn-windows-title': 'Приложение Sovereign для Windows в разработке',
+    'conn-windows-1': 'Скачайте установщик AmneziaWG кнопкой ниже (файл .msi для вашей системы, обычно x64) и установите его',
+    'conn-windows-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-windows-3': 'В AmneziaWG нажмите Add Tunnel → Import tunnel(s) from file и выберите файл',
+    'conn-windows-4': 'Нажмите Activate — готово',
+    'conn-macos-title': 'Приложение Sovereign для macOS в разработке',
+    'conn-macos-1': 'Установите AmneziaWG из Mac App Store',
+    'conn-macos-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
+    'conn-macos-3': 'В AmneziaWG нажмите Import tunnel(s) from file и выберите файл',
+    'conn-macos-4': 'Если macOS спросит про добавление VPN-конфигурации — нажмите «Разрешить»',
+    'conn-macos-5': 'Выберите туннель и нажмите Activate — готово',
+    'conn-linux-title': 'Приложение Sovereign для Linux в разработке',
+    'conn-linux-sub': 'Сейчас подключение идёт через AmneziaWG: модуль ядра и утилита awg-quick — ваш файл подключения и две команды.',
+    'conn-linux-1': 'Установите модуль ядра AmneziaWG и amneziawg-tools — шаги для вашего дистрибутива есть в документации',
+    'conn-linux-2': 'В разделе «Мой конфиг» скачайте файл .conf и сохраните под коротким именем, например sovrn.conf',
+    'conn-linux-3': 'Положите его на место, доступным только root: sudo install -m 600 sovrn.conf /etc/amnezia/amneziawg/',
+    'conn-linux-4': 'Подключиться: sudo awg-quick up sovrn — отключиться: sudo awg-quick down sovrn',
+    'conn-linux-note': 'В файле — ключ вашего устройства: не оставляйте его копии в общих папках.',
+    'conn-android-app': 'Приложение Sovereign для Android',
+    'conn-android-sub': 'Вход — тем же логином и паролем, что здесь. Профили и подключение — прямо в приложении.',
+    'apk-download': 'Скачать приложение',
+    'apk-meta': 'Версия {v} · {size} МБ · Android 8 и новее',
+    'apk-soon': 'Файл приложения появится здесь совсем скоро. Пока подключиться можно через AmneziaWG — инструкция ниже.',
+    'apk-sha': 'SHA-256 файла:',
+    'conn-apk-1': 'Скачайте файл кнопкой выше',
+    'conn-apk-2': 'Откройте его из уведомления или из «Загрузок». Если Android спросит — разрешите установку приложений из этого источника (вашего браузера)',
+    'conn-apk-3': 'Если Google Play Защита предупредит о неизвестном приложении — нажмите «Подробнее» → «Всё равно установить»',
+    'conn-apk-4': 'Откройте Sovereign и войдите тем же логином и паролем, что на сайте',
+    'conn-apk-5': 'Выберите профиль и нажмите кнопку в центре экрана. Разрешите VPN-подключение, когда Android спросит',
+    'conn-apk-update': 'Когда выйдет новая версия, приложение само об этом скажет, а скачать её можно здесь же — поверх старой, вход и профиль сохранятся.',
+    'conn-alt-awg': 'Другой способ: AmneziaWG',
+    'conn-alt-awg-sub': 'Бесплатное приложение, в котором ваш файл подключения открывается в пару нажатий.',
+    'conn-ios-app': 'Приложение Sovereign для iPhone и iPad в разработке',
+    'conn-via-awg': 'Сейчас подключение идёт через AmneziaWG — бесплатное приложение, в котором ваш файл подключения открывается в пару нажатий.',
     'conn-android-1': 'Установите AmneziaWG из Google Play или RuStore',
     'conn-android-2': 'В разделе «Мой конфиг» выберите устройство и скачайте его файл .conf',
     'conn-android-3': 'Откройте AmneziaWG → нажмите + → Импорт из файла и выберите файл',
@@ -2663,6 +2849,12 @@ const translations = {
     'dev-add-first': 'Добавьте устройство, чтобы получить его файл подключения.',
     'dev-create': 'Создать',
     'dev-rename': 'Переименовать',
+    'dev-delete': 'Удалить',
+    'dev-del-confirm': 'Удалить «{name}»? Его файл сразу перестанет работать, а место освободится для другого устройства.',
+    'dev-del-yes': 'Да, удалить',
+    'dev-deleted': 'Устройство удалено, место свободно.',
+    'dev-err-remove': 'Не получилось удалить устройство. Попробуйте через минуту или напишите в поддержку.',
+    'dev-err-trial': 'Пробное устройство удалится само, когда закончится пробный период.',
     'dev-cancel': 'Отмена',
     'dev-name-label': 'Имя устройства',
     'dev-name-rule': 'Имя устройства — до 6 символов: латиница, цифры, «-» и «_». Под этим именем скачивается файл подключения.',
@@ -2677,6 +2869,7 @@ const translations = {
     'reg-sent': 'Аккаунт создан. Мы отправили ссылку для подтверждения на {e}.',
     'set-title': 'Настройки', 'set-sub': 'Язык, оформление и аккаунт',
     'hist-granted': 'Подарок',
+    'peer-no-hint': 'По адресу пира: 33 — это 10.88.88.33, 89.10 — 10.88.89.10',
     'src-col': 'Источник', 'src-portal': 'портал', 'src-trial': 'пробный', 'src-manual': 'вручную', 'src-unknown': 'неизвестно',
     'src-rename': 'Назвать пир', 'src-prompt': 'Имя для этого пира (пусто — убрать):', 'src-fail': 'Не удалось сохранить имя.',
     'grant-title': 'Выдать доступ', 'grant-user': 'Логин', 'grant-plan': 'Тариф',
@@ -2728,6 +2921,8 @@ const translations = {
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
     'vb-already': 'Почта уже подтверждена.',
+    'pay-too-many': 'Устройств на этом тарифе: {limit}, у вас сейчас: {held}. Сначала удалите лишние, потом оплатите.',
+    'pay-too-many-go': 'К моим устройствам →',
     'pay-need-verify': 'Сначала подтвердите почту — ссылка в письме, которое пришло после регистрации.',
     'verify-title-1': 'Подтверждение', 'verify-title-2': ' почты',
     'verify-wait': 'Подтверждаем…',
@@ -3264,10 +3459,36 @@ function choosePlatform(plat) {
   try { localStorage.setItem('sov_platform', plat); } catch (e) { /* private mode */ }
 }
 
+// The APK the portal offers (api/android.py). Asked each time the page opens:
+// it is one small request, and a release reaches the page without a deploy.
+async function loadAndroidRelease() {
+  const btn = document.getElementById('apk-btn');
+  const meta = document.getElementById('apk-meta');
+  const sum = document.getElementById('apk-sum');
+  if (!btn || !meta || !sum) return;
+  let r = null;
+  try {
+    const res = await fetch(API + '/api/public/android', { cache: 'no-store' });
+    if (res.ok) r = await res.json();
+  } catch (e) { /* offline: say it is not there yet */ }
+  if (r && r.available) {
+    btn.hidden = false;
+    const mb = (r.size / 1048576).toFixed(1);
+    meta.textContent = t('apk-meta').replace('{v}', r.version_name).replace('{size}', currentLang === 'ru' ? mb.replace('.', ',') : mb);
+    document.getElementById('apk-sha').textContent = r.sha256;
+    sum.hidden = false;
+  } else {
+    btn.hidden = true;
+    meta.textContent = t('apk-soon');
+    sum.hidden = true;
+  }
+}
+
 function initConnectPage() {
+  loadAndroidRelease();
   let saved = null;
   try { saved = localStorage.getItem('sov_platform'); } catch (e) { /* private mode */ }
-  if (saved === 'android' || saved === 'ios') choosePlatform(saved);
+  if (['android', 'ios', 'windows', 'macos', 'linux'].includes(saved)) choosePlatform(saved);
 }
 
 function showPayTab(tab) {
@@ -3571,6 +3792,16 @@ async function startPayment() {
     if (res.status === 403 && d.detail === 'email_not_verified') {
       if (out) out.textContent = t('pay-need-verify');
       loadClientMe();
+    } else if (res.status === 409 && d.detail && d.detail.code === 'too_many_devices') {
+      // The plan allows fewer devices than the account holds: delete first.
+      if (out) {
+        out.textContent = t('pay-too-many').replace('{held}', d.detail.held).replace('{limit}', d.detail.limit) + ' ';
+        const go = document.createElement('a');
+        go.href = '#';
+        go.textContent = t('pay-too-many-go');
+        go.addEventListener('click', e => { e.preventDefault(); closeCheckout(); showPage('client', 'config'); });
+        out.appendChild(go);
+      }
     } else if (out) {
       out.textContent = (d.detail ? (t('pay-error') + ': ' + d.detail) : t('pay-error'));
     }
@@ -4058,14 +4289,38 @@ function _devMsg(text, bad) {
 }
 
 // One inline form, used for both naming a new device and renaming one.
-function _devForm(value, submitLabel, onSubmit) {
+// `onDelete`, when given, adds a Delete button that asks first, in place.
+function _devForm(value, submitLabel, onSubmit, onDelete) {
   const form = document.createElement('form');
   form.className = 'dev-form';
   form.innerHTML = `
     <input class="dev-input" maxlength="6" autocomplete="off" spellcheck="false"
            placeholder="phone" aria-label="${t('dev-name-label')}">
     <button type="submit" class="dev-ok">${submitLabel}</button>
+    ${onDelete ? `<button type="button" class="dev-del">${t('dev-delete')}</button>` : ''}
     <button type="button" class="dev-cancel" aria-label="${t('dev-cancel')}">✕</button>`;
+  if (onDelete) {
+    form.querySelector('.dev-del').addEventListener('click', () => {
+      if (_devBusy) return;
+      _devMsg('');
+      // A second step on the same spot: one click never deletes.
+      form.innerHTML = `
+        <span class="dev-confirm">${t('dev-del-confirm').replace('{name}', escHtml(String(value || '')))}</span>
+        <button type="button" class="dev-del-yes">${t('dev-del-yes')}</button>
+        <button type="button" class="dev-cancel" aria-label="${t('dev-cancel')}">✕</button>`;
+      form.querySelector('.dev-cancel').addEventListener('click', () => { _devMsg(''); renderDevices(); });
+      const yes = form.querySelector('.dev-del-yes');
+      yes.addEventListener('click', async () => {
+        if (_devBusy) return;
+        _devBusy = true;
+        form.querySelectorAll('button').forEach(el => el.disabled = true);
+        _devMsg(t('dev-saving'));
+        try { await onDelete(); }
+        finally { _devBusy = false; }
+      });
+      setTimeout(() => yes.focus(), 0);
+    });
+  }
   const input = form.querySelector('input');
   input.value = value || '';
   form.addEventListener('click', e => e.stopPropagation());
@@ -4138,8 +4393,29 @@ function startDeviceEdit(id) {
       _devMsg('');
       renderDevices();
     } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
-  });
+  }, cfg.kind === 'trial' ? null : () => deleteDevice(id));
   chip.replaceWith(form);
+}
+
+// The node takes the peer off first; the server frees the slot only after
+// that, so a 503 here means the device still works and still counts.
+async function deleteDevice(id) {
+  try {
+    const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: hdrs(),
+    });
+    if (res.status === 401) { doLogout(); return; }
+    if (res.status === 404) { _devMsg(''); await loadClientConfigPage(); return; }  // already gone
+    if (!res.ok) {
+      _devMsg(t(res.status === 409 ? 'dev-err-trial' : res.status === 503 ? 'dev-err-remove' : 'dev-err-generic'), true);
+      renderDevices();
+      return;
+    }
+    if (_configId === id) { _configId = null; _configName = null; _configText = null; }
+    _devMsg(t('dev-deleted'));
+    await loadClientConfigPage();
+  } catch (e) { _devMsg(t('dev-err-generic'), true); renderDevices(); }
 }
 
 // `fromCode` is the page's own reload after adding a device — that runs while
@@ -4424,7 +4700,7 @@ async function loadAdminClients() {
       <div class="sup-hint" style="margin:0 0 12px">${summary}</div>
       <table class="table">
         <thead><tr>
-          <th>Name</th><th data-i18n="src-col">${escHtml(t('src-col'))}</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
+          <th title="${escHtml(t('peer-no-hint'))}">№</th><th>Name</th><th data-i18n="src-col">${escHtml(t('src-col'))}</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Endpoint</th>
         </tr></thead>
         <tbody>
           ${d.clients.map(c => {
@@ -4433,6 +4709,7 @@ async function loadAdminClients() {
               ? ` <button class="btn-sm peer-label-btn" data-key="${escHtml(c.key)}" data-label="${escHtml(c.source === 'manual' ? c.name : '')}" title="${escHtml(t('src-rename'))}">✎</button>`
               : '';
             return `<tr>
+            <td title="${escHtml(c.address || '')}" style="font-variant-numeric:tabular-nums">${escHtml(c.number || '—')}</td>
             <td>${escHtml(c.name)}${edit}</td>
             <td><span class="badge badge-src-${c.source}">${escHtml(t(PEER_SOURCE[c.source] || c.source))}</span></td>
             <td><span class="badge badge-${c.status}">${c.status}</span></td>

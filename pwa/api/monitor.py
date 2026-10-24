@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt import require_admin
 from db.base import get_db
 from db.models import MonitorEvent, MonitorReport
-from services import monitor_view
+from services import monitor_view, monitor_watch
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,7 +92,10 @@ async def receive(report: Report, db: AsyncSession = Depends(get_db),
     else:
         row.received_at, row.payload = now, payload
 
-    open_rows = (await db.execute(select(MonitorEvent).where(MonitorEvent.ended_at.is_(None)))).scalars().all()
+    # The portal's own event (the monitor fell silent) is opened and closed by
+    # services/monitor_watch.py, which must send the all-clear first.
+    open_rows = (await db.execute(select(MonitorEvent).where(
+        MonitorEvent.ended_at.is_(None), MonitorEvent.key != monitor_watch.SILENT_KEY))).scalars().all()
     open_by_key = {e.key: e for e in open_rows}
     current = {p.key: p for p in report.problems}
     for key, p in current.items():

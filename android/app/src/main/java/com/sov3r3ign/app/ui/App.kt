@@ -3,7 +3,9 @@ package com.sov3r3ign.app.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,11 +17,14 @@ import androidx.compose.ui.platform.LocalContext
 import com.sov3r3ign.app.api.ApiClient
 import com.sov3r3ign.app.api.HttpTransport
 import com.sov3r3ign.app.session.Session
+import com.sov3r3ign.app.state.AccountModel
 import com.sov3r3ign.app.storage.SecureStore
+import com.sov3r3ign.app.tunnel.AppTunnel
+import com.sov3r3ign.app.ui.main.MainScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Signed out → sign-in form; signed in → the account. Nothing else yet. */
+/** Signed out → sign-in form; signed in → the main screen, and the devices page from it. */
 @Composable
 fun App() {
     val context = LocalContext.current
@@ -42,9 +47,24 @@ fun App() {
             notice = null
             signedIn = true
         }
-        true -> AccountScreen(session) { reason ->
-            notice = reason
-            signedIn = false
+        // A new model for each signed-in session: nothing of the last account's
+        // state may show on the next one's screen.
+        true -> {
+            val model = remember { AccountModel(session, AppTunnel(context)) }
+            val ui by model.ui.collectAsState()
+            var devicesOpen by remember { mutableStateOf(false) }
+            LaunchedEffect(ui.signedOut) {
+                ui.signedOut?.let {
+                    notice = it.notice
+                    signedIn = false
+                }
+            }
+            if (devicesOpen) {
+                BackHandler { devicesOpen = false }
+                DevicesScreen(model, onBack = { devicesOpen = false })
+            } else {
+                MainScreen(session, model, onOpenDevices = { devicesOpen = true })
+            }
         }
     }
 }

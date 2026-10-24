@@ -13,7 +13,14 @@ Inputs (made by the commands in docs/runbook.md, "Peers and the database"):
   db.txt      <public key>|<peer ip>|<is_active t/f>|<kind>|<username>|<device name>
   labels.txt  <public key>|<label>      (the admin panel's names for hand-made peers)
 
-Usage: peer_reconcile.py node.txt db.txt labels.txt
+Usage: peer_reconcile.py node.txt db.txt labels.txt [candidates.txt]
+
+Every peer line starts with its address and the first 8 characters of its key,
+the form tools/peer-remove.sh takes. With candidates.txt, the peers that could
+go — ended in the database, hand-made, unknown — are written there one per
+line, each commented out: uncomment the ones to remove and give the file to
+peer-remove.sh. Labels whose peer is no longer on the node are listed with the
+statement that deletes them.
 """
 import ipaddress
 import sys
@@ -79,7 +86,7 @@ def sort_ip(ip):
         return 0
 
 
-def main(node_path, db_path, labels_path):
+def main(node_path, db_path, labels_path, candidates_path=None):
     now = int(time.time())
     node, db, labels = read_node(node_path), read_db(db_path), read_labels(labels_path)
     active = {k: v for k, v in db.items() if v["active"]}
@@ -92,20 +99,47 @@ def main(node_path, db_path, labels_path):
 
     print(f"На сервере peers: {len(node)}   активных конфигов в базе: {len(active)}   совпадают: {len(ok)}\n")
 
+    def ordered(keys):
+        return sorted(keys, key=lambda k: sort_ip((node.get(k) or db.get(k))["ip"]))
+
     def section(title, keys, line):
         print(f"== {title}: {len(keys)}")
-        for k in sorted(keys, key=lambda k: sort_ip((node.get(k) or db.get(k))["ip"])):
-            print("   " + line(k))
+        for k in ordered(keys):
+            print(f"   {(node.get(k) or active.get(k))['ip']:<15} {k[:8]}  " + line(k))
         print()
 
     section("В базе активны, на сервере НЕТ (у клиента конфиг не работает)", missing,
-            lambda k: f"{active[k]['ip']:<15} {active[k]['user']} · {active[k]['name']} ({active[k]['kind']})")
+            lambda k: f"{active[k]['user']} · {active[k]['name']} ({active[k]['kind']})")
     section("Закончились в базе, но всё ещё на сервере (пользуются бесплатно)", stale,
-            lambda k: f"{node[k]['ip']:<15} {db[k]['user']} · {db[k]['name']}  связь: {ago(node[k]['hs'], now)}")
+            lambda k: f"{db[k]['user']} · {db[k]['name']}  связь: {ago(node[k]['hs'], now)}")
     section("Ручные, с подписью в админке", manual,
-            lambda k: f"{node[k]['ip']:<15} {labels[k]}  связь: {ago(node[k]['hs'], now)}")
+            lambda k: f"{labels[k]}  связь: {ago(node[k]['hs'], now)}")
     section("Неизвестные (нет в базе и без подписи)", unknown,
-            lambda k: f"{node[k]['ip']:<15} {k[:8]}…  связь: {ago(node[k]['hs'], now)}")
+            lambda k: f"связь: {ago(node[k]['hs'], now)}")
+
+    orphan_labels = sorted(k for k in labels if k not in node)
+    print(f"== Подписи без пира на сервере: {len(orphan_labels)}")
+    for k in orphan_labels:
+        print(f"   {k[:8]}  {labels[k]}")
+    if orphan_labels:
+        # Public keys are base64 (the API checks them before storing a label): no quotes to escape.
+        keys = ", ".join(f"'{k}'" for k in orphan_labels)
+        print(f"   убрать: DELETE FROM peer_labels WHERE public_key IN ({keys});")
+    print()
+
+    if candidates_path:
+        with open(candidates_path, "w", encoding="utf-8") as f:
+            f.write("# Кандидаты на удаление. Раскомментируй тех, кого убираем, и отдай файл\n"
+                    "# tools/peer-remove.sh. Строка: адрес, начало ключа, остальное — пометка.\n")
+            for title, keys, note in (
+                    ("закончились в базе", stale, lambda k: f"{db[k]['user']} · {db[k]['name']}"),
+                    ("ручные", manual, lambda k: labels[k]),
+                    ("неизвестные", unknown, lambda k: "")):
+                f.write(f"\n# — {title}: {len(keys)}\n")
+                for k in ordered(keys):
+                    text = " ".join(f"{title} | {note(k)} | связь: {ago(node[k]['hs'], now)}".split())
+                    f.write(f"# {node[k]['ip']} {k[:8]} {text}\n")
+        print(f"Кандидаты записаны в {candidates_path}: {len(stale) + len(manual) + len(unknown)}\n")
 
     dup = [ip for ip, n in Counter(p["ip"] for p in node.values()).items() if n > 1]
     if dup:
@@ -122,6 +156,6 @@ def main(node_path, db_path, labels_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         sys.exit(__doc__)
     main(*sys.argv[1:])

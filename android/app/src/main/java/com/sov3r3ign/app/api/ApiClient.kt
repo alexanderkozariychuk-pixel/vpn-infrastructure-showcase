@@ -38,7 +38,13 @@ sealed interface ApiError {
      */
     data object NotFound : ApiError
 
-    /** 409 — the plan is full, or the username or email is taken. */
+    /** 403 — refused for a reason the server names: trial_off, email_not_verified, Account disabled. */
+    data class Forbidden(val message: String) : ApiError
+
+    /** 429 — too many attempts from here; the server lifts it after a while. */
+    data object TooMany : ApiError
+
+    /** 409 — the plan is full, the username or email is taken, or a trial rule. */
     data class Conflict(val message: String) : ApiError
 
     /** 400 or 422 — the request itself was refused. */
@@ -71,7 +77,7 @@ class ApiClient(private val transport: Transport) {
      * any role but "client" is refused here rather than kept.
      */
     fun login(username: String, password: String): ApiResult<TokenResponse> {
-        val body = json.encodeToString(LoginRequest.serializer(), LoginRequest(username, password))
+        val body = json.encodeToString(LoginRequest.serializer(), LoginRequest(username, password, refresh = true))
         val result = call("POST", "/api/auth/token", null, body) {
             json.decodeFromString(TokenResponse.serializer(), it)
         }
@@ -148,6 +154,49 @@ class ApiClient(private val transport: Transport) {
         }
     }
 
+    /**
+     * Starts the free trial: one device in the trial subnet, for the days the
+     * server sets. Needs a confirmed email (403 email_not_verified); a second
+     * one is refused (409 trial_used).
+     */
+    /** A new access token for the stored refresh token. 401: it is no longer valid. */
+    fun refresh(refreshToken: String): ApiResult<TokenResponse> {
+        val body = json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))
+        val result = call("POST", "/api/auth/refresh", null, body) {
+            json.decodeFromString(TokenResponse.serializer(), it)
+        }
+        if (result is ApiResult.Ok && result.value.role != "client") {
+            return ApiResult.Failed(ApiError.Unauthorized)
+        }
+        return result
+    }
+
+    /** Ends this app's session on the portal: the refresh token stops working. */
+    fun logout(refreshToken: String): ApiResult<Unit> =
+        call("POST", "/api/auth/logout", null, json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))) {}
+
+    fun startTrial(token: String): ApiResult<Device> =
+        call("POST", "/api/client/trial", token, "{}") {
+            json.decodeFromString(TrialStarted.serializer(), it).config
+        }
+
+    /** Sends the confirmation letter again. Ok(true) when the address is already confirmed. */
+    fun resendVerification(token: String): ApiResult<Boolean> =
+        call("POST", "/api/auth/resend-verification", token, "{}") {
+            json.decodeFromString(ResendResult.serializer(), it).alreadyVerified
+        }
+
+    fun trialOffer(): ApiResult<TrialOffer> =
+        call("GET", "/api/public/trial", null, null) {
+            json.decodeFromString(TrialOffer.serializer(), it)
+        }
+
+    /** The APK the site offers now, for "a new version is available". No token. */
+    fun latestRelease(): ApiResult<AppRelease> =
+        call("GET", "/api/public/android", null, null) {
+            json.decodeFromString(AppRelease.serializer(), it)
+        }
+
     /** The .conf text, handed to the tunnel as it is. */
     fun config(token: String, deviceId: String): ApiResult<String> {
         // Ids come from our own server and are UUIDs. Checked anyway: an id
@@ -179,7 +228,9 @@ class ApiClient(private val transport: Transport) {
             }
             401 -> ApiResult.Failed(ApiError.Unauthorized)
             402 -> ApiResult.Failed(ApiError.SubscriptionLapsed)
+            403 -> ApiResult.Failed(ApiError.Forbidden(detail(reply.body)))
             404 -> ApiResult.Failed(ApiError.NotFound)
+            429 -> ApiResult.Failed(ApiError.TooMany)
             409 -> ApiResult.Failed(ApiError.Conflict(detail(reply.body)))
             400, 422 -> ApiResult.Failed(ApiError.Rejected(detail(reply.body)))
             else -> ApiResult.Failed(ApiError.Server(reply.code))

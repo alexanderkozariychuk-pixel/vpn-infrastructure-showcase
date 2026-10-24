@@ -105,12 +105,40 @@ def test_the_servers_in_words(db):
     assert "Устройств на сервере: 52, активны сейчас: 14" in entry
     assert "Упавшие службы: openipmi.service" in entry
     links = _card(st, "links")
-    assert links["lines"] == ["Вход (entry), awg1: обмен ключами 34 с назад",
+    assert links["lines"] == ["Вход A (entry), awg1: обмен ключами 34 с назад",
                               "Выход (exit), awg0: обмен ключами 37 с назад"]
     assert _card(st, "site")["lines"] == ["https://sov3r3ign.com/ — открывается",
                                           "Сертификат sov3r3ign.com: ещё 71 дн"]
     assert "Копия бэкапа здесь" in " ".join(_card(st, "am1")["lines"])
     assert st["summary"] == "Всё работает" and st["stale"] is False
+
+
+ENTRY_B = {"host": "v3272993", "load1": 0.02, "ncpu": 1, "mem_avail_pct": 80, "disk_root_pct": 9,
+           "uptime_s": 172800, "failed_units": 0, "awg.awg0.peers": 1, "awg.awg0.active": 0,
+           "awg.awg0.fresh": -1, "awg.awg1.peers": 1, "awg.awg1.active": 1, "awg.awg1.fresh": 41}
+EXIT_TWO_LINKS = {**EXIT, "awg.awg2.peers": 1, "awg.awg2.fresh": 44}
+
+
+def test_the_standby_entry_has_a_card_and_a_link_of_its_own(db):
+    report = _report(**{"entry-b": ENTRY_B, "exit": EXIT_TWO_LINKS}, problems=[
+        monitor.Problem(key="entry-b:units", text="entry-b: упали сервисы: x.service", level="warn",
+                        since=NOW.timestamp() - 600),
+        monitor.Problem(key="exit:link:awg2", text="exit: связка awg2 молчит", level="bad",
+                        since=NOW.timestamp() - 300)])
+    report.links = {"entry": ["awg1"], "entry-b": ["awg1"], "exit": ["awg0", "awg2"]}
+    report.clients = {"entry": ["awg0"], "entry-b": ["awg0"]}
+    _send(db, report)
+    st = _state(db)
+    assert _card(st, "entry-b")["title"] == "Вход B (entry-b)"
+    assert "Устройств на сервере: 1, активны сейчас: 0" in _card(st, "entry-b")["lines"]
+    # "entry-b:…" starts with "entry" but is not entry A's problem.
+    assert _card(st, "entry-b")["status"] == "warn" and _card(st, "entry")["status"] == "ok"
+    assert _card(st, "links")["lines"] == [
+        "Вход A (entry), awg1: обмен ключами 34 с назад",
+        "Вход B (entry-b), awg1: обмен ключами 41 с назад",
+        "Выход (exit), awg0: обмен ключами 37 с назад",
+        "Выход (exit), awg2: обмен ключами 44 с назад"]
+    assert _card(st, "links")["problems"] == ["exit: связка awg2 молчит"]
 
 
 def test_problems_colour_their_card_and_the_whole(db):

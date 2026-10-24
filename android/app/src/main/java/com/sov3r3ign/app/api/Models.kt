@@ -28,8 +28,16 @@ const val MAX_DEVICE_NAME = 6
  */
 val DEVICE_NAME = Regex("[A-Za-z0-9_-]{1,$MAX_DEVICE_NAME}")
 
+/**
+ * [refresh] asks the portal for a refresh token as well (api/auth.py): the
+ * app's sign-in then outlives the day-long access token. No default on
+ * purpose — kotlinx.serialization leaves defaults out of the JSON.
+ */
 @Serializable
-data class LoginRequest(val username: String, val password: String)
+data class LoginRequest(val username: String, val password: String, val refresh: Boolean)
+
+@Serializable
+data class RefreshRequest(@SerialName("refresh_token") val refreshToken: String)
 
 @Serializable
 data class RegisterRequest(
@@ -46,6 +54,8 @@ data class NewDeviceRequest(val name: String)
 data class TokenResponse(
     @SerialName("access_token") val accessToken: String,
     val role: String,
+    /** Only from a sign-in that asked for it; a refresh answers without one. */
+    @SerialName("refresh_token") val refreshToken: String? = null,
 )
 
 @Serializable
@@ -58,7 +68,26 @@ data class Profile(
     val plan: String? = null,
     /** The server's own gate, has_active_subscription. Sent since 2026-09-29. */
     val active: Boolean? = null,
+    /** A purchase and a trial need it. Sent since 2026-10. Absent reads as unknown. */
+    @SerialName("email_verified") val emailVerified: Boolean? = null,
+    /** The free trial, as the portal offers it. Sent since 2026-10. */
+    val trial: TrialInfo? = null,
 ) {
+    /** The trial's end, when one was ever granted; unreadable reads as none. */
+    val trialUntil: Instant?
+        get() = trial?.untilRaw?.let { parseServerTime(it) }
+
+    /**
+     * A trial runs now. The server's state is the answer: it compares the end
+     * with its own clock (services/trial.py), so the phone's clock is not asked.
+     * [now] is kept so every access check reads the same way.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun trialActiveAt(now: Instant): Boolean = trial?.state == "active"
+
+    /** What the server's has_access answers: a paid period, or a trial. */
+    fun hasAccessAt(now: Instant): Boolean = activeAt(now) == true || trialActiveAt(now)
+
     /** Null when absent, and also when unreadable: a date must never crash a screen. */
     val subscribedUntil: Instant?
         get() = subscribedUntilRaw?.let { parseServerTime(it) }
@@ -99,13 +128,28 @@ internal fun parseServerTime(text: String): Instant? =
         }
     }
 
+/**
+ * `state`: active, used, needs_verify, available, off (pwa/services/trial.py).
+ * A state the app does not know is treated as no offer.
+ */
+@Serializable
+data class TrialInfo(
+    val state: String? = null,
+    @SerialName("until") val untilRaw: String? = null,
+)
+
 @Serializable
 data class Device(
     val id: String,
     val name: String,
     @SerialName("peer_ip") val peerIp: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-)
+    /** "paid" or "trial". Sent since 2026-10; absent is a paid device. */
+    val kind: String? = null,
+) {
+    /** The trial's one device: the server refuses to delete it (409 trial_device). */
+    val isTrial: Boolean get() = kind == "trial"
+}
 
 @Serializable
 data class DeviceList(
@@ -125,3 +169,27 @@ data class RenamedDevice(val config: Device)
 
 @Serializable
 data class RemovedDevice(val removed: String)
+
+@Serializable
+data class TrialStarted(val config: Device)
+
+@Serializable
+data class ResendResult(@SerialName("already_verified") val alreadyVerified: Boolean = false)
+
+/** GET /api/public/trial: whether the site offers a trial now, and for how long. */
+@Serializable
+data class TrialOffer(val enabled: Boolean = false, val days: Int = 0)
+
+/**
+ * GET /api/public/android: the APK the site hands out now. `available` false
+ * when no file is published. [url] is relative to the site.
+ */
+@Serializable
+data class AppRelease(
+    val available: Boolean = false,
+    @SerialName("version_code") val versionCode: Int = 0,
+    @SerialName("version_name") val versionName: String = "",
+    val size: Long = 0,
+    val sha256: String = "",
+    val url: String = "/download/android",
+)

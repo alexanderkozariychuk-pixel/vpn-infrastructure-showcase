@@ -18,7 +18,10 @@ STALE_AFTER_S = 600
 
 TITLES = {
     "portal": "Портал",
-    "entry": "Вход (entry)",
+    # Entry A keeps the name "entry": the monitor's state and the history of
+    # problems are keyed by it. The standby entry is "entry-b".
+    "entry": "Вход A (entry)",
+    "entry-b": "Вход B (entry-b)",
     "exit": "Выход (exit)",
     "am1": "Бэкап-сервер (am1)",
 }

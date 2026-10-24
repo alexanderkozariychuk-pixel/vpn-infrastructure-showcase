@@ -36,6 +36,8 @@ link_stale_s = 300
 pool_warn_pct = 70
 pool_bad_pct = 95
 cert_min_days = 14
+# seconds a host's clock may stray from am1's before it is reported
+clock_skew_s = 2
 confirm_runs = 2
 remind_h = 6
 
@@ -47,19 +49,28 @@ remind_h = 6
 # Fill them from `sudo awg show interfaces` and sov-probe's output on each node.
 
 [host:portal]
-ssh = sovmon@159.194.232.158
+ssh = sovmon@<portal>
 backup_max_h = 26
 expiry_max_h = 2
 
 [host:entry]
-ssh = sovmon@212.67.14.85
+ssh = sovmon@<entry-A>
 clients = awg0
 links = awg1
 pools = paid:10.88.88.42-199, trial:10.88.89.10-250
 
+# The standby entry. No pools: they are counted on A, where the portal hands
+# out addresses; once B carries the same peers it would only repeat A's alarms.
+# The section's place is the card's place on the panel: keep it after A's.
+[host:entry-b]
+ssh = sovmon@<entry-B>
+clients = awg0
+links = awg1
+
+# awg0 is the link from A, awg2 the link from B.
 [host:exit]
-ssh = sovmon@45.134.217.122
-links = awg0
+ssh = sovmon@<exit>
+links = awg0 awg2
 
 [host:am1]
 ssh = local

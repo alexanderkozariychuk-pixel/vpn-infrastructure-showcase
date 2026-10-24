@@ -15,7 +15,13 @@ What it looks at:
   - the links between nodes: the newest AmneziaWG handshake on the interfaces
     named as links in the config;
   - the portal's own jobs: tonight's dump, the hourly expiry sweep and its
-    failures, the containers; and the copy pulled to am1.
+    failures, the containers; and the copy pulled to am1;
+  - every host's clock: synchronised by its own account (NTPSynchronized),
+    and within `clock_skew_s` of am1's clock. The probe prints its time first;
+    am1 notes its own time just before and just after the SSH call, and only a
+    time outside that window counts — a slow connection widens the window, it
+    never raises an alarm. If am1's own clock is not synchronised, it is no
+    reference and the comparison is skipped (am1's alarm says why).
 
 After every run the report (numbers + confirmed problems) is posted to the
 portal, /api/monitor/report, with MONITOR_TOKEN; the portal says it in words
@@ -77,19 +83,26 @@ DEFAULT_LIMITS = {
     "expiry_max_h": "2",
     "pool_warn_pct": "70",
     "pool_bad_pct": "95",
+    "clock_skew_s": "2",
 }
 
 
 # ── collecting ──────────────────────────────────────────────────────────
 
+TEXT_KEYS = {"host", "failed_unit_names"}
+
 def parse_probe(text: str) -> dict:
-    """key=value lines from sov-probe; numbers become numbers."""
+    """key=value lines from sov-probe; numbers become numbers — except the
+    names, which stay text even when they are all digits (the exit's is)."""
     out = {}
     for line in text.splitlines():
         key, sep, value = line.partition("=")
         if not sep or not key.strip():
             continue
         value = value.strip()
+        if key.strip() in TEXT_KEYS:
+            out[key.strip()] = value
+            continue
         try:
             out[key.strip()] = int(value)
         except ValueError:
@@ -118,6 +131,32 @@ def run_probe(target: str, key: str, timeout: int = 40) -> tuple[dict | None, st
     if "host" not in values:
         return None, "пустой ответ"
     return values, ""
+
+
+def clock_skew(clock_now, before: float, after: float) -> float | None:
+    """How far a host's clock lies outside [before, after], am1's time around
+    the call: 0 inside it, positive = the host is ahead, negative = behind.
+    None when the probe printed no time."""
+    if not isinstance(clock_now, (int, float)):
+        return None
+    if clock_now < before:
+        return clock_now - before
+    if clock_now > after:
+        return clock_now - after
+    return 0.0
+
+
+def apply_clock_skews(probes: dict, windows: dict, local: set) -> None:
+    """Put clock_skew_s into each remote probe — unless am1's own clock says it
+    is not synchronised, in which case it measures nothing."""
+    if any((probes.get(n) or {}).get("clock_synced") == 0 for n in local):
+        return
+    for name, probe in probes.items():
+        if not probe or name in local or name not in windows:
+            continue
+        skew = clock_skew(probe.get("clock_now"), *windows[name])
+        if skew is not None:
+            probe["clock_skew_s"] = round(skew, 1)
 
 
 def check_url(url: str, timeout: int = 15) -> str:
@@ -196,6 +235,13 @@ def host_problems(name: str, section, limits, probe: dict | None, why: str) -> d
         p[f"{name}:load"] = f"{name}: нагрузка {load} на {ncpu} CPU"
     if probe.get("failed_units", 0):
         p[f"{name}:units"] = f"{name}: упали сервисы: {probe.get('failed_unit_names', '?')}"
+    # An older probe prints neither field: then there is nothing to judge.
+    skew = probe.get("clock_skew_s")
+    if probe.get("clock_synced") == 0:
+        p[f"{name}:clock"] = f"{name}: часы не синхронизированы (NTP)"
+    elif isinstance(skew, (int, float)) and abs(skew) >= float(limits["clock_skew_s"]):
+        way = "спешат" if skew > 0 else "отстают"
+        p[f"{name}:clock"] = f"{name}: часы {way} на {abs(skew):.0f} с относительно am1"
 
     for ifname in _list(section.get("links", "")):
         fresh = probe.get(f"awg.{ifname}.fresh")
@@ -264,7 +310,7 @@ def web_checks(cfg, limits) -> tuple[dict, dict]:
     return p, facts
 
 
-WARN_KINDS = ("disk", "mem", "load", "units", "pool")
+WARN_KINDS = ("disk", "mem", "load", "units", "pool", "clock")
 
 
 def level(key: str) -> str:
@@ -441,16 +487,24 @@ def main() -> int:
 
     now = time.time()
     key = cfg.get("ssh", "key", fallback="/root/.ssh/sov-monitor")
-    probes, problems, errors = {}, {}, {}
-    for section in cfg.sections():
-        if not section.startswith("host:"):
-            continue
+    probes, errors, windows, local = {}, {}, {}, set()
+    hosts = [s for s in cfg.sections() if s.startswith("host:")]
+    for section in hosts:
         name = section[5:]
-        probe, why = run_probe(cfg[section].get("ssh", "local"), key)
+        target = cfg[section].get("ssh", "local")
+        if target == "local":
+            local.add(name)
+        before = time.time()
+        probe, why = run_probe(target, key)
+        windows[name] = (before, time.time())
         probes[name] = probe
         if why:
             errors[name] = why
-        problems.update(host_problems(name, cfg[section], limits, probe, why))
+    apply_clock_skews(probes, windows, local)
+    problems = {}
+    for section in hosts:
+        name = section[5:]
+        problems.update(host_problems(name, cfg[section], limits, probes[name], errors.get(name, "")))
     web_p, web = web_checks(cfg, limits)
     problems.update(web_p)
 

@@ -285,4 +285,76 @@ class SessionTest {
         assertTrue(Session(ApiClient(Script(reply)), secrets).deleteDevice(other) is ApiResult.Ok)
         assertEquals(Session.Selected(phone.id, "phone"), Session(ApiClient(Script()), secrets).selected())
     }
+
+    // ── staying signed in ────────────────────────────────────────────────────
+
+    private val tokenWithRefresh = HttpReply(200, """{"access_token":"T1","token_type":"bearer","role":"client","refresh_token":"R1"}""")
+    private val expired = HttpReply(401, """{"detail":"Invalid or expired token"}""")
+    private val renewed = HttpReply(200, """{"access_token":"T2","token_type":"bearer","role":"client","refresh_token":null}""")
+
+    @Test
+    fun `signing in keeps the refresh token beside the access token`() {
+        val secrets = MapSecrets()
+        Session(ApiClient(Script(tokenWithRefresh)), secrets).signIn("paid", "secret")
+        assertEquals(mapOf("token" to "T1", "refresh" to "R1"), secrets.map)
+    }
+
+    @Test
+    fun `an expired access token is renewed quietly and the call made again`() {
+        val secrets = MapSecrets().apply { put("token", "OLD"); put("refresh", "R1") }
+        val script = Script(expired, renewed, profile)
+        val r = Session(ApiClient(script), secrets).profile()
+        assertEquals("paid", (r as ApiResult.Ok).value.username)
+        assertEquals(listOf("GET /api/client/me", "POST /api/auth/refresh", "GET /api/client/me"), script.calls)
+        assertEquals("T2", secrets.map["token"])
+        assertEquals("R1", secrets.map["refresh"])
+    }
+
+    @Test
+    fun `with only the refresh token left, it is used before the call`() {
+        val secrets = MapSecrets().apply { put("refresh", "R1") }
+        val script = Script(renewed, profile)
+        val s = Session(ApiClient(script), secrets)
+        assertTrue(s.isSignedIn)
+        assertTrue(s.profile() is ApiResult.Ok)
+        assertEquals(listOf("POST /api/auth/refresh", "GET /api/client/me"), script.calls)
+    }
+
+    @Test
+    fun `a refused refresh token signs out, and keeps the config the tunnel runs on`() {
+        val secrets = MapSecrets().apply {
+            put("token", "OLD"); put("refresh", "R1"); put("conf", "[Interface]"); put("device_id", "d"); put("device_name", "p")
+        }
+        val s = Session(ApiClient(Script(expired, expired)), secrets)
+        assertEquals(ApiResult.Failed(ApiError.Unauthorized), s.profile())
+        assertNull(secrets.map["token"])
+        assertNull(secrets.map["refresh"])
+        assertFalse(s.isSignedIn)
+        assertEquals("[Interface]", secrets.map["conf"])
+    }
+
+    @Test
+    fun `an unreachable portal during renewal is not a sign-out`() {
+        val secrets = MapSecrets().apply { put("token", "OLD"); put("refresh", "R1") }
+        val s = Session(ApiClient(Script(expired, HttpReply(502, "<html>"))), secrets)
+        assertEquals(ApiResult.Failed(ApiError.Server(502)), s.profile())
+        assertEquals("R1", secrets.map["refresh"])
+        assertTrue(s.isSignedIn)
+    }
+
+    @Test
+    fun `signing out tells the portal, then forgets everything`() {
+        val secrets = MapSecrets().apply { put("token", "T1"); put("refresh", "R1") }
+        val script = Script(HttpReply(200, """{"ok":true}"""))
+        Session(ApiClient(script), secrets).signOut()
+        assertEquals(listOf("POST /api/auth/logout"), script.calls)
+        assertTrue(secrets.map.isEmpty())
+    }
+
+    @Test
+    fun `signing out with the portal down still forgets everything`() {
+        val secrets = MapSecrets().apply { put("token", "T1"); put("refresh", "R1") }
+        Session(ApiClient(Script(HttpReply(503, ""))), secrets).signOut()
+        assertTrue(secrets.map.isEmpty())
+    }
 }
