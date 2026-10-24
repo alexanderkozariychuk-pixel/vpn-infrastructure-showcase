@@ -3,9 +3,14 @@ services/provisioner.py — issuing and activating AWG peers.
 
 Issuing a device:
   1. Generate AWG keypair + PSK
-  2. Find the next free address in the client pool
-  3. Add the peer to Bridge awg0 through the pwa-add-peer wrapper
+  2. Find the next free address in the client pool of the device's location
+  3. Add the peer to that location's entry (awg0) through the pwa-add-peer wrapper
   4. Save a Config row (private key and PSK encrypted with Fernet)
+
+A device belongs to one location (services/locations.py): Germany is entry A,
+the portal's original setup, and keeps its old helpers (_add_peer_to_bridge,
+_remove_peer_from_bridge, _bridge_used_ips) unchanged; another location's
+entry is reached through the same wrappers at its own address (_*_at).
 
 Activating a payment extends `subscribed_until` from whichever is later — now
 or the end of the period already paid for — and issues a device only on a first
@@ -28,7 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from db.models import User, Config, Payment
 from config import plan_info
-from services import credit, mailer
+from services import credit, mailer, locations
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +43,8 @@ BRIDGE_AWG  = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
 BRIDGE_PUB  = os.getenv("BRIDGE_PUBLIC_KEY", "kCq1FK/tYvvB68h9luTRX5PAV0a2pIn2klbyNUKRMm0=")
 BRIDGE_ENDPOINT = os.getenv("BRIDGE_ENDPOINT", "")
 
-# Obfuscation params matching Bridge awg0
-AWG_PARAMS = {
-    "Jc": "3", "Jmin": "50", "Jmax": "1000",
-    "S1": "72", "S2": "146",
-    "H1": "1163059398", "H2": "1787455160",
-    "H3": "970047041",  "H4": "133143559",
-}
+# Obfuscation params matching Bridge awg0 (Germany); see services/locations.py
+AWG_PARAMS = locations.DE_PARAMS
 
 # One address pool for every client, regardless of plan.
 #
@@ -108,7 +108,8 @@ PWA_SSH_KEY = os.getenv("PWA_SSH_KEY", f"{PWA_SSH_DIR}/pwa-provisioner")
 PWA_SSH_USER = "pwa-provisioner"
 
 
-def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
+def _ssh_bridge(cmd: str, timeout: int = 15, host: str | None = None) -> tuple[str, str]:
+    host = host or BRIDGE_IP
     result = subprocess.run(
         ["ssh",
          "-i", PWA_SSH_KEY,
@@ -117,15 +118,20 @@ def _ssh_bridge(cmd: str, timeout: int = 15) -> tuple[str, str]:
          # The key directory is mounted read-only; don't try to rewrite it.
          "-o", "UpdateHostKeys=no",
          "-o", "ConnectTimeout=5",
-         f"{PWA_SSH_USER}@{BRIDGE_IP}",
+         f"{PWA_SSH_USER}@{host}",
          cmd],
         capture_output=True, text=True, timeout=timeout,
     )
     return result.stdout.strip(), result.stderr.strip()
 
 def _bridge_used_ips() -> set[str]:
+    """Addresses currently assigned on entry A (Germany)."""
+    return _entry_used_ips(BRIDGE_IP)
+
+
+def _entry_used_ips(host: str) -> set[str]:
     """
-    Addresses currently assigned on the entry node.
+    Addresses currently assigned on an entry node.
 
     The local Config table is a mirror, not the source of truth: it can be
     empty after a fresh migration, or stale after manual peer work. Asking
@@ -137,9 +143,9 @@ def _bridge_used_ips() -> set[str]:
     and the wrapper's own duplicate-IP rejection behind it.
     """
     try:
-        stdout, _ = _ssh_bridge("sudo pwa-awg-show")
+        stdout, _ = _ssh_bridge("sudo pwa-awg-show", host=host)
     except Exception as e:
-        logger.warning("Could not read peer list from bridge: %s", e)
+        logger.warning("Could not read peer list from %s: %s", host, e)
         return set()
 
     used: set[str] = set()
@@ -168,14 +174,21 @@ def _decrypt(cipher: str) -> str:
 
 async def _find_free_ip(
     db: AsyncSession, exclude: set[str] | None = None, pool: tuple = CLIENT_POOL,
+    location: str = locations.DEFAULT,
 ) -> str | None:
-    """Return the next free address in `pool`."""
+    """Return the next free address in `pool` on `location`'s entry.
+
+    Every location uses the same subnets on its own entry, so an address is
+    taken only by a device of the same location.
+    """
     prefix, start, end = pool
     # Only active rows hold an address. A revoked config's peer is off the node,
     # so keeping its address reserved would leak the pool one expiry at a time.
     # The node's own list arrives separately in `exclude` and remains the
     # authority — this query is the mirror, and the mirror can be stale.
-    result = await db.execute(select(Config.peer_ip).where(Config.is_active.is_(True)))
+    result = await db.execute(
+        select(Config.peer_ip).where(Config.is_active.is_(True), Config.location == location)
+    )
     used = {row[0] for row in result.fetchall() if row[0]}
     if exclude:
         used |= exclude
@@ -189,7 +202,12 @@ async def _find_free_ip(
 # ── add peer to Bridge ────────────────────────────────────────────────
 
 def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> tuple[bool, str]:
-    """Add a peer via the validated wrapper on the entry node.
+    """Add a peer on entry A (Germany)."""
+    return _add_peer_at(BRIDGE_IP, pub, psk, peer_ip, client_name)
+
+
+def _add_peer_at(host: str, pub: str, psk: str, peer_ip: str, client_name: str) -> tuple[bool, str]:
+    """Add a peer via the validated wrapper on the entry node at `host`.
 
     The wrapper (pwa-add-peer) re-validates every argument server-side —
     key format, that the IP is a /32 in the client subnet, no duplicate key
@@ -200,11 +218,11 @@ def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> t
     # remote shell before the wrapper's own validation even runs.
     import shlex
     args = " ".join(shlex.quote(a) for a in (pub, psk, f"{peer_ip}/32", client_name))
-    stdout, stderr = _ssh_bridge(f"sudo pwa-add-peer {args}")
+    stdout, stderr = _ssh_bridge(f"sudo pwa-add-peer {args}", host=host)
 
     out = (stdout + " " + stderr).strip()
     if stdout.startswith("ok:"):
-        logger.info("Peer added to bridge: %s (%s)", client_name, peer_ip)
+        logger.info("Peer added on %s: %s (%s)", host, client_name, peer_ip)
         return True, "ok"
 
     # wrapper rejected it — surface why, don't retry blindly
@@ -215,7 +233,12 @@ def _add_peer_to_bridge(pub: str, psk: str, peer_ip: str, client_name: str) -> t
 # ── remove peer from Bridge ───────────────────────────────────────────
 
 def _remove_peer_from_bridge(pub: str) -> tuple[bool, str]:
-    """Remove a peer via the validated wrapper on the entry node.
+    """Remove a peer from entry A (Germany)."""
+    return _remove_peer_at(BRIDGE_IP, pub)
+
+
+def _remove_peer_at(host: str, pub: str) -> tuple[bool, str]:
+    """Remove a peer via the validated wrapper on the entry node at `host`.
 
     The wrapper (pwa-del-peer) re-checks the key format, refuses anything
     outside the client subnet — so the backbone peer is unreachable through
@@ -227,11 +250,11 @@ def _remove_peer_from_bridge(pub: str) -> tuple[bool, str]:
     silently swallowed: the caller decides whether that is expected.
     """
     import shlex
-    stdout, stderr = _ssh_bridge(f"sudo pwa-del-peer {shlex.quote(pub)}")
+    stdout, stderr = _ssh_bridge(f"sudo pwa-del-peer {shlex.quote(pub)}", host=host)
 
     out = (stdout + " " + stderr).strip()
     if stdout.startswith("ok:"):
-        logger.info("Peer removed from bridge: %s", pub[:12])
+        logger.info("Peer removed on %s: %s", host, pub[:12])
         return True, "ok"
 
     logger.error("pwa-del-peer refused peer %s: %s", pub[:12], out)
@@ -240,19 +263,30 @@ def _remove_peer_from_bridge(pub: str) -> tuple[bool, str]:
 
 # ── build client config text ──────────────────────────────────────────
 
-def _build_conf(priv: str, psk: str, peer_ip: str) -> str:
-    params = "\n".join(f"{k} = {v}" for k, v in AWG_PARAMS.items())
+def _build_conf(priv: str, psk: str, peer_ip: str, location: str = locations.DEFAULT) -> str:
+    loc = locations.get(location)
+    if loc is None:
+        # Its NL_* settings are gone from the environment: a file built from
+        # anything else would carry the wrong key and endpoint and fail
+        # without a word. The API turns this into a 503.
+        raise ValueError(f"location {location!r} is not configured")
+    if loc.key == locations.DEFAULT:
+        # Germany as it always was, from this module's own settings.
+        params_map, mtu, pub_key, endpoint = AWG_PARAMS, 1300, BRIDGE_PUB, BRIDGE_ENDPOINT
+    else:
+        params_map, mtu, pub_key, endpoint = loc.params, loc.mtu, loc.public_key, loc.endpoint
+    params = "\n".join(f"{k} = {v}" for k, v in params_map.items())
     return (
         f"[Interface]\n"
         f"PrivateKey = {priv}\n"
         f"Address = {peer_ip}/32\n"
         f"DNS = 1.1.1.1\n"
-        f"MTU = 1300\n"
+        f"MTU = {mtu}\n"
         f"{params}\n\n"
         f"[Peer]\n"
-        f"PublicKey = {BRIDGE_PUB}\n"
+        f"PublicKey = {pub_key}\n"
         f"PresharedKey = {psk}\n"
-        f"Endpoint = {BRIDGE_ENDPOINT}\n"
+        f"Endpoint = {endpoint}\n"
         f"AllowedIPs = 0.0.0.0/0\n"
         f"PersistentKeepalive = 25\n"
     )
@@ -262,6 +296,7 @@ def _build_conf(priv: str, psk: str, peer_ip: str) -> str:
 
 async def issue_config(
     user: User, db: AsyncSession, name: str = "device", kind: str = "paid",
+    location: str = locations.DEFAULT,
 ) -> Config | None:
     """
     Create one peer for a user: keys → free address → node → Config row.
@@ -277,7 +312,16 @@ async def issue_config(
 
     `kind` picks the address pool: "trial" issues from TRIAL_POOL, which is
     what puts the device under the trial subnet's ceiling on the node.
+
+    `location` picks the entry (services/locations.py). A trial is Germany's
+    only: the trial net and its kill switch are set up and watched there.
     """
+    if kind == "trial":
+        location = locations.DEFAULT
+    loc = locations.get(location)
+    if loc is None:
+        logger.error("Unknown or unconfigured location %r for %s", location, user.username)
+        return None
     pool = TRIAL_POOL if kind == "trial" else CLIENT_POOL
     try:
         priv = _awg_genkey()
@@ -292,19 +336,28 @@ async def issue_config(
     client_name = (f"trial-{user.username}" if kind == "trial" else f"auto-{user.username}")[:32]
     loop = asyncio.get_event_loop()
 
-    # Seed from the node's live state, not from the local mirror.
-    tried_ips: set[str] = await loop.run_in_executor(None, _bridge_used_ips)
+    # Seed from the node's live state, not from the local mirror. Germany goes
+    # through the original helpers (tests and the admin tools patch them).
+    if loc.key == locations.DEFAULT:
+        tried_ips: set[str] = await loop.run_in_executor(None, _bridge_used_ips)
+    else:
+        tried_ips = await loop.run_in_executor(None, _entry_used_ips, loc.host)
     logger.info("Bridge reports %d addresses in use", len(tried_ips))
 
     peer_ip = None
     for _ in range(10):
-        peer_ip = await _find_free_ip(db, exclude=tried_ips, pool=pool)
+        peer_ip = await _find_free_ip(db, exclude=tried_ips, pool=pool, location=loc.key)
         if not peer_ip:
             logger.error("No free addresses left in the client pool")
             return None
-        ok, reason = await loop.run_in_executor(
-            None, _add_peer_to_bridge, pub, psk, peer_ip, client_name
-        )
+        if loc.key == locations.DEFAULT:
+            ok, reason = await loop.run_in_executor(
+                None, _add_peer_to_bridge, pub, psk, peer_ip, client_name
+            )
+        else:
+            ok, reason = await loop.run_in_executor(
+                None, _add_peer_at, loc.host, pub, psk, peer_ip, client_name
+            )
         if ok:
             break
         tried_ips.add(peer_ip)
@@ -325,9 +378,10 @@ async def issue_config(
         preshared_key=_encrypt(psk),
         is_active=True,
         kind=kind,
+        location=loc.key,
     )
     db.add(config)
-    logger.info("Issued config '%s' for %s → %s", name, user.username, peer_ip)
+    logger.info("Issued config '%s' for %s → %s (%s)", name, user.username, peer_ip, loc.key)
     return config
 
 
@@ -473,7 +527,26 @@ def render_config(config: Config) -> str:
         _decrypt(config.private_key),
         _decrypt(config.preshared_key),
         config.peer_ip,
+        config.location or locations.DEFAULT,
     )
+
+
+def remove_peer_for(config: Config, remove_de=None) -> tuple[bool, str]:
+    """
+    Take a device's peer off the entry of its own location.
+
+    Germany goes through `remove_de` — the caller's own reference to
+    _remove_peer_from_bridge, which is what tests and tools patch in each
+    module. A device whose location is no longer configured cannot be reached
+    and is reported as a failure, so its row stays active and is retried.
+    """
+    key = config.location or locations.DEFAULT
+    if key == locations.DEFAULT:
+        return (remove_de or _remove_peer_from_bridge)(config.public_key)
+    loc = locations.get(key)
+    if loc is None:
+        return False, f"location {key} is not configured"
+    return _remove_peer_at(loc.host, config.public_key)
 
 
 async def get_client_config(user: User, db: AsyncSession) -> str | None:

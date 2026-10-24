@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import User, Config
-from services.provisioner import _remove_peer_from_bridge
+from services.provisioner import _remove_peer_from_bridge, remove_peer_for
 from services import notify
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ async def expire_due_trials(db: AsyncSession, now: datetime | None = None) -> di
     stats = {"trials_due": len(rows), "trial_peers_removed": 0, "trial_failures": 0}
     for config, user in rows:
         ok, reason = await asyncio.get_event_loop().run_in_executor(
-            None, _remove_peer_from_bridge, config.public_key
+            None, remove_peer_for, config, _remove_peer_from_bridge
         )
         if ok:
             config.is_active = False
@@ -153,7 +153,7 @@ async def expire_due_subscriptions(db: AsyncSession, now: datetime | None = None
             # SSH is blocking; keep it off the event loop so this behaves the
             # same way when called from a request as it does from cron.
             ok, reason = await asyncio.get_event_loop().run_in_executor(
-                None, _remove_peer_from_bridge, config.public_key
+                None, remove_peer_for, config, _remove_peer_from_bridge
             )
             if ok:
                 config.is_active = False

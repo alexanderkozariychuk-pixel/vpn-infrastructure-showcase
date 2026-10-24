@@ -31,8 +31,9 @@ def account(db, monkeypatch):
     """A subscribed basic-plan user (limit 2) holding the auto-issued first device."""
     issued = []
 
-    async def _fake_issue(user, session, name="device"):
+    async def _fake_issue(user, session, name="device", location="de"):
         c = _config(user, name)
+        c.location = location
         session.add(c)
         await session.flush()
         issued.append(name)

@@ -1,5 +1,9 @@
 """
-api/clients.py — the admin's list of peers on the entry node.
+api/clients.py — the admin's list of peers on an entry node.
+
+One location at a time (services/locations.py): Germany is entry A, read
+through get_bridge_status_data as it always was; another location's entry
+through get_entry_status_data at its own address. `?location=nl`.
 
 Each peer is named from what we know about it:
 
@@ -28,7 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt import require_admin
 from db.base import get_db
 from db.models import Config, PeerLabel, User
-from services.net_manager import get_bridge_status_data
+from services import locations
+from services.net_manager import get_bridge_status_data, get_entry_status_data
 
 router = APIRouter()
 executor = ThreadPoolExecutor()
@@ -136,11 +141,22 @@ def _classify_handshake(handshake: str) -> str:
     return "active" if age <= 180 else "idle"
 
 
+async def _peers_of(location: str):
+    """(peers, error) from the entry of `location`; 422 for an unknown one."""
+    loc = locations.get(location)
+    if loc is None:
+        raise HTTPException(status_code=422, detail="Unknown location")
+    if loc.key == locations.DEFAULT:
+        return await run_sync(get_bridge_status_data)
+    return await run_sync(get_entry_status_data, loc.host)
+
+
 @router.get("/api/clients")
-async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    peers, err = await run_sync(get_bridge_status_data)
+async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depends(get_db),
+                      location: str = locations.DEFAULT):
+    peers, err = await _peers_of(location)
     if err:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": err, "location": location, "locations": locations.keys()}
 
     configs, labels = await _known(db)
     clients = [_describe(p, configs, labels) for p in (peers or [])]
@@ -153,6 +169,8 @@ async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depen
 
     return {
         "ok": True,
+        "location": location,
+        "locations": locations.keys(),
         "total": len(clients),
         "active": count("status", "active"),
         "idle": count("status", "idle"),
@@ -163,8 +181,9 @@ async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depen
 
 
 @router.get("/api/clients/{name}")
-async def get_client(name: str, _: dict = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    peers, err = await run_sync(get_bridge_status_data)
+async def get_client(name: str, _: dict = Depends(require_admin), db: AsyncSession = Depends(get_db),
+                     location: str = locations.DEFAULT):
+    peers, err = await _peers_of(location)
     if err:
         return {"ok": False, "error": err}
 

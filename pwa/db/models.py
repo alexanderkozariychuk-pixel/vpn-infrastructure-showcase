@@ -49,6 +49,10 @@ class Config(Base):
     # under its own bandwidth ceiling, so it cannot simply become a paid one:
     # a purchase issues a paid device and removes the trial peer.
     kind: Mapped[str] = mapped_column(String(8), default="paid", server_default="paid")
+    # Which entry the peer lives on: "de" (entry A) or "nl" (entry B), see
+    # services/locations.py. Fixed for the device's life; the same address
+    # may be held by one device in each location.
+    location: Mapped[str] = mapped_column(String(8), default="de", server_default="de")
     private_key: Mapped[str] = mapped_column(String(255), nullable=False)
     public_key: Mapped[str] = mapped_column(String(255), nullable=False)
     preshared_key: Mapped[str] = mapped_column(String(255), nullable=False)

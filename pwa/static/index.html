@@ -1309,6 +1309,29 @@
     }
     .dev-del:disabled, .dev-del-yes:disabled { opacity: .6; cursor: progress; }
     .dev-msg { margin-top: 10px; font-size: 13px; color: var(--text-dim); min-height: 0; }
+    /* Locations: one group per entry, the recommended one first. */
+    .loc-group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .loc-group:first-child { margin-top: 4px; padding-top: 4px; border-top: none; }
+    .loc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .loc-flag { font-size: 18px; line-height: 1; }
+    .loc-name { font-size: 15px; font-weight: 600; color: var(--text-bright); }
+    .loc-tag {
+      font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-family: var(--font-mono);
+      padding: 3px 7px; border-radius: 20px; border: 1px solid var(--accent); color: var(--accent);
+    }
+    .loc-tag.dim { border-color: var(--border-bright); color: var(--text-dim); }
+    .loc-count { margin-left: auto; font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); letter-spacing: 1px; }
+    .loc-sub { font-size: 12px; color: var(--text-dim); margin: -4px 0 10px; line-height: 1.5; }
+    .loc-news {
+      display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px;
+      border: 1px solid var(--accent); border-radius: 12px; padding: 14px 16px; background: var(--accent-glow);
+    }
+    .loc-news-text { flex: 1; font-size: 13px; line-height: 1.55; color: var(--text); }
+    .loc-news-text b { color: var(--text-bright); }
+    .loc-news-x { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 2px; }
+    .loc-news-x:hover { color: var(--accent); }
+    .adm-loc-tabs { display: flex; gap: 6px; }
+    .adm-loc-tabs button.active { border-color: var(--accent); color: var(--accent); }
     .dev-msg:empty { display: none; }
     .dev-msg.bad { color: var(--red); }
 
@@ -1709,6 +1732,11 @@
             <span id="trial-strip-text"></span>
             <button class="btn-sm" onclick="showPage('client','payment');showPayTab('sub')" data-i18n="btn-go-plans">Choose a plan →</button>
           </div>
+          <div class="loc-news" id="loc-news" style="display:none" role="status">
+            <div class="loc-flag">🇳🇱</div>
+            <div class="loc-news-text" id="loc-news-text"></div>
+            <button class="loc-news-x" onclick="dismissLocNews()" aria-label="✕">✕</button>
+          </div>
           <div class="card">
             <div class="dev-head">
               <div class="card-title" data-i18n="card-devices">Devices</div>
@@ -1718,9 +1746,10 @@
             <div class="dev-msg" id="dev-msg" role="status"></div>
             <div class="dev-hint" data-i18n="dev-name-rule">A device name is up to 6 characters: Latin letters, digits, - and _. The connection file downloads under this name.</div>
             <div class="dev-hint" data-i18n="dev-one-file">One file is for one device. The same file on two devices at once makes them knock each other off.</div>
+            <div class="dev-hint" id="dev-two-locs" style="display:none" data-i18n="dev-two-locs">Each location is a file of its own: a phone can hold both and switch between them.</div>
           </div>
           <div class="card">
-            <div class="card-title" data-i18n="card-conn">Connection Details</div>
+            <div class="card-title"><span data-i18n="card-conn">Connection Details</span><span id="cl-conf-loc"></span></div>
             <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
               <div class="qr-placeholder" id="cl-qr">QR CODE<br>COMING SOON</div>
               <div style="flex:1;min-width:220px">
@@ -2333,7 +2362,10 @@
           <div class="page-sub">All registered users</div>
         </div>
         <div class="card">
-          <div class="card-title">AWG Peers on Bridge</div>
+          <div class="dev-head">
+            <div class="card-title">AWG Peers <span id="adm-loc-title"></span></div>
+            <div class="adm-loc-tabs" id="adm-loc-tabs"></div>
+          </div>
           <div id="adm-clients-table" class="loading">Fetching</div>
         </div>
       </div>
@@ -2449,6 +2481,12 @@ const translations = {
     'conn-to-config': 'Open My Config →',
     'card-devices': 'Devices',
     'dev-used': '{used} of {limit} in use',
+    'loc-de': 'Germany', 'loc-nl': 'Netherlands',
+    'loc-rec': 'Recommended', 'loc-new': 'New · AmneziaWG 3',
+    'loc-nl-sub': 'A separate chain of servers on the new AmneziaWG 3 protocol. Needs a recent AmneziaWG or AmneziaVPN app. Russian sites open directly, as in Germany.',
+    'loc-plan': '{limit} + {limit} devices',
+    'dev-two-locs': 'Each location is a file of its own: a phone can hold both and switch between them.',
+    'loc-news': '<b>New location — the Netherlands.</b> We keep working on the stability of the service, and the last few days have not been smooth. So we are opening a second, fully separate chain of servers on the new AmneziaWG 3 protocol. We recommend adding a device in the Netherlands and using it first; keep Germany as a spare. Places in the Netherlands come on top of your plan — as many as in Germany.',
     'dev-one-file': 'One file is for one device. The same file on two devices at once makes them knock each other off.',
     'btn-how-connect': 'How to connect →',
     'btn-copied': 'Copied',
@@ -2842,6 +2880,12 @@ const translations = {
     'conn-to-config': 'Открыть «Мой конфиг» →',
     'card-devices': 'Устройства',
     'dev-used': 'Используется {used} из {limit}',
+    'loc-de': 'Германия', 'loc-nl': 'Нидерланды',
+    'loc-rec': 'Рекомендуем', 'loc-new': 'Новое · AmneziaWG 3',
+    'loc-nl-sub': 'Отдельная цепочка серверов на новом протоколе AmneziaWG 3. Нужна свежая версия приложения AmneziaWG или AmneziaVPN. Российские сайты открываются напрямую, как и в Германии.',
+    'loc-plan': 'Устройств: {limit} + {limit}',
+    'dev-two-locs': 'У каждой локации свой файл: на телефоне можно держать оба и включать любой.',
+    'loc-news': '<b>Новая локация — Нидерланды.</b> Мы продолжаем работать над стабильностью сервиса и видим, что последние дни подключение работало с перебоями. Поэтому запускаем вторую, полностью независимую цепочку серверов на новом протоколе AmneziaWG 3. Рекомендуем добавить устройство в Нидерландах и пользоваться им в первую очередь, а Германию держать запасной. Места в Нидерландах — сверх тарифа, столько же, сколько в Германии.',
     'dev-one-file': 'Один файл — для одного устройства. Если открыть один и тот же файл на двух устройствах одновременно, они будут выбивать друг друга.',
     'btn-how-connect': 'Как подключить →',
     'btn-copied': 'Скопировано',
@@ -4210,6 +4254,11 @@ let _configName = null;
 
 let _devLimit = 0;
 let _devBusy = false;
+// Each location's slots, recommended first: [{key, limit, used, recommended}].
+// A server from before locations sends none; then Germany is all there is.
+let _locations = [];
+const LOC_FLAG = {de: '🇩🇪', nl: '🇳🇱'};
+const _locOf = c => (c && c.location) || 'de';
 // Must match what the server accepts (1–6 chars) and what survives as a
 // filename: downloadConfig keeps only these characters, so a name outside
 // them would download as a generic file and two devices could collide.
@@ -4233,10 +4282,21 @@ async function loadClientConfigPage(selectId) {
     const d = await res.json();
     _configs = (d && d.configs) || [];
     _devLimit = Math.max(Number(d.limit) || 0, _configs.length);
+    _locations = (d && Array.isArray(d.locations) && d.locations.length) ? d.locations
+      : [{key: 'de', limit: _devLimit, used: _configs.length, recommended: false}];
+    // Devices first in the order of their location, recommended one on top.
+    const order = _locations.map(l => l.key);
+    _configs.sort((a, b) => order.indexOf(_locOf(a)) - order.indexOf(_locOf(b)));
 
     noSub.style.display = 'none';
     hasSub.style.display = 'block';
-    setText('cl-dev-count', t('dev-used').replace('{used}', _configs.length).replace('{limit}', _devLimit));
+    const multi = _locations.length > 1;
+    setText('cl-dev-count', multi
+      ? t('loc-plan').replace(/\{limit\}/g, Number(d.limit) || 0)
+      : t('dev-used').replace('{used}', _configs.length).replace('{limit}', _devLimit));
+    const two = document.getElementById('dev-two-locs');
+    if (two) two.style.display = multi ? '' : 'none';
+    showLocNews();
 
     if (!_configs.length) {
       // Subscribed with no device yet (all removed from the app, say):
@@ -4262,6 +4322,8 @@ async function loadClientConfigPage(selectId) {
 function renderDevices() {
   const list = document.getElementById('cl-devices');
   if (!list) return;
+  if (_locations.length > 1) { renderDeviceGroups(list); return; }
+  list.style.display = '';
   const filled = _configs.map(c => `
     <div class="dev-chip${c.id === _configId ? ' selected' : ''}" data-id="${escHtml(String(c.id))}"
          role="button" tabindex="0"
@@ -4279,6 +4341,67 @@ function renderDevices() {
       <span>${t('dev-add')}</span>
     </button>`);
   list.innerHTML = filled.join('') + empty.join('');
+}
+
+function _devChip(c) {
+  return `
+    <div class="dev-chip${c.id === _configId ? ' selected' : ''}" data-id="${escHtml(String(c.id))}"
+         role="button" tabindex="0"
+         onclick="selectDevice(this.dataset.id)"
+         onkeydown="if(event.key==='Enter'){selectDevice(this.dataset.id)}">
+      <span class="dev-chip-name">${escHtml(String(c.name || '—'))}</span>
+      <span class="dev-chip-ip">${escHtml(String(c.peer_ip || ''))}</span>
+      <button class="dev-edit" title="${t('dev-rename')}" aria-label="${t('dev-rename')}"
+              onclick="event.stopPropagation(); startDeviceEdit(this.parentElement.dataset.id)">✎</button>
+    </div>`;
+}
+
+// One group per location, in the server's order (recommended first), each
+// with its own count and its own empty slots.
+function renderDeviceGroups(list) {
+  list.style.display = 'block';
+  list.innerHTML = _locations.map(loc => {
+    const mine = _configs.filter(c => _locOf(c) === loc.key);
+    const limit = Math.max(Number(loc.limit) || 0, mine.length);
+    const free = Math.max(0, limit - mine.length);
+    const key = escHtml(String(loc.key));
+    const tags = loc.key === 'nl'
+      ? (loc.recommended ? `<span class="loc-tag">${t('loc-rec')}</span>` : '') + `<span class="loc-tag dim">${t('loc-new')}</span>`
+      : '';
+    const slots = Array.from({length: free}, () => `
+      <button class="dev-slot" data-loc="${key}" onclick="startDeviceAdd(this)">
+        <span class="dev-slot-plus">+</span>
+        <span>${t('dev-add')}</span>
+      </button>`).join('');
+    return `
+      <div class="loc-group" data-loc="${key}">
+        <div class="loc-head">
+          <span class="loc-flag">${LOC_FLAG[loc.key] || ''}</span>
+          <span class="loc-name">${t('loc-' + loc.key)}</span>${tags}
+          <span class="loc-count">${mine.length} / ${limit}</span>
+        </div>
+        ${loc.key === 'nl' ? `<div class="loc-sub">${t('loc-nl-sub')}</div>` : ''}
+        <div class="dev-list">${mine.map(_devChip).join('')}${slots}</div>
+      </div>`;
+  }).join('');
+}
+
+function _locNewsSeen() {
+  try { return localStorage.getItem('sov_loc_news_nl') === '1'; } catch (e) { return false; }
+}
+
+function showLocNews() {
+  const box = document.getElementById('loc-news');
+  if (!box) return;
+  const show = _locations.some(l => l.key === 'nl') && !_locNewsSeen();
+  if (show) document.getElementById('loc-news-text').innerHTML = t('loc-news');
+  box.style.display = show ? '' : 'none';
+}
+
+function dismissLocNews() {
+  try { localStorage.setItem('sov_loc_news_nl', '1'); } catch (e) {}
+  const box = document.getElementById('loc-news');
+  if (box) box.style.display = 'none';
 }
 
 function _devMsg(text, bad) {
@@ -4350,8 +4473,10 @@ function _devError(status) {
 
 function startDeviceAdd(slot) {
   if (_devBusy) return;
+  const loc = (slot && slot.dataset && slot.dataset.loc) || 'de';
   renderDevices();   // one form at a time
-  const target = document.querySelectorAll('#cl-devices .dev-slot')[0];
+  const target = document.querySelector(`#cl-devices .dev-slot[data-loc="${CSS.escape(loc)}"]`)
+              || document.querySelectorAll('#cl-devices .dev-slot')[0];
   if (!target) return;
   _devMsg('');
   const form = _devForm('', t('dev-create'), async name => {
@@ -4359,7 +4484,7 @@ function startDeviceAdd(slot) {
       const res = await fetch(`${API}/api/client/configs`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', ...hdrs()},
-        body: JSON.stringify({name}),
+        body: JSON.stringify({name, location: loc}),
       });
       if (res.status === 401) { doLogout(); return; }
       const d = await res.json().catch(() => ({}));
@@ -4430,6 +4555,9 @@ async function selectDevice(id, fromCode) {
   _configName = cfg.name;
   _configText = null;
   document.querySelectorAll('.dev-chip').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+  const locLabel = document.getElementById('cl-conf-loc');
+  if (locLabel) locLabel.textContent = _locations.length > 1
+    ? ` · ${LOC_FLAG[_locOf(cfg)] || ''} ${t('loc-' + _locOf(cfg))} · ${cfg.name}` : '';
   block.innerHTML = `<span class="loading">${t('hist-loading')}</span>`;
   try {
     const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}/raw`, {headers: hdrs()});
@@ -4686,13 +4814,28 @@ async function loadAdminDash() {
 
 const PEER_SOURCE = {portal: 'src-portal', trial: 'src-trial', manual: 'src-manual', unknown: 'src-unknown'};
 
+// Which entry's peers are shown. Germany first-time, then whatever was picked.
+let _admLoc = 'de';
+
+function _renderAdmLocTabs(locs) {
+  const box = document.getElementById('adm-loc-tabs');
+  if (!box) return;
+  const title = document.getElementById('adm-loc-title');
+  if (title) title.textContent = `· ${LOC_FLAG[_admLoc] || ''} ${t('loc-' + _admLoc)}`;
+  box.innerHTML = (locs && locs.length > 1) ? locs.map(k => `
+    <button class="btn-sm${k === _admLoc ? ' active' : ''}" onclick="_admLoc='${escHtml(k)}';loadAdminClients()">
+      ${LOC_FLAG[k] || ''} ${escHtml(t('loc-' + k))}</button>`).join('') : '';
+}
+
 async function loadAdminClients() {
   const el = document.getElementById('adm-clients-table');
   el.innerHTML = '<span class="loading">Fetching</span>';
   try {
-    const res = await adminFetch(`${API}/api/clients`, {headers: hdrs()});
+    const res = await adminFetch(`${API}/api/clients?location=${encodeURIComponent(_admLoc)}`, {headers: hdrs()});
+    if (res.status === 422) { _admLoc = 'de'; return loadAdminClients(); }
     const d = await res.json();
-    if (!d.ok) { el.textContent = 'Error'; return; }
+    _renderAdmLocTabs(d.locations);
+    if (!d.ok) { el.textContent = 'Error: ' + (d.error || ''); return; }
     const src = d.sources || {};
     const summary = ['portal', 'trial', 'manual', 'unknown']
       .map(k => `${escHtml(t(PEER_SOURCE[k]))}: ${src[k] || 0}`).join(' · ');
