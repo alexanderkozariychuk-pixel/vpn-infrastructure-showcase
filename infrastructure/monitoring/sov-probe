@@ -29,6 +29,8 @@
 #   awg.<if>.ips                        each peer's first address, comma-separated
 #   link_hop.port link_hop.hops         entry: the link's source port and how many
 #   link_hop.last                       times sovrn-link-hop moved it; epoch of the last
+#   net.if net.rx_bytes net.tx_bytes    the uplink (default route) and its byte counters
+#                                       since boot; sov-monitor sums them per day and month
 #   backup_age                           portal: seconds since the last good dump
 #   pulled_backup_age                    am1: seconds since the last pulled LAST_OK
 #   expiry_age expiry_failures           portal: the hourly sweep's last run
@@ -77,6 +79,14 @@ if command -v awg >/dev/null 2>&1; then
     awg show all allowed-ips 2>/dev/null | awk '
         { split($3, a, "/"); if (a[1] ~ /^[0-9.]+$/) ips[$1] = ips[$1] (ips[$1] ? "," : "") a[1] }
         END { for (i in ips) printf "awg.%s.ips=%s\n", i, ips[i] }'
+fi
+
+# The uplink's byte counters: what a provider bills, in and out together.
+upif=$(ip -4 route show default 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit }}')
+if [[ -n $upif && -r /sys/class/net/$upif/statistics/rx_bytes ]]; then
+    kv net.if "$upif"
+    kv net.rx_bytes "$(cat "/sys/class/net/$upif/statistics/rx_bytes")"
+    kv net.tx_bytes "$(cat "/sys/class/net/$upif/statistics/tx_bytes")"
 fi
 
 # Entry: where sovrn-link-hop has put the link (infrastructure/link).

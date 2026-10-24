@@ -372,3 +372,56 @@ def test_the_probe_reads_the_hop_state(tmp_path):
     out = subprocess.run(["bash", str(ROOT / "sov-probe")], capture_output=True, text=True, timeout=30, env=env)
     v = mon.parse_probe(out.stdout)
     assert (v["link_hop.port"], v["link_hop.hops"], v["link_hop.last"]) == (51861, 4, 1800000000)
+
+
+# ── traffic ─────────────────────────────────────────────────────────────
+
+def _t(rx, tx):
+    return {"net.rx_bytes": rx, "net.tx_bytes": tx}
+
+
+# 2026-10-24 12:00 MSK and the next day; the month turns on 2026-11-01.
+D1 = 1792832400
+D2 = D1 + 86400
+
+
+def test_traffic_counts_from_the_first_sight_and_sums_in_and_out():
+    rep, st = mon.traffic({}, {"exit-2": _t(1000, 2000)}, D1)
+    assert rep["exit-2"]["day_bytes"] == 0 and rep["exit-2"]["since"] == D1
+    rep, st = mon.traffic(st, {"exit-2": _t(1500, 2600)}, D1 + 120)
+    assert rep["exit-2"] == {"day_bytes": 1100, "month_bytes": 1100, "since": D1}
+
+
+def test_a_new_day_starts_the_day_and_keeps_the_month():
+    _, st = mon.traffic({}, {"x": _t(0, 0)}, D1)
+    _, st = mon.traffic(st, {"x": _t(100, 0)}, D1 + 60)
+    rep, st = mon.traffic(st, {"x": _t(150, 0)}, D2)
+    assert rep["x"]["day_bytes"] == 50 and rep["x"]["month_bytes"] == 150
+
+
+def test_a_reboot_counts_everything_since_the_boot():
+    _, st = mon.traffic({}, {"x": _t(10_000, 0)}, D1)
+    rep, _ = mon.traffic(st, {"x": _t(300, 0)}, D1 + 60)
+    assert rep["x"]["day_bytes"] == 300
+
+
+def test_a_silent_host_keeps_its_numbers_and_an_old_probe_is_ignored():
+    _, st = mon.traffic({}, {"x": _t(0, 0)}, D1)
+    _, st = mon.traffic(st, {"x": _t(500, 0)}, D1 + 60)
+    rep, st = mon.traffic(st, {"x": None, "old": {"uptime_s": 5}}, D1 + 120)
+    assert rep == {"x": {"day_bytes": 500, "month_bytes": 500, "since": D1}}
+
+
+def test_the_month_turns_over():
+    nov = 1793480400   # 2026-11-01 00:00 MSK
+    _, st = mon.traffic({}, {"x": _t(0, 0)}, nov - 120)
+    _, st = mon.traffic(st, {"x": _t(700, 0)}, nov - 60)
+    rep, _ = mon.traffic(st, {"x": _t(900, 0)}, nov + 60)
+    assert rep["x"]["month_bytes"] == 200
+
+
+def test_the_probe_prints_the_uplink_counters():
+    out = subprocess.run(["bash", str(ROOT / "sov-probe")], capture_output=True, text=True, timeout=30)
+    v = mon.parse_probe(out.stdout)
+    if "net.if" in v:   # a sandbox may have no default route
+        assert isinstance(v["net.rx_bytes"], int) and isinstance(v["net.tx_bytes"], int)

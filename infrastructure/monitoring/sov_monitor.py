@@ -89,7 +89,7 @@ DEFAULT_LIMITS = {
 
 # ── collecting ──────────────────────────────────────────────────────────
 
-TEXT_KEYS = {"host", "failed_unit_names"}
+TEXT_KEYS = {"host", "failed_unit_names", "net.if"}
 
 def parse_probe(text: str) -> dict:
     """key=value lines from sov-probe; numbers become numbers — except the
@@ -396,6 +396,43 @@ def link_hops(state: dict, probes: dict, now: float) -> tuple[list[str], dict]:
     return msgs, out
 
 
+def traffic(state: dict, probes: dict, now: float) -> tuple[dict, dict]:
+    """
+    Bytes through each host's uplink, in and out together — what a provider
+    counts — summed per day and per month (Moscow time) from the probe's
+    counters since boot. A counter smaller than last time means a reboot:
+    then everything since the boot counts. Nothing is counted before the
+    first run that saw a host (`since`); a run whose state was not saved
+    (Telegram refused) is counted again from the same base on the next one.
+    """
+    keep = dict(state.get("traffic", {}))
+    day = datetime.fromtimestamp(now, MSK).strftime("%Y-%m-%d")
+    month = day[:7]
+    report = {}
+    for name, p in probes.items():
+        rx, tx = (p or {}).get("net.rx_bytes"), (p or {}).get("net.tx_bytes")
+        t = dict(keep.get(name, {}))
+        if isinstance(rx, int) and isinstance(tx, int):
+            cur = rx + tx
+            prev = t.get("last")
+            delta = 0 if prev is None else (cur - prev if cur >= prev else cur)
+            if t.get("day") != day:
+                t["day"], t["day_bytes"] = day, 0
+            if t.get("month") != month:
+                t["month"], t["month_bytes"] = month, 0
+            t["day_bytes"] += delta
+            t["month_bytes"] += delta
+            t["last"] = cur
+            t.setdefault("since", now)
+            keep[name] = t
+        if t.get("month") == month:
+            report[name] = {"day_bytes": t["day_bytes"] if t.get("day") == day else 0,
+                            "month_bytes": t["month_bytes"], "since": t.get("since", now)}
+    out = dict(state)
+    out["traffic"] = keep
+    return report, out
+
+
 def digest(probes: dict, problems: dict, now: float) -> str:
     lines = ["📋 Sovereign, сводка на " + datetime.fromtimestamp(now, MSK).strftime("%d.%m %H:%M МСК")]
     for name, probe in probes.items():
@@ -432,10 +469,12 @@ def send_telegram(cfg, text: str) -> bool:
         return False
 
 
-def build_report(cfg, probes: dict, errors: dict, web: dict, state: dict, now: float, confirm: int) -> dict:
+def build_report(cfg, probes: dict, errors: dict, web: dict, state: dict, now: float, confirm: int,
+                 traffic_report: dict | None = None) -> dict:
     """What the admin panel gets: the numbers and the problems confirmed so far."""
     hosts = [s for s in cfg.sections() if s.startswith("host:")]
     return {
+        "traffic": traffic_report or {},
         "sent_at": now,
         "hosts": probes,
         "errors": errors,
@@ -548,6 +587,7 @@ def main() -> int:
     msgs += boot_msgs
     hop_msgs, state = link_hops(state, probes, now)
     msgs += hop_msgs
+    traffic_report, state = traffic(state, probes, now)
 
     hour = cfg.getint("digest", "hour_msk", fallback=-1)
     today = datetime.fromtimestamp(now, MSK)
@@ -555,7 +595,7 @@ def main() -> int:
         msgs.append(digest(probes, problems, now))
         state["digest_day"] = today.strftime("%F")
 
-    report = build_report(cfg, probes, errors, web, state, now, int(limits["confirm_runs"]))
+    report = build_report(cfg, probes, errors, web, state, now, int(limits["confirm_runs"]), traffic_report)
     if args.dry_run:
         print(json.dumps(report, ensure_ascii=False, indent=1))
         print("\n".join(msgs) or "(nothing to send)")
