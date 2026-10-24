@@ -222,3 +222,15 @@ def test_the_delete_texts_exist_in_both_languages_and_name_the_device():
             assert f"'{key}':" in table, f"{key} missing in {lang}"
         confirm = re.search(r"'dev-del-confirm': '([^']*)'", table).group(1)
         assert "{name}" in confirm, f"the {lang} confirmation does not say which device"
+
+
+def test_the_qr_library_is_served_from_the_portal_itself():
+    """The device's QR is drawn in the browser from the file on the page, by a
+    vendored copy of qrcode-generator (MIT): no outside script sees the key."""
+    from pathlib import Path
+    static = Path(__file__).resolve().parents[1] / "pwa" / "static"
+    page = (static / "index.html").read_text()
+    assert '<script src="/static/vendor/qrcode-1.4.4.js"></script>' in page
+    lib = (static / "vendor" / "qrcode-1.4.4.js").read_text()
+    assert "Licensed under the MIT license" in lib
+    assert "renderQr(text);" in page and "QR CODE<br>COMING SOON" not in page

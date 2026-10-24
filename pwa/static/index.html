@@ -542,6 +542,21 @@
 
     .copy-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
 
+    /* QR of the selected device's file: dark modules on white whatever the
+       theme — a scanner needs the contrast and the quiet zone around it. */
+    .qr-wrap { display: grid; gap: 8px; justify-items: center; flex-shrink: 0; }
+    .qr-box {
+      width: 240px; height: 240px; padding: 10px; background: #fff; border-radius: 8px;
+      border: 1px solid var(--border); display: grid; place-items: center; cursor: zoom-in;
+    }
+    .qr-box svg { width: 100%; height: 100%; display: block; }
+    .qr-hint { max-width: 240px; font-size: 12px; line-height: 1.45; color: var(--text-dim); text-align: center; }
+    .qr-zoom {
+      position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.85);
+      display: grid; place-items: center; padding: 16px; cursor: zoom-out;
+    }
+    .qr-zoom .qr-box { width: min(92vw, 92vh, 560px); height: min(92vw, 92vh, 560px); cursor: zoom-out; }
+
     /* QR placeholder */
     .qr-placeholder {
       width: 160px;
@@ -1751,7 +1766,10 @@
           <div class="card">
             <div class="card-title"><span data-i18n="card-conn">Connection Details</span><span id="cl-conf-loc"></span></div>
             <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
-              <div class="qr-placeholder" id="cl-qr">QR CODE<br>COMING SOON</div>
+              <div class="qr-wrap">
+                <div class="qr-placeholder" id="cl-qr">QR</div>
+                <div class="qr-hint" id="cl-qr-hint" style="display:none" data-i18n="qr-hint">Scan it in AmneziaWG: “+” → “Scan from QR code”. Tap the code to enlarge it.</div>
+              </div>
               <div style="flex:1;min-width:220px">
                 <div class="config-block" id="cl-config-block">
                   <button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">Copy</button>
@@ -2406,6 +2424,7 @@
   </div>
 </div>
 
+<script src="/static/vendor/qrcode-1.4.4.js"></script>
 <script>
 const API = '';
 let token = localStorage.getItem('sov_token');
@@ -2693,6 +2712,7 @@ const translations = {
     'config-no-sub-sub': 'Subscribe to get your personal config',
     'btn-go-plans': 'Choose a plan →',
     'btn-copy': 'Copy',
+    'qr-hint': 'Scan it in AmneziaWG: “+” → “Scan from QR code”. Tap the code to enlarge it.',
     'hist-title': 'Order history',
     'hist-loading': 'Loading',
     'hist-empty': 'No orders yet',
@@ -3092,6 +3112,7 @@ const translations = {
     'config-no-sub-sub': 'Оформите подписку чтобы получить конфиг',
     'btn-go-plans': 'Выбрать тариф →',
     'btn-copy': 'Скопировать',
+    'qr-hint': 'Отсканируйте в AmneziaWG: «+» → «Сканировать QR-код». Нажмите на код, чтобы увеличить.',
     'hist-title': 'История заказов',
     'hist-loading': 'Загрузка',
     'hist-empty': 'Заказов пока нет',
@@ -4302,6 +4323,7 @@ async function loadClientConfigPage(selectId) {
       // Subscribed with no device yet (all removed from the app, say):
       // the empty slots are the way forward, not a "being prepared" notice.
       _configId = null; _configName = null; _configText = null;
+      renderQr(null);
       renderDevices();
       if (block) block.innerHTML = `<span style="color:var(--text-dim)">${t('dev-add-first')}</span>`;
       return;
@@ -4559,6 +4581,7 @@ async function selectDevice(id, fromCode) {
   if (locLabel) locLabel.textContent = _locations.length > 1
     ? ` · ${LOC_FLAG[_locOf(cfg)] || ''} ${t('loc-' + _locOf(cfg))} · ${cfg.name}` : '';
   block.innerHTML = `<span class="loading">${t('hist-loading')}</span>`;
+  renderQr(null);   // never the previous device's code under this one's name
   try {
     const res = await fetch(`${API}/api/client/configs/${encodeURIComponent(id)}/raw`, {headers: hdrs()});
     if (res.status === 401) { doLogout(); return; }
@@ -4576,9 +4599,45 @@ async function selectDevice(id, fromCode) {
       return `<span style="color:var(--text-dim)">${line}</span>`;
     });
     block.innerHTML = `<button class="copy-btn" onclick="copyConfig()" data-i18n="btn-copy">${t('btn-copy')}</button>` + lines.join('<br>');
+    renderQr(text);
   } catch(e) {
     if (_configId === id) block.innerHTML = '<span style="color:var(--red)">—</span>';
   }
+}
+
+// The file as a QR code, drawn here from the text already on the page: the
+// key never travels anywhere else. qrcode-generator 1.4.4 (MIT, vendored in
+// /static/vendor). Error correction L: a 3.x file is ~700 characters, and L
+// keeps the code small enough to scan off a phone screen.
+function renderQr(text) {
+  const box = document.getElementById('cl-qr');
+  const hint = document.getElementById('cl-qr-hint');
+  if (!box) return;
+  const reset = () => {
+    box.className = 'qr-placeholder'; box.textContent = 'QR'; box.onclick = null;
+    if (hint) hint.style.display = 'none';
+  };
+  if (!text || typeof qrcode !== 'function') { reset(); return; }
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(text.replace(/\n+$/, ''));
+    qr.make();
+    box.className = 'qr-box';
+    box.innerHTML = qr.createSvgTag({cellSize: 4, margin: 2, scalable: true});
+    box.onclick = () => openQrZoom(box.innerHTML);
+    if (hint) { hint.textContent = t('qr-hint'); hint.style.display = ''; }
+  } catch (e) { reset(); }
+}
+
+function openQrZoom(svg) {
+  const over = document.createElement('div');
+  over.className = 'qr-zoom';
+  over.innerHTML = `<div class="qr-box">${svg}</div>`;
+  const close = () => { over.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  over.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(over);
 }
 
 function copyConfig() {
