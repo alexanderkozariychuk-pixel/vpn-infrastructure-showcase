@@ -13,3 +13,13 @@
     proto: udp
     comment: "{{ entry_link.if }} link to exit"
   when: entry_link is defined
+
+# The ports the link may hop to: the exit answers to whichever is in use.
+- name: Link hop ports open
+  community.general.ufw:
+    rule: allow
+    port: "{{ item | string }}"
+    proto: udp
+    comment: "{{ entry_link.if }} link to exit"
+  loop: "{{ entry_link.hop_ports | default([]) }}"
+  when: entry_link is defined

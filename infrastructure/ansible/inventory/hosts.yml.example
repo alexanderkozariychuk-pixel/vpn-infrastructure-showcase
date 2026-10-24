@@ -54,6 +54,9 @@ all:
           #   port: 51821                     # this entry's listen port
           #   peer_endpoint: "<exit>:51823"   # the exit's awg2 port
           #   peer_public_key: "<exit awg2 public key>"
+          #   hop_ports: [51821, 51831, 51841, 51851, 51861]  # optional: sovrn-link-hop
+          #                                   # moves the link to the next one when it is
+          #                                   # silent for entry_link_hop_stale seconds
           #   public_key: "<this end's public key>"   # checked against awg1
           #   obfuscation:                    # same values as awg2 on the exit
           #     jc: "4"

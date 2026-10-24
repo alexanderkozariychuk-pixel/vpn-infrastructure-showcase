@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+#
+# sovrn-link-hop — move an entry's link to another source port when it goes silent.
+#
+#   sovrn-link-hop check       hop if the link has had no handshake for STALE seconds
+#                              (run every minute by sovrn-link-hop.timer)
+#   sovrn-link-hop apply <if>  put the link on the port the last hop chose (link PostUp),
+#                              so a restart or a reboot does not fall back to a blocked port
+#   sovrn-link-hop status      the state, as key=value
+#
+# Why: twice in two days (2026-10-23 and -24, two different exits) the path
+# between entry B and its exit dropped one flow — one pair of ports — while
+# both ends were healthy and other ports passed. A different source port on
+# the entry's side cured it within seconds each time. The exit accepts the
+# entry from any source port (its ufw rule is per address) and learns the new
+# one from the first authenticated packet, so only the entry changes.
+#
+# The port is changed in the running interface only. The config file keeps
+# the inventory's port, so the Ansible role still sees its own file; the port
+# in use lives in the state file, and `apply` (from PostUp) restores it.
+#
+# Config, /etc/sovereign/link-hop.conf (written by roles/entry):
+#   IF=awg1                       the link interface
+#   PORTS="51851 51861 51871"     ports to cycle through, each open in ufw
+#   STALE=180                     seconds without a handshake before a hop
+#
+# State, /var/lib/sovrn/link-hop.state: port, last_hop (epoch), hops, from.
+# Read by sov-probe, so sov-monitor tells the operator about every hop.
+
+set -euo pipefail
+export LC_ALL=C
+
+CONF=${SOVRN_LINK_HOP_CONF:-/etc/sovereign/link-hop.conf}
+STATE=${SOVRN_LINK_HOP_STATE:-/var/lib/sovrn/link-hop.state}
+NOW=${SOVRN_NOW:-$(date +%s)}
+
+log() { logger -t sovrn-link-hop -- "$*" 2>/dev/null || true; echo "$*"; }
+
+[[ -r $CONF ]] || { echo "no config at $CONF" >&2; exit 2; }
+# shellcheck disable=SC1090
+. "$CONF"
+IF=${IF:?IF missing in $CONF}
+PORTS=${PORTS:?PORTS missing in $CONF}
+STALE=${STALE:-180}
+
+state_get() {
+    [[ -r $STATE ]] || return 0
+    sed -n "s/^$1=//p" "$STATE" | tail -1
+}
+
+in_ports() {
+    local p
+    for p in $PORTS; do [[ $p == "$1" ]] && return 0; done
+    return 1
+}
+
+next_port() {
+    # The port after $1 in PORTS, wrapping; the first one if $1 is not there.
+    local first="" take="" p
+    for p in $PORTS; do
+        [[ -n $first ]] || first=$p
+        if [[ -n $take ]]; then echo "$p"; return; fi
+        [[ $p == "$1" ]] && take=1
+    done
+    echo "$first"
+}
+
+# Seconds the link's unit has been up; a large number when that is unknown.
+up_for() {
+    local since
+    since=$(systemctl show "awg-quick@$IF" -p ActiveEnterTimestamp --value 2>/dev/null || true)
+    if [[ -z $since || $since == "n/a" ]]; then echo 999999; return; fi
+    echo $(( NOW - $(date -d "$since" +%s 2>/dev/null || echo 0) ))
+}
+
+case "${1:-}" in
+check)
+    awg show "$IF" listen-port >/dev/null 2>&1 || { echo "$IF is not up"; exit 0; }
+    last=$(awg show "$IF" latest-handshakes | awk 'NR == 1 { print $2 }')
+    [[ -n $last ]] || { echo "$IF has no peer"; exit 0; }
+    age=$(( last > 0 ? NOW - last : NOW ))
+    if (( age <= STALE )); then
+        echo "$IF fresh (${age}s)"
+        exit 0
+    fi
+    # Give a new port, or a freshly started link, the full STALE to shake
+    # hands before judging it, plus a minute for the keepalive and the retry.
+    last_hop=$(state_get last_hop)
+    if (( NOW - ${last_hop:-0} < STALE + 60 )); then
+        echo "$IF silent ${age}s, waiting: last hop $(( NOW - last_hop ))s ago"
+        exit 0
+    fi
+    up=$(up_for)
+    if (( up < STALE + 60 )); then
+        echo "$IF silent ${age}s, waiting: link up for ${up}s"
+        exit 0
+    fi
+    cur=$(awg show "$IF" listen-port)
+    new=$(next_port "$cur")
+    if [[ $new == "$cur" ]]; then
+        echo "$IF silent ${age}s, but there is no other port to try"
+        exit 0
+    fi
+    awg set "$IF" listen-port "$new"
+    hops=$(state_get hops)
+    install -d -m 755 "$(dirname "$STATE")"
+    tmp="$STATE.tmp"
+    printf 'port=%s\nfrom=%s\nlast_hop=%s\nhops=%s\n' "$new" "$cur" "$NOW" "$(( ${hops:-0} + 1 ))" > "$tmp"
+    mv "$tmp" "$STATE"
+    log "$IF: no handshake for ${age}s, source port $cur -> $new"
+    ;;
+apply)
+    # From PostUp: never fail, or the link would not come up at all.
+    iface=${2:-$IF}
+    port=$(state_get port)
+    if [[ -n $port ]] && in_ports "$port"; then
+        if awg set "$iface" listen-port "$port"; then
+            log "$iface: source port $port from the last hop"
+        fi
+    fi
+    exit 0
+    ;;
+status)
+    [[ -r $STATE ]] && cat "$STATE" || echo "hops=0"
+    ;;
+*)
+    echo "usage: $0 check | apply <interface> | status" >&2
+    exit 2
+    ;;
+esac

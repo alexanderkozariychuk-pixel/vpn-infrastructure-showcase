@@ -9,6 +9,11 @@ entry_uplink_if: "{{ ansible_facts['default_ipv4']['interface'] }}"
 entry_isolate_clients: true
 
 entry_route_table: 200
+
+# Link port hopping (infrastructure/link/sovrn-link-hop), on when
+# entry_link.hop_ports is set: seconds without a handshake before the link
+# moves to the next source port.
+entry_link_hop_stale: 180
 entry_conntrack_max: 262144
 entry_ru_min_prefixes: 8000
 

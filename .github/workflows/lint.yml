@@ -47,7 +47,9 @@ jobs:
 
       - name: sovrn-bt test
         working-directory: .
-        run: bash tests/infrastructure/test_sovrn_bt.sh
+        run: |
+          bash tests/infrastructure/test_sovrn_bt.sh
+          bash tests/infrastructure/test_link_hop.sh
 
   shell:
     name: Shellcheck

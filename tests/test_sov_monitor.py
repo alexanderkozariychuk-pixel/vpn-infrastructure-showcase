@@ -336,3 +336,39 @@ def test_main_measures_the_clock_around_each_call(tmp_path, monkeypatch, capsys)
     assert 29 <= report["hosts"]["entry"]["clock_skew_s"] <= 30
     assert report["hosts"]["exit"]["clock_skew_s"] == 0.0
     assert "clock_skew_s" not in report["hosts"]["am1"]
+
+
+# ── link port hops (infrastructure/link/sovrn-link-hop) ─────────────────
+
+def test_a_link_hop_is_told_once_and_the_first_sight_only_records():
+    msgs, st = mon.link_hops({}, {"entry-b": {"link_hop.hops": 2, "link_hop.port": 51861}}, 1000)
+    assert msgs == [] and st["hops"] == {"entry-b": 2}
+    msgs, st = mon.link_hops(st, {"entry-b": {"link_hop.hops": 2, "link_hop.port": 51861}}, 1120)
+    assert msgs == []
+    msgs, st = mon.link_hops(st, {"entry-b": {"link_hop.hops": 3, "link_hop.port": 51871, "link_hop.last": 1200}}, 1240)
+    assert len(msgs) == 1 and "entry-b" in msgs[0] and "51871" in msgs[0]
+    assert st["notices"] == [{"key": "entry-b:hop", "text": "entry-b: связка сменила порт на 51871", "at": 1200}]
+
+
+def test_several_hops_between_runs_say_how_many():
+    _, st = mon.link_hops({}, {"entry-b": {"link_hop.hops": 1}}, 0)
+    msgs, _ = mon.link_hops(st, {"entry-b": {"link_hop.hops": 3, "link_hop.port": 51871}}, 120)
+    assert "2 смены подряд" in msgs[0]
+
+
+def test_hop_notices_join_reboot_notices_and_hosts_without_hops_are_ignored():
+    _, st = mon.reboots({"boots": {"entry": 0}}, {"entry": {"uptime_s": 60}}, 100000)
+    st["hops"] = {"entry-b": 1}
+    msgs, st = mon.link_hops(st, {"entry": {"uptime_s": 60}, "exit": None,
+                                  "entry-b": {"link_hop.hops": 2, "link_hop.port": 51861}}, 100000)
+    assert [n["key"] for n in st["notices"]] == ["entry:reboot", "entry-b:hop"]
+    assert "entry" not in st["hops"]
+
+
+def test_the_probe_reads_the_hop_state(tmp_path):
+    state = tmp_path / "link-hop.state"
+    state.write_text("port=51861\nfrom=51851\nlast_hop=1800000000\nhops=4\n")
+    env = {"PATH": "/usr/bin:/bin", "SOV_LINK_HOP_STATE": str(state)}
+    out = subprocess.run(["bash", str(ROOT / "sov-probe")], capture_output=True, text=True, timeout=30, env=env)
+    v = mon.parse_probe(out.stdout)
+    assert (v["link_hop.port"], v["link_hop.hops"], v["link_hop.last"]) == (51861, 4, 1800000000)

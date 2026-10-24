@@ -73,6 +73,9 @@
     label: "{{ item.if }} {{ item.key }}"
   when:
     - item.if in entry_v_have
+    # A link that hops (sovrn-link-hop) may be on any of its hop ports.
+    - not (entry_link is defined and item.if == entry_link.if and item.key == 'listening port'
+           and _v_have in (entry_link.hop_ports | default([]) | map('string') | list))
     - _v_have != (item.value | string)
 
 # The node's own clock on both sides of the subtraction.
@@ -98,6 +101,11 @@
     - (_v_now | int) - (_v_last | int) > 180
 
 - name: Policy rules, table 200, ipset, firewall, sysctl, units
+  vars:
+    _v_units: >-
+      {{ ['awg-quick@awg0', 'sov-split']
+         + (['sovrn-trial-net', 'awg-quick@' ~ entry_link.if] if entry_link is defined else [])
+         + (['sovrn-link-hop.timer'] if (entry_link is defined and entry_link.hop_ports is defined) else []) }}
   ansible.builtin.shell: |
     set -o pipefail
     echo "== rules";    ip rule show
@@ -110,7 +118,7 @@
       echo "$k=$(sysctl -n "$k" 2>/dev/null)"
     done
     echo "== units"
-    for u in awg-quick@awg0 sov-split {{ ('sovrn-trial-net awg-quick@' ~ entry_link.if) if entry_link is defined else '' }}; do
+    for u in {{ _v_units | join(' ') }}; do
       echo "$u=$(systemctl is-active "$u") $(systemctl is-enabled "$u" 2>/dev/null)"
     done
   args:

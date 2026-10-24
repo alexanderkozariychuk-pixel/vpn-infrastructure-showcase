@@ -1,0 +1,10 @@
+[Unit]
+Description=Check the entry's link every minute (sovrn-link-hop)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

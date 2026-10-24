@@ -27,6 +27,8 @@
 #   awg.<if>.peers  awg.<if>.active     (handshake in the last 3 min)
 #   awg.<if>.fresh                      (seconds since the newest handshake, -1 = none yet)
 #   awg.<if>.ips                        each peer's first address, comma-separated
+#   link_hop.port link_hop.hops         entry: the link's source port and how many
+#   link_hop.last                       times sovrn-link-hop moved it; epoch of the last
 #   backup_age                           portal: seconds since the last good dump
 #   pulled_backup_age                    am1: seconds since the last pulled LAST_OK
 #   expiry_age expiry_failures           portal: the hourly sweep's last run
@@ -75,6 +77,14 @@ if command -v awg >/dev/null 2>&1; then
     awg show all allowed-ips 2>/dev/null | awk '
         { split($3, a, "/"); if (a[1] ~ /^[0-9.]+$/) ips[$1] = ips[$1] (ips[$1] ? "," : "") a[1] }
         END { for (i in ips) printf "awg.%s.ips=%s\n", i, ips[i] }'
+fi
+
+# Entry: where sovrn-link-hop has put the link (infrastructure/link).
+hop_state=${SOV_LINK_HOP_STATE:-/var/lib/sovrn/link-hop.state}
+if [[ -r $hop_state ]]; then
+    v=$(sed -n 's/^port=//p' "$hop_state" | tail -1); [[ -n $v ]] && kv link_hop.port "$v"
+    v=$(sed -n 's/^hops=//p' "$hop_state" | tail -1); [[ -n $v ]] && kv link_hop.hops "$v"
+    v=$(sed -n 's/^last_hop=//p' "$hop_state" | tail -1); [[ -n $v ]] && kv link_hop.last "$v"
 fi
 
 # Portal: nightly dump, hourly sweep, containers.

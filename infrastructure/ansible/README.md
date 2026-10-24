@@ -118,6 +118,20 @@ At that switch `entry_link` moves to `awg3` and `awg1` is removed; until then
 the role must not template `awg3`, because `link.conf.j2` also routes the
 clients into the link.
 
+## Link port hopping
+
+The path between an entry and its exit has twice dropped one flow — one pair
+of ports — while both ends were healthy (2026-10-23 and -24, two different
+exits); another source port on the entry cured it each time. With
+`entry_link.hop_ports` set, `sovrn-link-hop.timer` checks the link every
+minute and, after `entry_link_hop_stale` seconds (180) without a handshake,
+moves it to the next port in the list (`infrastructure/link/sovrn-link-hop`).
+Only the running interface changes; the file keeps the inventory's port and
+the link's PostUp restores the port in use from `/var/lib/sovrn/link-hop.state`,
+so the role still owns the file and a reboot does not fall back to a blocked
+port. The exit needs nothing: it accepts the entry from any port. sov-probe
+reports the hops and sov-monitor sends one message per hop.
+
 ## Tests
 
 `tests/infrastructure/test_entry_verify.sh` runs the read-only checks against

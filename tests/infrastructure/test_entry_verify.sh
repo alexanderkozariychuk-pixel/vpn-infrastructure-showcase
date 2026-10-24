@@ -37,8 +37,10 @@ fail=0
 
 # run <fixture dir> <output file>; prints ansible's output on failure.
 run() {
+    local extra=()
+    [[ -f $1/extra.yml ]] && extra=(-e "@$1/extra.yml")
     if ! ansible-playbook "$DIR/play.yml" \
-            -e "stub_dir=$DIR/stubs" -e "fixture=$1" -e "out=$2" \
+            -e "stub_dir=$DIR/stubs" -e "fixture=$1" -e "out=$2" "${extra[@]}" \
             </dev/null >"$2.log" 2>&1; then
         echo "  ansible failed:"; sed 's/^/    /' "$2.log" | tail -20
         return 1
@@ -99,6 +101,10 @@ case_ unit-disabled       "unit sovrn-trial-net: active disabled"            'se
 case_ sshd-root           "sshd: permitrootlogin is yes, want no"            'sed -i "s/^permitrootlogin no/permitrootlogin yes/" sshd_T'
 case_ sshd-password       "sshd: passwordauthentication is unset"            'sed -i "/^passwordauthentication/d" sshd_T'
 case_ ufw-off             "ufw: Status: inactive"                            'echo "Status: inactive" > ufw_status'
+case_ hop-port-in-list    ""                                                 'printf "entry_link:\n  if: awg1\n  port: 51821\n  hop_ports: [51821, 51831, 51841]\n  public_key: \"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\"\n" > extra.yml; echo "sovrn-link-hop.timer=active enabled" >> units; sed -i "s/^  listening port: 51821/  listening port: 51841/" awg_show_awg1'
+case_ hop-port-off-list   "awg1: listening port is 51900, want 51821"        'printf "entry_link:\n  if: awg1\n  port: 51821\n  hop_ports: [51821, 51831, 51841]\n  public_key: \"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\"\n" > extra.yml; echo "sovrn-link-hop.timer=active enabled" >> units; sed -i "s/^  listening port: 51821/  listening port: 51900/" awg_show_awg1'
+case_ hop-timer-stopped   "unit sovrn-link-hop.timer: inactive enabled"      'printf "entry_link:\n  if: awg1\n  port: 51821\n  hop_ports: [51821, 51831, 51841]\n  public_key: \"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI=\"\n" > extra.yml; echo "sovrn-link-hop.timer=active enabled" >> units; sed -i "s/^sovrn-link-hop.timer=.*/sovrn-link-hop.timer=inactive enabled/" units'
+case_ no-hop-port-moved   "awg1: listening port is 51841, want 51821"        'sed -i "s/^  listening port: 51821/  listening port: 51841/" awg_show_awg1'
 
 echo
 echo "$pass passed, $fail failed"

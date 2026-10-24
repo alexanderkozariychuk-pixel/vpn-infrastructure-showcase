@@ -20,6 +20,61 @@
         enabled: true
         state: started
 
+    - name: Link port hopping
+      when: entry_link.hop_ports is defined
+      block:
+        - name: Hop ports include the inventory's port
+          ansible.builtin.assert:
+            that:
+              - entry_link.hop_ports | length >= 2
+              - entry_link.port | int in (entry_link.hop_ports | map('int') | list)
+            fail_msg: "entry_link.hop_ports needs two or more ports, entry_link.port among them"
+            quiet: true
+
+        - name: /etc/sovereign exists
+          ansible.builtin.file:
+            path: /etc/sovereign
+            state: directory
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: sovrn-link-hop installed
+          ansible.builtin.copy:
+            src: "{{ sovereign_repo }}/infrastructure/link/sovrn-link-hop"
+            dest: /usr/local/sbin/sovrn-link-hop
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: sovrn-link-hop config
+          ansible.builtin.copy:
+            dest: /etc/sovereign/link-hop.conf
+            content: |
+              # Installed by Ansible (roles/entry). See /usr/local/sbin/sovrn-link-hop.
+              IF={{ entry_link.if }}
+              PORTS="{{ entry_link.hop_ports | join(' ') }}"
+              STALE={{ entry_link_hop_stale }}
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: sovrn-link-hop units
+          ansible.builtin.copy:
+            src: "{{ sovereign_repo }}/infrastructure/link/{{ item }}"
+            dest: "/etc/systemd/system/{{ item }}"
+            owner: root
+            group: root
+            mode: "0644"
+          loop: [sovrn-link-hop.service, sovrn-link-hop.timer]
+
+        - name: sovrn-link-hop timer on
+          ansible.builtin.systemd_service:
+            name: sovrn-link-hop.timer
+            enabled: true
+            state: started
+            daemon_reload: true
+
 - name: No link configured yet
   ansible.builtin.debug:
     msg: "entry_link is not set for {{ inventory_hostname }}: client traffic has no route to the exit"

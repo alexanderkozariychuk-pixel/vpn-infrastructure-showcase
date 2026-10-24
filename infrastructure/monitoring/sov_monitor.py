@@ -369,6 +369,33 @@ def reboots(state: dict, probes: dict, now: float) -> tuple[list[str], dict]:
     return msgs, out
 
 
+def link_hops(state: dict, probes: dict, now: float) -> tuple[list[str], dict]:
+    """
+    An entry whose link moved to another source port (sovrn-link-hop): one
+    message per hop, no "resolved". The link healed itself; the operator
+    should still know the path dropped a flow, and on which port it now runs.
+    The first sight of a counter only records it.
+    """
+    seen = dict(state.get("hops", {}))
+    msgs, notices = [], list(state.get("notices", []))
+    for name, probe in probes.items():
+        if not probe or not isinstance(probe.get("link_hop.hops"), int):
+            continue
+        hops, last = probe["link_hop.hops"], seen.get(name)
+        if last is not None and hops > last:
+            port = probe.get("link_hop.port", "?")
+            n = hops - last
+            msgs.append(f"🔁 {name}: связка молчала, порт сменён на {port}"
+                        + (f" ({n} смены подряд)" if n > 1 else "") + " — путь режет поток, проверь, держится ли")
+            notices.append({"key": f"{name}:hop", "text": f"{name}: связка сменила порт на {port}",
+                            "at": probe.get("link_hop.last", now)})
+        seen[name] = hops
+    out = dict(state)
+    out["hops"] = seen
+    out["notices"] = notices
+    return msgs, out
+
+
 def digest(probes: dict, problems: dict, now: float) -> str:
     lines = ["📋 Sovereign, сводка на " + datetime.fromtimestamp(now, MSK).strftime("%d.%m %H:%M МСК")]
     for name, probe in probes.items():
@@ -519,6 +546,8 @@ def main() -> int:
     msgs, state = step(state, problems, now, int(limits["confirm_runs"]), float(limits["remind_h"]) * 3600)
     boot_msgs, state = reboots(state, probes, now)
     msgs += boot_msgs
+    hop_msgs, state = link_hops(state, probes, now)
+    msgs += hop_msgs
 
     hour = cfg.getint("digest", "hour_msk", fallback=-1)
     today = datetime.fromtimestamp(now, MSK)

@@ -13,6 +13,11 @@ Table = off
 {{ k | capitalize }} = {{ entry_link.obfuscation[k] }}
 {% endfor %}
 PostUp = ip route replace default via {{ entry_link.peer_address }} dev %i table {{ entry_route_table }}
+{% if entry_link.hop_ports is defined %}
+# The source port the last hop chose, if any (sovrn-link-hop); the file keeps
+# the inventory's port so this template stays the file's only author.
+PostUp = /usr/local/sbin/sovrn-link-hop apply %i
+{% endif %}
 PostUp = iptables -t nat -C POSTROUTING -o %i -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o %i -j MASQUERADE
 PostDown = iptables -t nat -D POSTROUTING -o %i -j MASQUERADE
 
