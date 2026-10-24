@@ -1,8 +1,11 @@
 ---
-# Values every entry shares. They are what a client config carries, so they
-# are the same on A and B by definition (docs/entry-spec.md, "same").
-# Nothing secret here: the obfuscation parameters are also in
-# pwa/services/provisioner.py (AWG_PARAMS), which writes the client side.
+# Values every entry shares. Port, addresses and subnets are the same on
+# every entry (the trial net and the wrappers assume them).
+# entry_awg0_obfuscation below is cluster 1's (entry A, AmneziaWG 1.0): what
+# its client configs carry, also in pwa/services/provisioner.py (AWG_PARAMS).
+# An entry of another cluster has its own awg0 key and obfuscation and sets
+# entry_awg0_obfuscation and entry_awg0_public_key as host vars, which win
+# over this file (since 2026-10-24: entry B, cluster 2, AmneziaWG 3.x).
 
 entry_awg0_port: 8443
 entry_awg0_address: 10.88.88.1/24

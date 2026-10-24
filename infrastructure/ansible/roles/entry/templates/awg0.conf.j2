@@ -6,7 +6,7 @@
 PrivateKey = {{ entry_awg0_private_key }}
 Address = {{ entry_awg0_address }}
 ListenPort = {{ entry_awg0_port }}
-{% for k in ['jc', 'jmin', 'jmax', 's1', 's2', 's3', 's4', 'h1', 'h2', 'h3', 'h4'] if k in entry_awg0_obfuscation %}
+{% for k in ['jc', 'jmin', 'jmax', 's1', 's2', 's3', 's4', 'h1', 'h2', 'h3', 'h4', 'i1', 'i2', 'i3', 'i4', 'i5'] if k in entry_awg0_obfuscation %}
 {{ k | capitalize }} = {{ entry_awg0_obfuscation[k] }}
 {% endfor %}
 {% if entry_isolate_clients %}

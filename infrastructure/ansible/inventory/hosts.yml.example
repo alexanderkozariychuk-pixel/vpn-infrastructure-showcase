@@ -27,6 +27,22 @@ all:
           # First run with -e ansible_user=root, before sovadmin exists.
           ansible_user: sovadmin
           admin_user: sovadmin
+          # An entry of cluster 2 has its own awg0 (own key, 3.x
+          # obfuscation); these override the group's cluster-1 values:
+          # entry_awg0_public_key: "<this entry's awg0 public key>"
+          # entry_awg0_obfuscation:
+          #   jc: "6"
+          #   jmin: "50"
+          #   jmax: "400"
+          #   s1: "<15-150>"
+          #   s2: "<15-150, not s1+56>"
+          #   s3: "<15-64>"
+          #   s4: "<1-16>"
+          #   h1: "<a-b>"
+          #   h2: "<a-b>"
+          #   h3: "<a-b>"
+          #   h4: "<a-b>"
+          #   i1: "<b 0x...><r N>"
           # The link to this entry's own interface on the exit (awg2 for B),
           # set up on the exit by hand first. Private key and PSK go into
           # the vault as entry_link_private_key / entry_link_psk.

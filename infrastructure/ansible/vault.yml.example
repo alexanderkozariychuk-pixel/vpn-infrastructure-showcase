@@ -7,7 +7,9 @@
 # Back it up next to the SSH key (Bitwarden). Losing entry_awg0_private_key
 # means every client config has to be reissued.
 
-# awg0 — copied from entry A, never generated. Same on every entry.
+# awg0. A standby entry of cluster 1 carries A's, copied, never generated.
+# An entry of its own cluster (B since 2026-10-24) has its own, generated
+# once on a node and piped in here (README.md).
 entry_awg0_private_key: "<44 chars>"
 
 # This entry's own link to the exit.
