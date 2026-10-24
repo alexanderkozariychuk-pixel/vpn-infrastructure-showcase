@@ -1330,6 +1330,8 @@
     .loc-news-text b { color: var(--text-bright); }
     .loc-news-x { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 2px; }
     .loc-news-x:hover { color: var(--accent); }
+    .adm-loc-tabs { display: flex; gap: 6px; }
+    .adm-loc-tabs button.active { border-color: var(--accent); color: var(--accent); }
     .dev-msg:empty { display: none; }
     .dev-msg.bad { color: var(--red); }
 
@@ -2360,7 +2362,10 @@
           <div class="page-sub">All registered users</div>
         </div>
         <div class="card">
-          <div class="card-title">AWG Peers on Bridge</div>
+          <div class="dev-head">
+            <div class="card-title">AWG Peers <span id="adm-loc-title"></span></div>
+            <div class="adm-loc-tabs" id="adm-loc-tabs"></div>
+          </div>
           <div id="adm-clients-table" class="loading">Fetching</div>
         </div>
       </div>
@@ -4809,13 +4814,28 @@ async function loadAdminDash() {
 
 const PEER_SOURCE = {portal: 'src-portal', trial: 'src-trial', manual: 'src-manual', unknown: 'src-unknown'};
 
+// Which entry's peers are shown. Germany first-time, then whatever was picked.
+let _admLoc = 'de';
+
+function _renderAdmLocTabs(locs) {
+  const box = document.getElementById('adm-loc-tabs');
+  if (!box) return;
+  const title = document.getElementById('adm-loc-title');
+  if (title) title.textContent = `· ${LOC_FLAG[_admLoc] || ''} ${t('loc-' + _admLoc)}`;
+  box.innerHTML = (locs && locs.length > 1) ? locs.map(k => `
+    <button class="btn-sm${k === _admLoc ? ' active' : ''}" onclick="_admLoc='${escHtml(k)}';loadAdminClients()">
+      ${LOC_FLAG[k] || ''} ${escHtml(t('loc-' + k))}</button>`).join('') : '';
+}
+
 async function loadAdminClients() {
   const el = document.getElementById('adm-clients-table');
   el.innerHTML = '<span class="loading">Fetching</span>';
   try {
-    const res = await adminFetch(`${API}/api/clients`, {headers: hdrs()});
+    const res = await adminFetch(`${API}/api/clients?location=${encodeURIComponent(_admLoc)}`, {headers: hdrs()});
+    if (res.status === 422) { _admLoc = 'de'; return loadAdminClients(); }
     const d = await res.json();
-    if (!d.ok) { el.textContent = 'Error'; return; }
+    _renderAdmLocTabs(d.locations);
+    if (!d.ok) { el.textContent = 'Error: ' + (d.error || ''); return; }
     const src = d.sources || {};
     const summary = ['portal', 'trial', 'manual', 'unknown']
       .map(k => `${escHtml(t(PEER_SOURCE[k]))}: ${src[k] || 0}`).join(' · ');

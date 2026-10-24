@@ -58,8 +58,8 @@ def _ssh(cmd: str, timeout: int = 10) -> tuple[str, str]:
     )
     return result.stdout.strip(), result.stderr.strip()
 
-def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
-    """Run command on Bridge via SSH."""
+def _ssh_bridge(cmd: str, timeout: int = 10, host: str | None = None) -> tuple[str, str]:
+    """Run command on an entry node via SSH: Bridge (entry A) unless `host` is given."""
     result = subprocess.run(
         [
             "ssh",
@@ -68,7 +68,7 @@ def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
             "-o", f"UserKnownHostsFile={PWA_SSH_DIR}/known_hosts",
             "-o", "UpdateHostKeys=no",
             "-o", "ConnectTimeout=5",
-            f"{PWA_SSH_USER}@{BRIDGE_IP}",
+            f"{PWA_SSH_USER}@{host or BRIDGE_IP}",
             cmd,
         ],
         capture_output=True, text=True, timeout=timeout,
@@ -77,10 +77,15 @@ def _ssh_bridge(cmd: str, timeout: int = 10) -> tuple[str, str]:
 
 
 def get_bridge_status_data() -> tuple[list[PeerStatus] | None, str | None]:
-    """Fetch AWG peers from Bridge."""
-    stdout, stderr = _ssh_bridge(f"sudo pwa-awg-show {BRIDGE_AWG_INTERFACE}")
+    """Fetch AWG peers from Bridge (entry A, Germany)."""
+    return get_entry_status_data(None)
+
+
+def get_entry_status_data(host: str | None) -> tuple[list[PeerStatus] | None, str | None]:
+    """Fetch AWG peers from the entry node at `host` (Bridge when None)."""
+    stdout, stderr = _ssh_bridge(f"sudo pwa-awg-show {BRIDGE_AWG_INTERFACE}", host=host)
     if not stdout or "interface" not in stdout.lower():
-        return None, stderr or "No data from Bridge"
+        return None, stderr or f"No data from {host or 'Bridge'}"
 
     peers = []
     current = None
