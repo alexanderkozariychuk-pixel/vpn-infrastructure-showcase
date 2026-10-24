@@ -5572,3 +5572,78 @@ What triggered it is unknown. The link carried little — test devices only.
 - Kill switch for paying clients when the link is down, modelled on B.
 - To decide: change the link's port automatically when it stays silent (on B
   in the role; on A it would be automation on the live node).
+
+### 🧭 Evening: two clusters instead of a standby entry
+Three bad days in a row (the path to A on the 22nd, B's link cut that night,
+a short drop for everyone on the 23rd) pointed the same way: a second entry
+does not help when what fails is the exit or the road to it. The plan
+changes. Cluster 1 stays as it is: clients → A → the current exit,
+AmneziaWG 1.0. Cluster 2 is new: clients → B → **an exit of its own**, 3.x on
+both legs. The portal will offer a location per device; a client whose
+cluster is down switches to the other, and the move from 1.0 to 3.x happens
+the same way — new configs for the new location, old ones keep working.
+Stage 4 (every peer on A and B) is on hold; its branch is kept.
+
+The exit provider was chosen by what shows up in whois and routing rather
+than by the price list: its own network or a known data centre, not a
+reseller on leased blocks; not under Russian jurisdiction; commercial VPN
+allowed in writing; crypto; reachable from A and B. The current exit's block
+turned out to belong to a network the first shortlist also contained, which
+ruled that one out — a second exit on the same network is not a second exit.
+
+---
+
+## 2026-10-24
+
+### 🔌 B's 33 minutes on the 23rd: the provider's maintenance
+B was off for 33 minutes on the 23rd. Its journal shows a clean shutdown
+(`Power key pressed short`), and the provider had announced host maintenance
+for 22–24 October two days before. Not a fault; everything came back on its
+own. Today's SSH timeout to B was the workstation's path: the monitor logged
+into B throughout. **First thing on a node that "fell": the provider's mail.**
+
+### 🛫 exit-2, built by hand, then by the role
+SKRIME (own AS, German blocks; the geo databases place the address in the
+Netherlands — the data centre is on the border — so the location will be
+called that). Built by hand first, one step at a time:
+
+- bootstrap: admin user, the `00-hardening.conf` drop-in, ufw, fail2ban;
+  AmneziaWG 3.1 from the PPA by fingerprint;
+- the link B `awg3` ↔ exit-2 `awg0`: keys made on each end and moved
+  server-to-server, never shown; 3.x obfuscation generated once and copied
+  to both ends (S1–S4, four non-overlapping H ranges), MTU 1380 for the S4
+  padding, `Table = off` on B so B's clients stay on `awg1` until the switch.
+  Handshake at once, ~46 ms;
+- NAT of the link's /30 and forwarding; checked from B with a temporary rule
+  that sends only B's own link address into the new link;
+- **I1** on both ends: a packet shaped as a QUIC v1 Initial (long header,
+  random 8-byte DCID, a length field that matches, 1218 bytes) before each
+  handshake. The receiver drops it, so a mistake in it cannot break the link;
+- **BitTorrent dropped** from day one (`sovrn-bt`): the handshake, tracker
+  announces, DHT and the UDP tracker protocol, by string match, chain first in
+  FORWARD for the link. Encrypted BitTorrent is not caught; without trackers
+  and DHT a client finds no peers, which is where complaints come from;
+- a reboot with nothing on it yet: all of it came back by itself.
+
+Then `roles/exit` (branch `cluster-2`) was written to reproduce exactly this,
+with read-only checks in the manner of the entry's. The check run against
+the hand-built node listed 23 differences, all expected — and two findings
+the hand build had missed (`X11Forwarding`, the conntrack limit). Real run,
+then a second run: `changed=0`, no findings.
+
+**Lessons.**
+- After a link restart the exit does not know the entry's address and cannot
+  start the handshake; the entry does, once its keepalives go unanswered.
+  A check right after the restart reports a dead link. The role now waits for
+  the handshake before checking.
+- `systemd-timesyncd` and `chrony` exclude each other in apt: the common role
+  would have removed chrony from the exit. The time daemon is a variable now.
+- Writing the role after the hand build paid off: the check run is a review
+  of the hand build.
+
+### 📋 Next
+- Keys and node details into Bitwarden; exit-2 into the monitor (traffic too,
+  before any client).
+- B: awg0 rebuilt for 3.x (own key, `n2`), the four hand-made peers reissued,
+  `entry_link` moved to `awg3`, `awg1` removed.
+- Portal: a location per device, and the device limit across two locations.

@@ -14,8 +14,8 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
 
 ## Live nodes
 - Entry A and the exit carry paying clients. **They are changed by hand only.
-  Ansible never touches them, not even `--check`.** Ansible builds entry B only
-  (`infrastructure/ansible/`, inventory with B alone, `live` group refused).
+  Ansible never touches them, not even `--check`.** Ansible builds entry B
+  and exit-2 only (`infrastructure/ansible/`, `live` group refused).
 - Before any change on A or the exit: show the command, explain the way back,
   and measure before and after (handshake age, traffic counters over 10 s,
   count of the rules involved). Ask before running it.
@@ -44,12 +44,13 @@ decisions recorded in `PROJECT-JOURNAL.md`; the journal says why.
 - Commits carry Alexander as author:
   `--author="Alexander Kozariychuk <alexanderkozariychuk@gmail.com>"`,
   with a `Co-Authored-By:` trailer for Claude.
-- Branch `cluster-b` holds the entry-B work. The journal is written in
-  `cluster-b`. Merge `main` into it before running the Ansible role on B again.
+- Branch `cluster-2` (from `cluster-b`, with `main` merged in, 2026-10-24)
+  holds the cluster-2 work: entry B and exit-2. The journal is written there
+  now. `cluster-b` is kept as it was; B's role is run from `cluster-2`.
 - **Direction since 2026-10-23: two independent clusters**, not a standby copy
   of A. Cluster 1 ("Germany"): clients → entry A → current exit, AmneziaWG 1.0.
-  Cluster 2: clients → entry B → a new exit of its own (provider being chosen),
-  AmneziaWG 3.x on both legs. The portal will offer a location per device.
+  Cluster 2: clients → entry B → exit-2 (its own exit, built 2026-10-24 by
+  `roles/exit`), AmneziaWG 3.x on both legs. The portal will offer a location per device.
   Stage 4 (the portal writing every peer to A and B; branch `stage4`) is on
   hold — its code stays, nothing of it is merged or deployed. The full
   decision record and provider shortlist are in the private context repo
