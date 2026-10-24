@@ -4782,6 +4782,102 @@ A71 before the next.
   into a shared state holder, so pages do not each carry a copy.
 - Stage 3: release signing key, the APK from the site.
 
+## 2026-10-02
+
+### 🛠 A trial subnet on the entry node
+Trial clients get their own /24, 10.88.89.0/24, on the same awg0 and port, so
+a trial is the product they will later buy. `sovrn-trial-net`, run by a
+systemd unit tied to awg0, adds what that subnet needs and nothing else:
+- the route back (10.88.89.1/24 on awg0 — `awg set` adds no routes);
+- the RU split: the split script and rc.local match 10.88.88.0/24 only, so
+  without a mark rule and ip rule 101 every trial packet would have left via
+  eth0 from a Russian address;
+- a `SOVRN-TRIAL` chain first in FORWARD: kill switch, no reaching other
+  clients, no SMTP, connlimit;
+- one bandwidth ceiling for the whole trial pool; paying clients sit in a
+  class with no real cap.
+
+A failed `up` removes whatever it applied; awg0.conf, the split script and
+rc.local are not edited. `pwa-add-peer` joins the repository, rewritten:
+both subnets, config written before the runtime and restored if the runtime
+refuses (the node's version did the opposite), exact-field duplicate checks.
+`snapshot.sh` and `rollback.sh` end in `ROLLBACK OK` only when nothing
+differs from the snapshot.
+
+Tested in network namespaces that rebuild the entry node as observed that
+day: reachability before install, after up, with the kill switch, after a
+failed up and after rollback. 29 + 42 checks; 17 deliberate breakages, each
+caught.
+
+## 2026-10-05
+
+### 🔒 What a stranger could make the portal do
+Before: guess any password, the admin's included, as fast as the network
+allowed; register any username with any address and have the portal mail it;
+request reset letters and support tickets without end through the one Resend
+quota; and a database dump opened every account with a reset pending, since
+reset tokens were stored as sent.
+
+Now:
+- Sliding-window limits per address and per (address, username) — never per
+  username alone, which would let anyone lock a customer out. Registration,
+  resets and support tickets each have their own. 429 with `Retry-After`.
+- Usernames follow the node's peer-name alphabet, 3–27 characters, so
+  `auto-<username>` always passes `pwa-add-peer`: a wider name used to take
+  the money and then fail to get a device.
+- Passwords 8–128 characters; addresses compared in lower case; reset tokens
+  stored as SHA-256; every request-derived value escaped in letters.
+- The limits trust `X-Real-IP`, which nginx must set.
+
+31 checks; 16 deliberate breakages, each caught. 306 tests.
+
+## 2026-10-06
+
+### 🛠 Accounts: confirmation, trial, letters, reminders
+- **Email confirmation before purchase.** One letter that is both welcome
+  and confirmation. The link opens a page that *posts* the token — nothing is
+  confirmed by a GET, because mail scanners fetch every link. 48 hours,
+  single use, stored as SHA-256. A receipt per payment, sent after the commit
+  and never able to undo an activation.
+- **Free trial.** 3 days, one device from 10.88.89.10–250. One trial per
+  mailbox for good: the grant keys on the normalised address (+tag and
+  Gmail's dots dropped) and outlives the account. The grant is written before
+  the peer, so two requests at once give one trial; a node failure rolls it
+  back. Off by default (`TRIAL_ENABLED`), daily caps per address and overall.
+- **Settings** behind one gear; in the account the corner is now a bell.
+- **Notifications and reminders**: paid, trial started/ending/ended,
+  subscription ending in 3 days / 1 day / ended. Letters only where missing
+  them costs the connection. Idempotent per period.
+- **Letters** share one frame and one set of rules (`docs/email-style.md`),
+  held by `tests/test_letters.py` in both languages. The user agreement
+  gained a trial section, the privacy policy the trial record.
+
+### 🛠 Admin
+- **Open access without a payment** — gifts and moving customers over. Runs
+  the same activation as a purchase, recorded as a zero `manual` payment so
+  it shows in history and never counts as revenue.
+- **Every peer named**: `<username> · <device>` for portal configs, the
+  operator's label for hand-made peers, the key prefix otherwise. The
+  "unknown" count is the list to work through.
+- **Referral links** (Anton's idea): `/?ref=CODE` is remembered for 30 days
+  and applied on the first real purchase. Codes still go to paying customers
+  only.
+
+### 🐛 Found on the way
+- **A `.env` backup was inside the image** built on 09-06: `.dockerignore`
+  excluded `.env` alone. Every `.env*` is now kept out of the image and the
+  deploy sync. The first fix's sed also matched `venv` — the dot was a regex
+  wildcard.
+- **The activity badge matched words** in `awg show`'s handshake text, so
+  every age read as active and "Now" as idle. The age is parsed into seconds.
+- **The hourly sweep's cron file lived only on the portal host**, and the
+  docstring pointed at a log path that does not exist — enough to conclude
+  the job was missing and install a second copy. It is in the repository now.
+- CI red since the trial merge (shellcheck) and the accounts merge (gitleaks
+  on example tokens); nothing found was a real problem.
+
+394 tests.
+
 ## 2026-10-07
 
 Pre-launch audit, worked through in order: backups, then the servers, then
@@ -4894,3 +4990,177 @@ described a layout that no longer exists. Removed with `/api/status`,
   weeks.
 - Remaining audit items: payments end to end, capacity, peer reconcile and
   cleanup, refresh tokens, SPF/DKIM/DMARC, disaster recovery, hosting risk.
+
+## 2026-10-10
+
+### 🛠 Peers against the database
+`tools/peer_reconcile` — read-only. Lists configs active in the database but
+missing on the node, ended configs still on the node, labelled hand-made
+peers, unknown peers, duplicate addresses, and how full the paid (.42–.199,
+158 addresses) and trial pools are. The node's PSK column is cut before the
+file leaves it. Runbook section 9 has the collection commands.
+
+## 2026-10-12
+
+### 🔒 No root over SSH anywhere
+Root login is now off on the portal and the backup host too (entry and exit
+already had it off), every root `authorized_keys` is empty, and the
+workstation key is rotated. `deploy.sh` runs the receiving rsync under sudo
+for the non-root admin user.
+
+### 🛠 Entry A written down, before entry B is built
+- `tools/node-inventory` — what a VPN node is made of, keys redacted:
+  packages, DKMS, interfaces, config files against runtime peers, routing,
+  ipsets, sysctl, firewall, units, scripts with checksums, cron, users and
+  pinned keys, sshd. The spec the Ansible roles are written against, and the
+  diff a rebuilt node is checked with.
+- `docs/entry-spec.md` — entry A layer by layer and, for each, whether B must
+  match it, has its own, or leaves it out. Files that lived only on the node
+  (wrappers, split-tunnel scripts, unit, cron, logrotate, fail2ban jail,
+  sysctl) are now in the repository as found.
+- Found on A: a peer block in awg0.conf without its header; an ip rule
+  nothing visible created (it was in rc.local); Docker on a VPN node.
+  `awg-conf-check` compares every peer of the file with the running interface
+  (fingerprints only), and a one-off fix removed the headerless pair —
+  checked to be the old file minus exactly two lines, aborting if the portal
+  changed the file meanwhile.
+- `tools/dpi-test-node.sh` — bare AmneziaWG on a candidate address, same port,
+  obfuscation and MTU as the entry. One question before anything is built on
+  an address: does it get through mobile DPI.
+
+### 🛠 Admin and monitoring
+- Promo codes card: campaign codes with a discount up to 60%, optional limits
+  and validity, switch one off. Open access names plans in words.
+- `sov-monitor` counts how full the client address pools are: warn at 70%,
+  alarm at 95%. Found on the way: `level()` read the kind from everything
+  after the host, so a pool warning counted as broken.
+
+## 2026-10-14
+
+### 🛠 Every host's clock
+The probe prints its own time and the kernel's synchronised flag. The monitor
+notes its time just before and after each SSH call and counts only how far
+the host lies outside that window, so a slow connection never raises an
+alarm. If am1's own clock is not synchronised, it is no reference and the
+check is skipped. Warning after two runs in a row.
+
+### 🔒 Addresses out of the public repository
+The probe's `authorized_keys` example and `monitor.ini.example` carried the
+real addresses of all four servers. Hosts are now named by role; real values
+live only in `/etc/sov-monitor/monitor.ini` on am1.
+
+CI's Lint green again (two deliberate single-quote cases, shellcheck 0.9's
+SC2015).
+
+## 2026-10-15
+
+### 🛠 Removing peers, with a way back
+`tools/peer-remove.sh` takes a reviewed list of `<address> <key beginning>`;
+full keys never leave the node. The whole list is checked before anything
+changes, and one bad line stops the run. A peer with a handshake in the last
+3 minutes is someone connected now and is refused without `--allow-live`.
+`--apply` snapshots awg0.conf and the runtime first, removes one by one,
+checks every key is gone from file and runtime; `--restore <address>` puts
+one peer back from the snapshot. 67 cases under gawk and mawk; 25 mutations,
+each caught. CI now runs the wrapper suites from pytest.
+
+`peer_reconcile` writes its candidates in the format `peer-remove` takes,
+all commented out. The admin peer list numbers every peer by its address
+(33 for 10.88.88.33, 89.10 for a trial) — something to write down while
+reviewing, instead of a key prefix.
+
+Found: the exit node's hostname is all digits, and the monitor parsed it as a
+number.
+
+## 2026-10-19
+
+### 🛠 Monitoring that notices its own silence
+- Entry B on the panel: its own card, its link, the exit's second link
+  `awg2`.
+- The monitor's alerts come from the backup host itself, so if that host dies
+  monitoring goes quiet and nothing says so. The portal already receives a
+  report every two minutes: a cron job now mails when the last report is over
+  ten minutes old, and again when reports return. One letter per silence; a
+  failed letter is retried. First real test (timer stopped on purpose,
+  16:23–16:39 MSK) logged the silence from the threshold, 6 minutes; it now
+  starts at the last report.
+
+### 🛠 Portal
+- **A customer can delete a device**, after a second click in place. A lost
+  phone no longer keeps a working key, and a customer at the limit can free a
+  slot.
+- **No downgrade loophole.** Activation never takes devices away and the
+  limit was checked only when adding one, so an early renewal from Extended
+  (5) to Basic (2) kept all five at the Basic price. An order for a plan
+  smaller than the devices held is now refused (409) until the extra ones are
+  deleted.
+- **Connect** gets Windows, macOS and Linux beside the phones, and device
+  pictures that name the system without anyone's logo.
+- **The Android APK from the portal**: `/download/android` and a description
+  with version, size and SHA-256, read from a read-only mount — a release is
+  two files copied, not a deploy.
+
+### ✅ Android: the redesign, merged
+The main screen built on the mark, the profiles page, the site's theme,
+sign-in in the design system, the launcher icon from the mark. The app reads
+trials, rate limits and update availability as the server has them now.
+
+- **The app stays signed in.** It asked for the password daily: the access
+  token lasts 24 hours. A refresh token (256 bits, only its hash stored)
+  slides 90 days from each use. It does not rotate — a trade whose answer is
+  lost on a mobile network would otherwise cost the sign-in. A password reset
+  ends every app session; an admin never gets one.
+- **Release signing** from a key outside the public repository, created
+  2026-10-19; `tools/android-release.sh` checks our certificate, no debug
+  flag, no private key inside, only the expected native libraries, and
+  publishes. The first real build also carries Compose's own native library,
+  now allowed by name.
+- Found: a failed tunnel stop was swallowed without a trace, leaving the
+  screen saying connected; the profile-removed notice stayed until restart.
+
+## 2026-10-24
+
+### 🗺 Two independent chains
+On 2026-10-18 the decision was to leave cluster A as it is and begin the move
+to the newer AmneziaWG on a separate chain, not by upgrading A in place. From
+today there are two: **Germany** (entry A → the first exit, AmneziaWG 1.0) and
+**the Netherlands** (entry B → exit-2, 3.x). A device belongs to one of them
+for life. Customers are told the Netherlands is recommended and Germany is
+the fallback.
+
+### 🛠 Portal: a second location
+- `configs.location` (`de` | `nl`), existing rows `de`; migration checked
+  up/down/up.
+- A registry of locations. The Netherlands exists only when every `NL_*`
+  setting is present, its obfuscation included — the repository is public,
+  and a 3.x header range and I1 signature beside the code would be a pattern
+  to match.
+- Issue, remove, the free-address lookup and the file all go to the device's
+  own location. A device whose location is no longer configured gets no file
+  (503) rather than a file with the wrong key. Trials stay in Germany. The
+  same address may be held once in each location.
+- The plan's device limit holds per location (Basic 2 + 2, Extended 5 + 5).
+  The Android app, which sends no location, stays on Germany.
+- The page groups devices by location, the Netherlands on top, with a
+  dismissible notice about the new location.
+
+### 🛠 Admin and portal, the same day
+- Peer list per location (Germany / Netherlands tabs), through the same
+  wrapper at entry B's address.
+- Traffic on each server's card: today and this month, with "counting since"
+  while the month is partial.
+- The QR code of the selected device's file, drawn in the browser from the
+  text already on the page, so the key goes nowhere else. Checked: a 3.x file
+  with I1 decodes back byte for byte.
+
+680 tests.
+
+### 📋 Next
+- Work through the 13 unknown peers on A with `peer_reconcile` and
+  `peer-remove`; move the 11 hand-made peers to the portal.
+- One controlled night reboot of entry B and exit-2, to see the chain come
+  back from its files alone.
+- Check that the Состояние card shows B's own entry↔exit link row, not only
+  A's.
+- Logs and monitoring now carry the same client address in two locations:
+  name the location wherever an address is shown.
