@@ -234,3 +234,29 @@ def test_pool_usage_shows_on_the_entry_card(db):
 def test_a_report_from_an_older_monitor_without_pools_is_fine(db):
     _send(db, _report())
     assert not any("пул" in l for l in _card(_state(db), "entry")["lines"])
+
+
+def test_traffic_shows_on_a_host_card(db):
+    from datetime import datetime, timedelta, timezone
+    r = _report()
+    r.traffic = {"entry": {"day_bytes": 12_345_000_000, "month_bytes": 345_600_000_000,
+                           "since": (datetime.now(timezone.utc) - timedelta(days=60)).timestamp()}}
+    _send(db, r)
+    lines = _card(_state(db), "entry")["lines"]
+    assert "Трафик: сегодня 12,3 ГБ, за месяц 346 ГБ" in lines
+
+
+def test_traffic_counted_since_mid_month_says_so(db):
+    from datetime import datetime, timezone
+    r = _report()
+    now = datetime.now(timezone.utc)
+    r.traffic = {"entry": {"day_bytes": 0, "month_bytes": 0, "since": now.timestamp()}}
+    _send(db, r)
+    line = next(l for l in _card(_state(db), "entry")["lines"] if l.startswith("Трафик"))
+    if now.astimezone(timezone.utc).day > 1:
+        assert "считаем с" in line
+
+
+def test_a_report_without_traffic_has_no_traffic_line(db):
+    _send(db, _report())
+    assert not any(l.startswith("Трафик") for l in _card(_state(db), "entry")["lines"])

@@ -58,6 +58,9 @@ class Report(BaseModel):
     clients: dict[str, list[str]] = {}
     web: dict = {}
     pools: dict[str, list[dict]] = {}
+    # Uplink bytes per host, this day and month (Moscow time); see
+    # infrastructure/monitoring/sov_monitor.py, traffic().
+    traffic: dict[str, dict] = {}
     problems: list[Problem] = Field(default=[], max_length=200)
     notices: list[Notice] = Field(default=[], max_length=50)
 
