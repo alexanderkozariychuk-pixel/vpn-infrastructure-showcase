@@ -63,3 +63,26 @@
   loop_control:
     label: "{{ item.item.if }}"
   when: item is changed or exit_bt_script is changed
+
+# After a restart the exit no longer knows the entry's address and cannot
+# start a handshake itself: the entry does, once its keepalives go
+# unanswered (seen to take 15-40 s). Waited for here so verify.yml does not
+# report a link that is merely coming back (exit-2, 2026-10-24).
+- name: Restarted links have a handshake again
+  ansible.builtin.shell: |
+    set -o pipefail
+    awg show {{ item.item.if }} latest-handshakes | awk -v n="$(date +%s)" '{print n - $2}'
+  args:
+    executable: /bin/bash
+  register: exit_link_hs
+  until: (exit_link_hs.stdout | default('', true) | trim or '999999') | int < 180
+  retries: 18
+  delay: 10
+  changed_when: false
+  failed_when: false
+  loop: "{{ exit_link_conf.results }}"
+  loop_control:
+    label: "{{ item.item.if }}"
+  when:
+    - item is changed or exit_bt_script is changed
+    - not ansible_check_mode
