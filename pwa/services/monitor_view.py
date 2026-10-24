@@ -104,8 +104,28 @@ def _pool_lines(pools: list[dict]) -> list[str]:
     return out
 
 
+def _gb(n) -> str:
+    gb = (n or 0) / 1e9
+    return (f"{gb:.1f}" if gb < 100 else f"{gb:.0f}").replace(".", ",") + " ГБ"
+
+
+def _traffic_line(t: dict | None, now: datetime) -> list[str]:
+    """Uplink traffic, in and out together: what a provider counts."""
+    if not isinstance(t, dict) or "month_bytes" not in t:
+        return []
+    line = f"Трафик: сегодня {_gb(t.get('day_bytes'))}, за месяц {_gb(t.get('month_bytes'))}"
+    since = t.get("since")
+
+    if isinstance(since, (int, float)):
+        start = datetime.fromtimestamp(since, MSK)
+        month_start = now.astimezone(MSK).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if start > month_start:
+            line += f" (считаем с {start.strftime('%d.%m')})"
+    return [line]
+
+
 def _host_lines(name: str, p: dict, clients: list[str], base: datetime, now: datetime,
-                pools: list[dict] | None = None) -> list[str]:
+                pools: list[dict] | None = None, traffic: dict | None = None) -> list[str]:
     lines = []
     for ifname in clients:
         peers, active = p.get(f"awg.{ifname}.peers"), p.get(f"awg.{ifname}.active")
@@ -115,6 +135,7 @@ def _host_lines(name: str, p: dict, clients: list[str], base: datetime, now: dat
                 line += f", активны сейчас: {active}"
             lines.append(line)
     lines += _pool_lines(pools)
+    lines += _traffic_line(traffic, now)
     if "backup_age" in p:
         lines.append("Бэкап базы: " + _stamp(p["backup_age"], base, now))
     if "pulled_backup_age" in p:
@@ -159,6 +180,7 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
     web = payload.get("web") or {}
     problems = payload.get("problems") or []
     pools = payload.get("pools") or {}
+    traffic = payload.get("traffic") or {}
 
     def mine(prefix: str, *, only: str | None = None, skip: str | None = None) -> list[dict]:
         out = []
@@ -195,7 +217,7 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
                                host_problems, status="bad"))
             continue
         cards.append(_card(name, title, _host_lines(name, probe, clients.get(name) or [], base, now,
-                                                    pools.get(name)),
+                                                    pools.get(name), traffic.get(name)),
                            host_problems, raw=probe))
 
     # Links between nodes get a card of their own: the thing customers feel.
