@@ -129,6 +129,13 @@ VERIFY_RESEND_PER_IP = Limiter(limit=10, window=60 * 60)
 # many subscribers behind one address, and a family on one Wi-Fi is normal.
 TRIAL_PER_IP = Limiter(limit=3, window=24 * 60 * 60)
 
+# Support chat: every message is a paid request to the model. Per address a
+# conversation's worth in ten minutes and a few in an hour; the daily total
+# across everyone is set in config (CHAT_DAILY_LIMIT) and counted in api/chat.py.
+CHAT_PER_IP = Limiter(limit=15, window=10 * 60)
+CHAT_PER_IP_HOUR = Limiter(limit=40, window=60 * 60)
+
 ALL = (LOGIN_PER_IP, LOGIN_FAILS, REGISTER_PER_IP,
        FORGOT_PER_IP, FORGOT_PER_EMAIL, RESET_PER_IP, SUPPORT_PER_IP,
-       VERIFY_PER_IP, VERIFY_RESEND, VERIFY_RESEND_PER_IP, TRIAL_PER_IP)
+       VERIFY_PER_IP, VERIFY_RESEND, VERIFY_RESEND_PER_IP, TRIAL_PER_IP,
+       CHAT_PER_IP, CHAT_PER_IP_HOUR)

@@ -34,6 +34,7 @@ from api.notifications import router as notifications_router
 from api.admin_grant import router as admin_grant_router
 from api.monitor import router as monitor_router
 from api.android import router as android_router
+from api.chat import router as chat_router
 
 app = FastAPI(title="Sovereign PWA", version="0.8.0")
 # Only the site itself calls the API from a browser; the Android app is not
@@ -64,6 +65,7 @@ app.include_router(notifications_router)
 app.include_router(admin_grant_router)
 app.include_router(monitor_router)
 app.include_router(android_router)
+app.include_router(chat_router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
