@@ -148,7 +148,11 @@ CLIENT_PREFIXES = ("/api/client", "/api/auth", "/api/payment", "/api/register",
 # is not a person's route: sov-monitor posts to it with MONITOR_TOKEN, checked
 # in the handler (tests/test_monitor_panel.py). /api/public/android describes
 # the APK anyone may download (version, size, hash), nothing about an account.
-PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/public/android", "/api/version", "/api/monitor/report"}
+# /api/public/chat is the support assistant: open to visitors by design, limited
+# per address and per day, and given nothing but the public help base
+# (tests/test_support_chat.py).
+PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/public/android", "/api/version", "/api/monitor/report",
+                 "/api/public/chat"}
 
 
 def test_every_non_client_route_is_behind_the_admin_guard():
