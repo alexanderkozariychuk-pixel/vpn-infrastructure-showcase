@@ -130,3 +130,12 @@ def test_inside_telegram_the_email_form_never_opens_for_the_trial():
 def test_inside_telegram_create_account_is_the_username_only_form():
     page = (Path(bot.__file__).parent.parent / "static" / "index.html").read_text()
     assert "if (view === 'register' && IS_TG)" in page
+
+
+def test_the_config_page_opens_on_three_first_steps():
+    page = (Path(bot.__file__).parent.parent / "static" / "index.html").read_text()
+    assert 'id="qs-card"' in page and "renderQuickStart();" in page
+    assert "apps.apple.com/app/amneziawg/id6478942365" in page
+    assert "play.google.com/store/apps/details?id=org.amnezia.awg" in page
+    # dismissed per account: one storage is shared by every Telegram account on a phone
+    assert "'sov_qs_done:' + (localStorage.getItem('sov_user')" in page

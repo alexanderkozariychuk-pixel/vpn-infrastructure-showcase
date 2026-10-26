@@ -1433,6 +1433,12 @@
       background: var(--accent-glow); color: var(--accent);
       font-size: 12px; font-weight: 700; font-family: var(--font-mono);
     }
+    .qs-card { border-color: var(--accent); }
+    .qs-card .conn-steps { margin-top: 12px; }
+    .qs-card .conn-step { align-items: flex-start; flex-direction: column; gap: 8px; }
+    .qs-step-head { display: flex; align-items: center; gap: 12px; }
+    .qs-card .btn-full { margin-top: 2px; }
+    .qs-card .btn-sm.qs-store { align-self: flex-start; }
     .conn-note { margin-top: 12px; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
     .conn-pulse.ready { background: var(--green); animation: none; }
     .apk-box { margin-top: 16px; }
@@ -1790,6 +1796,28 @@
           <div class="trial-strip" id="trial-strip" role="status">
             <span id="trial-strip-text"></span>
             <button class="btn-sm" onclick="showPage('client','payment');showPayTab('sub')" data-i18n="btn-go-plans">Choose a plan →</button>
+          </div>
+          <!-- First steps: until the customer says it works. A file alone
+               told a newcomer nothing (2026-10-26, a trial from the bot). -->
+          <div class="card qs-card" id="qs-card" style="display:none">
+            <div class="card-title" data-i18n="qs-title">Connect in three steps</div>
+            <ol class="conn-steps">
+              <li class="conn-step" style="--i:1">
+                <div class="qs-step-head"><span class="conn-step-n">1</span><span id="qs-1"></span></div>
+                <button class="btn-sm qs-store" id="qs-store" onclick="openQsStore()"></button>
+              </li>
+              <li class="conn-step" style="--i:2">
+                <div class="qs-step-head"><span class="conn-step-n">2</span><span data-i18n="qs-2">Download the connection file</span></div>
+                <button class="btn-full" onclick="downloadConfig()" data-i18n="qs-dl">↓ Download the file</button>
+              </li>
+              <li class="conn-step" style="--i:3">
+                <div class="qs-step-head"><span class="conn-step-n">3</span><span id="qs-3"></span></div>
+              </li>
+            </ol>
+            <div class="actions">
+              <button class="btn-sm" onclick="showPage('client','connect')" data-i18n="btn-how-connect">How to connect →</button>
+              <button class="btn-sm" onclick="qsDone()" data-i18n="qs-done">It works ✓</button>
+            </div>
           </div>
           <div class="loc-news" id="loc-news" style="display:none" role="status">
             <div class="loc-flag">🇳🇱</div>
@@ -2901,6 +2929,14 @@ const translations = {
     'card-conn': 'Connection Details',
     'qr-soon': 'QR CODE\nCOMING SOON',
     'btn-download': '↓ Download .conf',
+    'qs-title': 'Connect in three steps',
+    'qs-1-ios': 'Install AmneziaWG from the App Store', 'qs-1-android': 'Install AmneziaWG from Google Play',
+    'qs-1-other': 'Install AmneziaWG on the device you will connect', 'qs-store': 'Open the store ↗', 'qs-store-other': 'Where to get it →',
+    'qs-2': 'Download the connection file', 'qs-dl': '↓ Download the file',
+    'qs-3-ios': 'In AmneziaWG: “Add a tunnel” → “Create from file or archive” → pick the file → turn the switch on',
+    'qs-3-android': 'In AmneziaWG: “+” → “Import from file or archive” → pick the file in Downloads → turn the switch on',
+    'qs-3-other': 'Import the file into AmneziaWG and turn the switch on',
+    'qs-done': 'It works ✓',
     'setup-1-label': '1. Download',
     'setup-1-val': 'AmneziaWG app (iOS / Android / Windows)',
     'setup-2-label': '2. Import',
@@ -3326,6 +3362,14 @@ const translations = {
     'card-conn': 'Данные подключения',
     'qr-soon': 'QR КОД\nСКОРО',
     'btn-download': '↓ Скачать .conf',
+    'qs-title': 'Подключение за три шага',
+    'qs-1-ios': 'Установите AmneziaWG из App Store', 'qs-1-android': 'Установите AmneziaWG из Google Play',
+    'qs-1-other': 'Установите AmneziaWG на устройство, которое будете подключать', 'qs-store': 'Открыть магазин ↗', 'qs-store-other': 'Где скачать →',
+    'qs-2': 'Скачайте файл подключения', 'qs-dl': '↓ Скачать файл',
+    'qs-3-ios': 'В AmneziaWG: «Добавить туннель» → «Создать из файла или архива» → выберите файл → включите переключатель',
+    'qs-3-android': 'В AmneziaWG: «+» → «Импорт из файла или архива» → выберите файл в «Загрузках» → включите переключатель',
+    'qs-3-other': 'Импортируйте файл в AmneziaWG и включите переключатель',
+    'qs-done': 'Готово, работает ✓',
     'setup-1-label': '1. Скачать',
     'setup-1-val': 'Приложение AmneziaWG (iOS / Android / Windows)',
     'setup-2-label': '2. Импорт',
@@ -4551,6 +4595,7 @@ async function loadClientConfigPage(selectId) {
       if (block) block.innerHTML = `<span style="color:var(--text-dim)">${t('dev-add-first')}</span>`;
       return;
     }
+    renderQuickStart();
     const want = selectId || _configId;
     const keep = _configs.some(c => c.id === want) ? want : _configs[0].id;
     _configId = keep;
@@ -5100,6 +5145,40 @@ function copyConfig() {
     btn.textContent = t('btn-copied');
     setTimeout(() => { btn.textContent = t('btn-copy'); }, 1500);
   }).catch(() => {});
+}
+
+// ── First steps ───────────────────────────────────────────────
+const QS_STORE = {ios: 'https://apps.apple.com/app/amneziawg/id6478942365',
+                  android: 'https://play.google.com/store/apps/details?id=org.amnezia.awg'};
+function qsPlatform() {
+  const tg = IS_TG && window.Telegram && window.Telegram.WebApp;
+  const p = (tg && tg.platform) || '';
+  const ua = navigator.userAgent || '';
+  if (p === 'ios' || /iPhone|iPad|iPod/.test(ua)) return 'ios';
+  if (p === 'android' || /Android/.test(ua)) return 'android';
+  return 'other';
+}
+function renderQuickStart() {
+  const card = document.getElementById('qs-card');
+  if (!card) return;
+  let done = false;
+  // Per account: Telegram keeps one storage for every account on a phone.
+  try { done = localStorage.getItem('sov_qs_done:' + (localStorage.getItem('sov_user') || '')) === '1'; } catch (e) {}
+  if (done || !_configs.length) { card.style.display = 'none'; return; }
+  const os = qsPlatform();
+  setText('qs-1', t('qs-1-' + os));
+  setText('qs-3', t('qs-3-' + os));
+  setText('qs-store', t(os === 'other' ? 'qs-store-other' : 'qs-store'));
+  card.style.display = '';
+}
+function openQsStore() {
+  const os = qsPlatform();
+  if (QS_STORE[os]) openExternal(QS_STORE[os]); else showPage('client', 'connect');
+}
+function qsDone() {
+  try { localStorage.setItem('sov_qs_done:' + (localStorage.getItem('sov_user') || ''), '1'); } catch (e) {}
+  const card = document.getElementById('qs-card');
+  if (card) card.style.display = 'none';
 }
 
 function downloadConfig() {
