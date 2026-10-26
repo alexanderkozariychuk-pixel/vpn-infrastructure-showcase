@@ -4717,14 +4717,38 @@ async function tgToggle() {
 // bot's profile "Open" button and a menu button set by hand in BotFather.
 const IS_TG = new URLSearchParams(location.search).get('tg') === '1'
   || /(^|[#&])tgWebAppData=/.test(location.hash);
-function tgApp() { return window.Telegram && window.Telegram.WebApp; }
+// The launch data Telegram puts in the address: enough to sign in even when
+// telegram.org's script never arrives (slow or filtered networks — the page
+// then sat on password sign-in, 2026-10-26).
+const TG_HASH_DATA = (() => {
+  const m = /(?:^#|&)tgWebAppData=([^&]*)/.exec(location.hash);
+  try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; }
+})();
+let _tgFallback = null;
+function tgFallback() {
+  if (!TG_HASH_DATA) return null;
+  if (!_tgFallback) {
+    let user = {};
+    try { user = JSON.parse(new URLSearchParams(TG_HASH_DATA).get('user') || '{}'); } catch (e) {}
+    _tgFallback = {initData: TG_HASH_DATA, initDataUnsafe: {user}, ready() {}, expand() {},
+                   openLink(u) { window.open(u, '_blank'); }};
+  }
+  return _tgFallback;
+}
+function tgApp() {
+  const w = window.Telegram && window.Telegram.WebApp;
+  return (w && w.initData) ? w : (tgFallback() || w);
+}
 function loadTgScript() {
   return new Promise(res => {
-    if (tgApp()) return res(tgApp());
+    if (window.Telegram && window.Telegram.WebApp) return res(tgApp());
+    let done = false;
+    const finish = () => { if (!done) { done = true; res(tgApp()); } };
     const s = document.createElement('script');
     s.src = 'https://telegram.org/js/telegram-web-app.js';
-    s.onload = () => res(tgApp());
-    s.onerror = () => res(null);
+    s.onload = finish;
+    s.onerror = finish;
+    setTimeout(finish, 3000);
     document.head.appendChild(s);
   });
 }
