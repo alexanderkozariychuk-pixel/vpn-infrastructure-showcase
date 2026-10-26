@@ -454,6 +454,11 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     except IntegrityError:
         logger.warning("Referral reward for payment %s was already recorded", payment.id)
 
+    # Months this customer earned by inviting others while their subscription
+    # was not live wait for a purchase; this is it. After the extension above,
+    # so they land on top of the period just paid for.
+    await credit.apply_rewards_for(db, user, now=now)
+
     from services import notify
     await notify.notify(db, user, "granted" if gift else "paid",
                         plan=mailer.plan_title(info["tier"], info["days"], user.lang or "ru"),

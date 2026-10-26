@@ -2092,6 +2092,28 @@
         <!-- TAB: Referrals -->
         <div class="paytab-panel" id="paytab-referral" style="display:none">
           <div class="card">
+            <div class="card-title" data-i18n="ref-code-title">Invite a friend</div>
+            <div id="ref-code-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" data-i18n="ref-bonus-title">Your bonus months</div>
+            <div class="ref-figures">
+              <div class="ref-figure">
+                <div class="ref-figure-value" id="ref-days-applied">—</div>
+                <div class="ref-figure-label" data-i18n="ref-days-applied">Days added to your subscription</div>
+              </div>
+              <div class="ref-figure">
+                <div class="ref-figure-value" id="ref-days-pending">—</div>
+                <div class="ref-figure-label" data-i18n="ref-days-pending">Days on the way</div>
+              </div>
+            </div>
+            <div id="ref-rewards-body"></div>
+          </div>
+
+          <!-- Points from the old programme (before 2026-10-26): shown only to
+               someone who has any. -->
+          <div class="card" id="ref-points-card" style="display:none">
             <div class="card-title" data-i18n="ref-balance-title">Your points</div>
             <div class="ref-figures">
               <div class="ref-figure">
@@ -2106,15 +2128,7 @@
             <div class="checkout-note" data-i18n="ref-rules">
               1 балл = 1 ₽. Баллами можно оплатить до половины заказа.
             </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title" data-i18n="ref-code-title">Your referral code</div>
-            <div id="ref-code-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
-          </div>
-
-          <div class="card">
-            <div class="card-title" data-i18n="ref-ledger-title">Points history</div>
+            <div class="card-title" style="margin-top:16px" data-i18n="ref-ledger-title">Points history</div>
             <div id="ref-ledger-body"><span class="loading" data-i18n="hist-loading">Loading</span></div>
           </div>
         </div>
@@ -2645,7 +2659,18 @@ const translations = {
     'ref-available': 'Available to spend',
     'ref-pending': 'Earned — available in 14 days',
     'ref-rules': '1 point = 1 ₽. Points can cover up to half of an order, and expire six months after they become available.',
-    'ref-code-title': 'Your referral code',
+    'ref-code-title': 'Invite a friend',
+    'ref-bonus-title': 'Your bonus months',
+    'ref-days-applied': 'Days added to your subscription',
+    'ref-days-pending': 'Days on the way',
+    'ref-reward-row': '+{days} days',
+    'ref-reward-applied': 'added',
+    'ref-reward-pending': 'will be added',
+    'ref-reward-waiting': 'will be added with your next payment',
+    'ref-rewards-empty': 'No invitations paid yet',
+    'ref-share': 'Send to a friend',
+    'ref-share-text': 'I use Sovereign VPN and it works reliably. Through my link you get {discount}% off your first payment: {link}',
+    'promo-no-not-first': "A friend's code applies to the first purchase only",
     'ref-copy': 'Copy',
     'ref-copy-link': 'Copy link', 'ref-copied': 'Copied',
     'ref-link-explain': 'Send the link: whoever registers through it gets the discount on their first payment without typing anything. The code below works too, typed at checkout.',
@@ -2653,7 +2678,7 @@ const translations = {
     'promo-invited': 'Invitation discount:',
     'ref-create': 'Get my code',
     'ref-uses': 'Purchases made with your code:',
-    'ref-explain': 'A friend gets {discount}% off their first purchase. When they buy more than one month, you get {reward} points — available to spend 14 days later.',
+    'ref-explain': 'A friend gets {discount}% off their first payment. For every friend who pays — any plan, even one month — you get +{days} days of subscription, added {vest} days after their payment.',
     'ref-need-sub': 'A referral code comes with an active subscription.',
     'ref-ledger-title': 'Points history',
     'ref-ledger-empty': 'No movements yet',
@@ -3045,7 +3070,18 @@ const translations = {
     'ref-available': 'Доступно к списанию',
     'ref-pending': 'Начислено — станет доступно через 14 дней',
     'ref-rules': '1 балл = 1 ₽. Баллами можно оплатить до половины заказа. Баллы сгорают через полгода после того, как станут доступны.',
-    'ref-code-title': 'Ваш промокод',
+    'ref-code-title': 'Пригласите друга',
+    'ref-bonus-title': 'Ваши бонусные месяцы',
+    'ref-days-applied': 'Дней добавлено к подписке',
+    'ref-days-pending': 'Дней в пути',
+    'ref-reward-row': '+{days} дней',
+    'ref-reward-applied': 'добавлено',
+    'ref-reward-pending': 'добавится',
+    'ref-reward-waiting': 'добавится при следующей оплате',
+    'ref-rewards-empty': 'Оплат по приглашениям пока нет',
+    'ref-share': 'Отправить другу',
+    'ref-share-text': 'Пользуюсь VPN Sovereign — работает стабильно. По моей ссылке скидка {discount}% на первую оплату: {link}',
+    'promo-no-not-first': 'Код друга действует только на первую оплату',
     'ref-copy': 'Копировать',
     'ref-copy-link': 'Копировать ссылку', 'ref-copied': 'Скопировано',
     'ref-link-explain': 'Отправьте ссылку: кто зарегистрируется по ней, получит скидку на первую оплату без ввода кода. Код ниже тоже работает — его вводят при оплате.',
@@ -3053,7 +3089,7 @@ const translations = {
     'promo-invited': 'Скидка по приглашению:',
     'ref-create': 'Получить промокод',
     'ref-uses': 'Покупок по вашему коду:',
-    'ref-explain': 'Друг получает скидку {discount}% на первую покупку. Когда он оплатит больше месяца, вам начисляется {reward} баллов — они станут доступны через 14 дней.',
+    'ref-explain': 'Друг получает скидку {discount}% на первую оплату. За каждого друга, который оплатит подписку — любой тариф, даже месяц, — вам +{days} дней подписки. Они добавятся через {vest} дней после его оплаты.',
     'ref-need-sub': 'Промокод доступен при активной подписке.',
     'ref-ledger-title': 'История баллов',
     'ref-ledger-empty': 'Движений пока нет',
@@ -3904,6 +3940,36 @@ async function loadReferral() {
   const ledger = document.getElementById('ref-ledger-body');
   const codeEl = document.getElementById('ref-code-body');
 
+  // Old points: the card appears only for someone who has any.
+  const pointsCard = document.getElementById('ref-points-card');
+  if (pointsCard) pointsCard.style.display =
+    credit && (credit.balance > 0 || credit.pending > 0 || credit.history.length) ? '' : 'none';
+
+  // Bonus months from friends' purchases.
+  const rewardsEl = document.getElementById('ref-rewards-body');
+  if (ref && Array.isArray(ref.rewards)) {
+    const applied = ref.rewards.filter(r => r.applied_at).reduce((n, r) => n + r.days, 0);
+    const pending = ref.rewards.filter(r => !r.applied_at).reduce((n, r) => n + r.days, 0);
+    setText('ref-days-applied', applied);
+    setText('ref-days-pending', pending);
+    if (rewardsEl) {
+      rewardsEl.innerHTML = ref.rewards.length
+        ? `<table class="ref-ledger">${ref.rewards.map(r => {
+            const vested = new Date(r.vests_at) <= new Date();
+            const when = r.applied_at
+              ? `${t('ref-reward-applied')} ${fmtDate(r.applied_at)}`
+              : (vested ? t('ref-reward-waiting') : `${t('ref-reward-pending')} ${fmtDate(r.vests_at)}`);
+            return `<tr><td>${t('ref-reward-row').replace('{days}', r.days)}
+                <div class="ref-when">${when}</div></td></tr>`;
+          }).join('')}</table>`
+        : `<div style="color:var(--text-dim);font-size:13px;margin-top:8px">${t('ref-rewards-empty')}</div>`;
+    }
+  } else {
+    setText('ref-days-applied', '—');
+    setText('ref-days-pending', '—');
+    if (rewardsEl) rewardsEl.innerHTML = '';
+  }
+
   if (!credit) {
     setText('ref-balance', '—');
     setText('ref-pending', '—');
@@ -3936,32 +4002,59 @@ async function loadReferral() {
   if (!ref) {
     codeEl.innerHTML = `<div style="color:var(--text-dim);font-size:13px">—</div>`;
   } else if (ref.code) {
+    _refDiscount = ref.discount_percent;
     codeEl.innerHTML = `
       <div class="ref-code">
         <div class="ref-code-value ref-link-value" id="ref-link-value">${escHtml(referralLink(ref.code))}</div>
         <button class="promo-btn" onclick="copyReferral('ref-link-value', this)">${t('ref-copy-link')}</button>
       </div>
+      <button class="btn-full" style="margin-top:12px" onclick="shareReferral(this)">${t('ref-share')}</button>
       <div class="checkout-note">${t('ref-link-explain')}</div>
       <div class="ref-code" style="margin-top:14px">
         <div class="ref-code-value" id="ref-code-value">${escHtml(ref.code)}</div>
         <button class="promo-btn" onclick="copyReferral('ref-code-value', this)">${t('ref-copy')}</button>
       </div>
       <div class="checkout-note">
-        ${t('ref-explain').replace('{reward}', ref.reward).replace('{discount}', ref.discount_percent)}
+        ${refExplain(ref)}
       </div>
       <div class="checkout-note">${t('ref-uses')} ${ref.uses}</div>`;
   } else if (ref.eligible) {
     codeEl.innerHTML = `
       <div class="checkout-note" style="margin-top:0">
-        ${t('ref-explain').replace('{reward}', ref.reward).replace('{discount}', ref.discount_percent)}
+        ${refExplain(ref)}
       </div>
-      <button class="btn-primary" style="margin-top:14px" onclick="createReferralCode()">${t('ref-create')}</button>`;
+      <button class="btn-full" style="margin-top:14px" onclick="createReferralCode()">${t('ref-create')}</button>`;
   } else {
     // Said plainly rather than by a greyed-out button. A code is earned by
     // being a customer, and that is the whole reason it cannot be minted by
     // an account that has never paid.
     codeEl.innerHTML = `<div class="checkout-note" style="margin-top:0">${t('ref-need-sub')}</div>`;
   }
+}
+
+function refExplain(ref) {
+  return t('ref-explain')
+    .replace('{discount}', ref.discount_percent)
+    .replace('{days}', ref.reward_days)
+    .replace('{vest}', ref.vesting_days);
+}
+
+// The ready-made invitation: the phone's share sheet where there is one,
+// the clipboard otherwise. Wording stays plain — no words a payment
+// provider would object to.
+let _refDiscount = 10;
+async function shareReferral(btn) {
+  const link = document.getElementById('ref-link-value')?.textContent || '';
+  const text = t('ref-share-text').replace('{discount}', _refDiscount).replace('{link}', link);
+  try {
+    if (navigator.share) { await navigator.share({ text }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    const was = btn.textContent;
+    btn.textContent = t('ref-copied');
+    setTimeout(() => { btn.textContent = was; }, 1500);
+  } catch (e) { /* nothing to fall back to */ }
 }
 
 async function createReferralCode() {

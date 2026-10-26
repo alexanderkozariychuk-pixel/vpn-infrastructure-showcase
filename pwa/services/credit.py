@@ -13,15 +13,22 @@ have 350 rather than 525 there is nothing to answer with.
 
 Four things the scheme has to survive, and where each is handled:
 
-  A reward followed by a refund — `REWARD_VESTING_DAYS` below. The credit is
-  written at once but is unspendable until it vests, and a refunded purchase
-  never vests. That prevents the loss rather than chasing an account that may
-  already have spent it.
+  A reward followed by a refund — `REWARD_VESTING_DAYS` below. The reward is
+  written at once but lands only when it vests, and a refunded purchase never
+  vests. That prevents the loss rather than chasing an account that may
+  already have used it.
 
   Self-referral — a code is refused against its owner's own purchase, and the
-  economics do the rest: the smallest qualifying order is 900 ₽ against a
-  175-point reward. Email registration cannot keep sockpuppets out; making
-  them unprofitable works without anyone watching.
+  economics do the rest: the cheapest referred order costs real money (one
+  month less the friend's discount) and earns a month the service barely pays
+  for, so a fake account buys exactly what it earns. Email registration cannot
+  keep sockpuppets out; making them pointless works without anyone watching.
+
+Since 2026-10-26 the referral reward is days, not points: every paid purchase
+through someone's code adds `REFERRAL_REWARD_DAYS` to their subscription
+(`ReferralReward`). The old rule paid 175 points for purchases over a month
+only, so the usual first purchase — one month to try — earned nothing.
+Points already earned stay in the ledger and keep working.
 
   A code and credit stacked on one order — `MAX_CREDIT_SHARE`.
 
@@ -37,17 +44,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import plan_info
-from db.models import CreditEntry, Payment, PromoCode, User
+from db.models import CreditEntry, Payment, PromoCode, ReferralReward, User
 
 logger = logging.getLogger(__name__)
 
-# A point is one ruble off a future order.
-REFERRAL_REWARD = 175
+# What a referrer gets for each paid purchase through their code: a month.
+REFERRAL_REWARD_DAYS = 30
 
-# Only a purchase longer than a month earns one.
-MIN_REWARD_DAYS = 31
-
-# Written immediately, spendable after this. The window is what a refund has
+# Written immediately, applied (or, for old points, spendable) after this. The window is what a refund has
 # to happen inside for the reward never to materialise.
 REWARD_VESTING_DAYS = 14
 
@@ -263,6 +267,11 @@ async def resolve_code(
         # Nobody refers themselves. Cheap to check and it removes the most
         # obvious way to try.
         return None, "own_code"
+    if promo.owner_user_id is not None and not await is_first_purchase(db, buyer):
+        # A friend's code is an invitation: it discounts the first purchase
+        # and rewards the friend once. Typed again at every renewal it would
+        # be a permanent discount and a month for the friend each time.
+        return None, "not_first"
 
     return promo, None
 
@@ -273,6 +282,7 @@ REFUSAL_TEXT = {
     "expired":  "This code has expired",
     "used_up":  "This code has been used up",
     "own_code": "You cannot use your own referral code",
+    "not_first": "A friend's code applies to the first purchase only",
 }
 
 
@@ -393,15 +403,16 @@ async def spend_on_payment(db: AsyncSession, payment: Payment, now: datetime | N
 
 async def reward_for_payment(db: AsyncSession, payment: Payment, now: datetime | None = None) -> int:
     """
-    Pay the referrer, if this purchase earned anything.
+    Reward the referrer, if this purchase earned anything.
 
-    Nothing is earned when the order carried no code, when the code has no
-    owner, when the plan is a single month, or when the buyer paid no cash —
-    that last one is what stops credit from breeding, since a reward computed
-    on face value would let two accounts pass points back and forth and grow
-    them on every lap.
+    Any paid plan earns `REFERRAL_REWARD_DAYS` — including a single month,
+    which is how most people start. Nothing is earned when the order carried
+    no code, when the code has no owner (a campaign code), when the buyer is
+    the owner, or when the buyer paid no cash (an admin grant, an order covered
+    by old points).
 
-    Returns the points credited, or 0.
+    The reward is recorded now and lands when it vests; see
+    `apply_due_rewards`. Returns the days recorded, or 0.
     """
     if not payment.promo_code:
         return 0
@@ -415,53 +426,61 @@ async def reward_for_payment(db: AsyncSession, payment: Payment, now: datetime |
     if promo.owner_user_id == payment.user_id:
         return 0
 
-    info = plan_info(payment.plan)
-    if not info or info["days"] <= MIN_REWARD_DAYS:
+    if not plan_info(payment.plan):
         return 0
 
     if payment.amount <= 0:
         logger.info("No reward for %s: nothing was paid in cash", payment.id)
         return 0
 
-    # The unique constraint on (reason, source_payment_id) is the real
-    # guarantee; this check just avoids a pointless integrity error on the
-    # common retry.
+    # The unique constraint on source_payment_id is the real guarantee; this
+    # check just avoids a pointless integrity error on the common retry.
     already = await db.execute(
-        select(CreditEntry).where(
-            CreditEntry.reason == "referral_reward",
-            CreditEntry.source_payment_id == payment.id,
-        )
+        select(ReferralReward).where(ReferralReward.source_payment_id == payment.id)
     )
     if already.scalars().first() is not None:
         return 0
 
     vests_at = now + timedelta(days=REWARD_VESTING_DAYS)
-    db.add(CreditEntry(
-        user_id=promo.owner_user_id,
-        delta=REFERRAL_REWARD,
-        reason="referral_reward",
+    db.add(ReferralReward(
+        referrer_user_id=promo.owner_user_id,
         source_payment_id=payment.id,
+        days=REFERRAL_REWARD_DAYS,
         vests_at=vests_at,
-        expires_at=vests_at + timedelta(days=CREDIT_LIFETIME_DAYS),
         note=f"referral: {payment.plan}",
     ))
-
     logger.info(
-        "Credited %d to %s for referred payment %s, vesting %s",
-        REFERRAL_REWARD, promo.owner_user_id, payment.id, vests_at.date(),
+        "Referral reward of %d days for %s on payment %s, vesting %s",
+        REFERRAL_REWARD_DAYS, promo.owner_user_id, payment.id, vests_at.date(),
     )
-    return REFERRAL_REWARD
+    return REFERRAL_REWARD_DAYS
 
 
 async def cancel_reward_for_payment(db: AsyncSession, payment: Payment) -> int:
     """
     Undo a reward whose purchase was refunded.
 
-    Only reaches credit that has not vested: once vested it may already have
-    been spent, and clawing it back would leave a negative balance on an
-    account that did nothing wrong. Inside the vesting window a refund simply
-    removes the entry, which is the whole point of the window.
+    Only reaches a reward that has not been applied: once the days are on the
+    referrer's subscription, taking them back would cut short an account that
+    did nothing wrong. Inside the vesting window a refund simply removes the
+    record, which is the whole point of the window. Points earned under the
+    old rule are handled the same way.
     """
+    result = await db.execute(
+        select(ReferralReward).where(ReferralReward.source_payment_id == payment.id)
+    )
+    reward = result.scalars().first()
+    if reward is not None:
+        if reward.applied_at is not None:
+            logger.warning(
+                "Reward on refunded payment %s was already applied — leaving it alone",
+                payment.id,
+            )
+            return 0
+        await db.delete(reward)
+        logger.info("Cancelled unapplied reward for refunded payment %s", payment.id)
+        return reward.days
+
     result = await db.execute(
         select(CreditEntry).where(
             CreditEntry.reason == "referral_reward",
@@ -484,3 +503,87 @@ async def cancel_reward_for_payment(db: AsyncSession, payment: Payment) -> int:
     await db.delete(entry)
     logger.info("Cancelled unvested reward for refunded payment %s", payment.id)
     return entry.delta
+
+
+def _subscribed(user: User, now: datetime) -> bool:
+    until = _aware(user.subscribed_until)
+    return bool(user.is_subscribed) and until is not None and until > now
+
+
+async def apply_rewards_for(db: AsyncSession, user: User, now: datetime | None = None) -> int:
+    """
+    Add this referrer's vested, unapplied rewards to their subscription.
+
+    Only to a live subscription: days added to an ended one would reopen it
+    with no devices on the node. A referrer whose subscription has lapsed
+    keeps the reward, and their next purchase calls this after extending.
+
+    Returns the days added. Does not commit.
+    """
+    now = now or datetime.now(timezone.utc)
+    if not _subscribed(user, now):
+        return 0
+    due = (await db.execute(
+        select(ReferralReward).where(
+            ReferralReward.referrer_user_id == user.id,
+            ReferralReward.applied_at.is_(None),
+            ReferralReward.vests_at <= now,
+        )
+    )).scalars().all()
+    if not due:
+        return 0
+
+    from services import notify  # notify imports mailer; keep it off the import path of pricing
+
+    added = 0
+    for reward in due:
+        user.subscribed_until = _aware(user.subscribed_until) + timedelta(days=reward.days)
+        reward.applied_at = now
+        added += reward.days
+        await notify.notify(
+            db, user, "referral_bonus", dedupe=f"referral:{reward.id}",
+            days=reward.days,
+            date=_aware(user.subscribed_until).astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y"),
+        )
+    logger.info("Added %d referral days to %s, now until %s",
+                added, user.username, _aware(user.subscribed_until).date())
+    return added
+
+
+async def apply_due_rewards(db: AsyncSession, now: datetime | None = None) -> dict:
+    """
+    The hourly part (expire_subscriptions.py): every vested reward whose
+    referrer has a live subscription. Runs before the expiry sweep, so a
+    month that has landed is on the subscription before anyone checks
+    whether it ended. Commits.
+    """
+    now = now or datetime.now(timezone.utc)
+    owners = (await db.execute(
+        select(ReferralReward.referrer_user_id).where(
+            ReferralReward.applied_at.is_(None),
+            ReferralReward.vests_at <= now,
+        ).distinct()
+    )).scalars().all()
+
+    stats = {"referrers_rewarded": 0, "referral_days_added": 0}
+    for uid in owners:
+        user = await db.get(User, uid)
+        if user is None:
+            continue
+        days = await apply_rewards_for(db, user, now=now)
+        if days:
+            stats["referrers_rewarded"] += 1
+            stats["referral_days_added"] += days
+    await db.commit()
+    return stats
+
+
+async def rewards_of(db: AsyncSession, user: User) -> list[ReferralReward]:
+    """This customer's rewards, newest first, for the portal."""
+    result = await db.execute(
+        select(ReferralReward)
+        .where(ReferralReward.referrer_user_id == user.id)
+        .order_by(ReferralReward.created_at.desc())
+        .limit(50)
+    )
+    return list(result.scalars().all())

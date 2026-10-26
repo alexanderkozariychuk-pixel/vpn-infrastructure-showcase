@@ -13,6 +13,7 @@ Events and their channels:
     sub_ends_1d       yes    —        under 24 hours left
     sub_ended         yes    yes      the period ended and devices came off
     service           yes    —        a message from the operator to everyone
+    referral_bonus    yes    —        a friend's purchase added days (credit.apply_rewards_for)
 
 Letters go only where a customer has to act and might not open the portal in
 time: renewing before the end, and learning that it ended. Everything else
@@ -86,6 +87,11 @@ TEXTS = {
         "ru": ("Подписка заканчивается завтра", "Она действует до {until}. После этого устройства отключатся."),
         "en": ("Your subscription ends tomorrow", "It is active until {until}. After that your devices stop working."),
     },
+    "referral_bonus": {
+        "ru": ("+{days} дней за приглашение", "Ваш друг оплатил подписку. Спасибо! Подписка продлена до {date}."),
+        "en": ("+{days} days for an invitation", "Your friend paid for a subscription. Thank you! "
+                                                 "Active until {date}."),
+    },
     "sub_ended": {
         "ru": ("Подписка закончилась", "Устройства отключены. После продления в «Мой конфиг» появится новый файл."),
         "en": ("Your subscription has ended", "Your devices are switched off. After renewing, a new file appears "
@@ -95,7 +101,7 @@ TEXTS = {
 
 LINKS = {
     "paid": "config", "granted": "config", "trial_started": "config", "trial_ends_1d": "payment", "trial_ended": "payment",
-    "sub_ends_3d": "payment", "sub_ends_1d": "payment", "sub_ended": "payment",
+    "sub_ends_3d": "payment", "sub_ends_1d": "payment", "sub_ended": "payment", "referral_bonus": "payment",
 }
 
 

@@ -77,8 +77,18 @@ async def get_referral(
         "code": promo.code if promo else None,
         "uses": await credit.uses_of(db, promo.code) if promo else 0,
         "discount_percent": promo.discount_percent if promo else credit.DEFAULT_DISCOUNT_PERCENT,
-        "reward": credit.REFERRAL_REWARD,
+        "reward_days": credit.REFERRAL_REWARD_DAYS,
+        "vesting_days": credit.REWARD_VESTING_DAYS,
         "eligible": has_active_subscription(user),
+        # What the friends' purchases have earned: landed, and still vesting.
+        "rewards": [
+            {
+                "days": r.days,
+                "vests_at": r.vests_at.isoformat() if r.vests_at else None,
+                "applied_at": r.applied_at.isoformat() if r.applied_at else None,
+            }
+            for r in await credit.rewards_of(db, user)
+        ],
     }
 
 
@@ -110,5 +120,7 @@ async def create_referral(
         "code": promo.code,
         "uses": await credit.uses_of(db, promo.code),
         "discount_percent": promo.discount_percent,
-        "reward": credit.REFERRAL_REWARD,
+        "reward_days": credit.REFERRAL_REWARD_DAYS,
+        "vesting_days": credit.REWARD_VESTING_DAYS,
+        "rewards": [],
     }

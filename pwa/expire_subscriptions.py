@@ -29,11 +29,16 @@ logger = logging.getLogger("expiry")
 
 async def main() -> int:
     from db.base import SessionLocal
+    from services.credit import apply_due_rewards
     from services.subscriptions import expire_due_subscriptions, expire_due_trials
 
     started = datetime.now(timezone.utc)
     async with SessionLocal() as db:
+        # Referral months first: a month that has landed belongs on the
+        # subscription before the sweep asks whether it ended.
+        rewards = await apply_due_rewards(db)
         stats = await expire_due_subscriptions(db)
+        stats.update(rewards)
         stats.update(await expire_due_trials(db))
         from services.notify import remind_due
         stats.update(await remind_due(db))
@@ -51,6 +56,8 @@ async def main() -> int:
         stats["failures"],
     )
     logger.info("reminders sent: %d", stats["reminders"])
+    logger.info("referral: %d referrers rewarded, %d days added",
+                stats["referrers_rewarded"], stats["referral_days_added"])
     logger.info(
         "trials: %d due, %d peers removed, %d failures",
         stats["trials_due"], stats["trial_peers_removed"], stats["trial_failures"],

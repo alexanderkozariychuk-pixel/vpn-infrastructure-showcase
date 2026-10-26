@@ -165,6 +165,32 @@ class CreditEntry(Base):
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
+class ReferralReward(Base):
+    """
+    Days of subscription earned by bringing a paying customer (since 2026-10-26;
+    before that the reward was points, CreditEntry "referral_reward").
+
+    Written when the referred purchase is paid, added to the referrer's
+    subscription once it vests (`vests_at`) — the window a refund has to happen
+    in for the reward never to land. `applied_at` is set when the days were
+    added; a referrer with no live subscription at that moment keeps the reward
+    until their next purchase, which picks it up.
+
+    One per referred payment: the unique `source_payment_id` is what makes a
+    retried gateway notification harmless.
+    """
+    __tablename__ = "referral_rewards"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    referrer_user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
+    source_payment_id: Mapped[str] = mapped_column(String, ForeignKey("payments.id"), nullable=False, unique=True)
+    days: Mapped[int] = mapped_column(Integer, nullable=False)
+    vests_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
 class TrialGrant(Base):
     """
     One free trial per mailbox, recorded for good.

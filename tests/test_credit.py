@@ -13,11 +13,14 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from db.models import CreditEntry, Payment, PromoCode, User  # noqa: E402
+from db.models import CreditEntry, Payment, PromoCode, ReferralReward, User  # noqa: E402
 from services import credit  # noqa: E402
 from services.credit import (  # noqa: E402
     MAX_CREDIT_SHARE,
-    REFERRAL_REWARD,
+    REFERRAL_REWARD_DAYS,
+    REWARD_VESTING_DAYS,
+    apply_due_rewards,
+    apply_rewards_for,
     balance,
     cancel_reward_for_payment,
     history,
@@ -248,35 +251,44 @@ def _referred(db, owner, buyer, plan="basic-3m", amount=810):
     return _payment(db, buyer, plan=plan, amount=amount, code=code.code)
 
 
-def test_a_qualifying_referral_pays_the_owner(db):
+def _rewards(db, owner):
+    return list(db.run(db.execute(
+        select(ReferralReward).where(ReferralReward.referrer_user_id == owner.id)
+    )).scalars().all())
+
+
+def _subscribe(db, user, days=60):
+    user.is_subscribed = True
+    user.subscribed_until = NOW + timedelta(days=days)
+
+
+def test_a_referral_records_a_month_for_the_owner(db):
     owner, buyer = _user(db, "alice"), _user(db, "bob")
     db.run(db.commit())
     payment = _referred(db, owner, buyer)
     db.run(db.commit())
 
-    assert db.run(reward_for_payment(db, payment, now=NOW)) == REFERRAL_REWARD
+    assert db.run(reward_for_payment(db, payment, now=NOW)) == REFERRAL_REWARD_DAYS
     db.run(db.commit())
 
-    # Earned, but not yet spendable.
-    assert db.run(balance(db, owner, now=NOW)) == 0
-    assert db.run(pending_balance(db, owner, now=NOW)) == REFERRAL_REWARD
-    assert db.run(balance(db, owner, now=NOW + timedelta(days=15))) == REFERRAL_REWARD
+    [r] = _rewards(db, owner)
+    assert r.days == REFERRAL_REWARD_DAYS and r.applied_at is None
+    # Days, not points: nothing lands in the ledger.
+    assert db.run(pending_balance(db, owner, now=NOW)) == 0
 
 
-def test_a_one_month_purchase_earns_nothing(db):
+def test_a_one_month_purchase_earns_a_month_too(db):
+    """The reason for the change: most people start with one month."""
     owner, buyer = _user(db, "alice"), _user(db, "bob")
     db.run(db.commit())
     payment = _referred(db, owner, buyer, plan="basic-1m", amount=315)
     db.run(db.commit())
 
-    assert db.run(reward_for_payment(db, payment, now=NOW)) == 0
+    assert db.run(reward_for_payment(db, payment, now=NOW)) == REFERRAL_REWARD_DAYS
 
 
 def test_an_order_paid_entirely_in_credit_earns_nothing(db):
-    """
-    Rewards are paid on cash received. Otherwise two accounts pass credit back
-    and forth and grow it on every lap.
-    """
+    """Rewards are paid on cash received."""
     owner, buyer = _user(db, "alice"), _user(db, "bob")
     db.run(db.commit())
     payment = _referred(db, owner, buyer, amount=0)
@@ -306,53 +318,166 @@ def test_buying_with_your_own_code_earns_nothing(db):
     assert db.run(reward_for_payment(db, payment, now=NOW)) == 0
 
 
-def test_a_reward_lands_exactly_once(db):
-    """Gateways retry. A second notification must not pay twice."""
+def test_a_reward_is_recorded_exactly_once(db):
+    """Gateways retry. A second notification must not reward twice."""
     owner, buyer = _user(db, "alice"), _user(db, "bob")
     db.run(db.commit())
     payment = _referred(db, owner, buyer)
     db.run(db.commit())
 
-    assert db.run(reward_for_payment(db, payment, now=NOW)) == REFERRAL_REWARD
+    assert db.run(reward_for_payment(db, payment, now=NOW)) == REFERRAL_REWARD_DAYS
     db.run(db.commit())
     assert db.run(reward_for_payment(db, payment, now=NOW)) == 0
     db.run(db.commit())
+    assert len(_rewards(db, owner)) == 1
 
-    assert db.run(balance(db, owner, now=NOW + timedelta(days=30))) == REFERRAL_REWARD
 
-
-def test_a_refund_inside_the_window_cancels_the_reward(db):
-    """The reason the vesting window exists."""
+def test_the_month_lands_only_after_vesting(db):
     owner, buyer = _user(db, "alice"), _user(db, "bob")
+    _subscribe(db, owner)
+    db.run(db.commit())
+    until = owner.subscribed_until
+    payment = _referred(db, owner, buyer)
+    db.run(db.commit())
+    db.run(reward_for_payment(db, payment, now=NOW))
+    db.run(db.commit())
+
+    assert db.run(apply_due_rewards(db, now=NOW + timedelta(days=REWARD_VESTING_DAYS - 1)))["referral_days_added"] == 0
+    stats = db.run(apply_due_rewards(db, now=NOW + timedelta(days=REWARD_VESTING_DAYS, hours=1)))
+    assert stats["referral_days_added"] == REFERRAL_REWARD_DAYS
+    db.run(db.refresh(owner))
+    assert credit._aware(owner.subscribed_until) == credit._aware(until) + timedelta(days=REFERRAL_REWARD_DAYS)
+
+
+def test_the_month_lands_once(db):
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
+    _subscribe(db, owner, days=30)
+    db.run(db.commit())
+    until = owner.subscribed_until
+    payment = _referred(db, owner, buyer)
+    db.run(db.commit())
+    db.run(reward_for_payment(db, payment, now=NOW))
+    db.run(db.commit())
+
+    later = NOW + timedelta(days=REWARD_VESTING_DAYS + 1)
+    db.run(apply_due_rewards(db, now=later))
+    db.run(apply_due_rewards(db, now=later + timedelta(hours=1)))
+    db.run(db.refresh(owner))
+    assert credit._aware(owner.subscribed_until) == credit._aware(until) + timedelta(days=REFERRAL_REWARD_DAYS)
+
+
+def test_a_lapsed_referrer_keeps_the_month_for_the_next_purchase(db):
+    """
+    Days added to an ended subscription would reopen it with no devices on
+    the node. The reward waits, and the next purchase picks it up.
+    """
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
+    owner.is_subscribed = False
+    owner.subscribed_until = NOW - timedelta(days=3)
     db.run(db.commit())
     payment = _referred(db, owner, buyer)
     db.run(db.commit())
     db.run(reward_for_payment(db, payment, now=NOW))
     db.run(db.commit())
 
-    assert db.run(cancel_reward_for_payment(db, payment)) == REFERRAL_REWARD
+    later = NOW + timedelta(days=REWARD_VESTING_DAYS + 1)
+    assert db.run(apply_due_rewards(db, now=later))["referral_days_added"] == 0
+    db.run(db.refresh(owner))
+    assert owner.is_subscribed is False
+
+    # The purchase: activation extends, then picks up the waiting month.
+    owner.is_subscribed = True
+    owner.subscribed_until = later + timedelta(days=30)
+    assert db.run(apply_rewards_for(db, owner, now=later)) == REFERRAL_REWARD_DAYS
+    assert credit._aware(owner.subscribed_until) == later + timedelta(days=30 + REFERRAL_REWARD_DAYS)
+
+
+def test_the_referrer_is_told_in_the_bell(db):
+    from db.models import Notification
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
+    _subscribe(db, owner)
+    db.run(db.commit())
+    payment = _referred(db, owner, buyer)
+    db.run(db.commit())
+    db.run(reward_for_payment(db, payment, now=NOW))
+    db.run(db.commit())
+    db.run(apply_due_rewards(db, now=NOW + timedelta(days=REWARD_VESTING_DAYS + 1)))
+
+    rows = db.run(db.execute(select(Notification).where(Notification.user_id == owner.id))).scalars().all()
+    assert [n.kind for n in rows] == ["referral_bonus"]
+    assert str(REFERRAL_REWARD_DAYS) in rows[0].title
+
+
+def test_a_refund_inside_the_window_cancels_the_reward(db):
+    """The reason the vesting window exists."""
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
+    _subscribe(db, owner)
+    db.run(db.commit())
+    until = owner.subscribed_until
+    payment = _referred(db, owner, buyer)
+    db.run(db.commit())
+    db.run(reward_for_payment(db, payment, now=NOW))
     db.run(db.commit())
 
-    assert db.run(pending_balance(db, owner, now=NOW)) == 0
-    assert db.run(balance(db, owner, now=NOW + timedelta(days=30))) == 0
+    assert db.run(cancel_reward_for_payment(db, payment)) == REFERRAL_REWARD_DAYS
+    db.run(db.commit())
+
+    db.run(apply_due_rewards(db, now=NOW + timedelta(days=30)))
+    db.run(db.refresh(owner))
+    assert credit._aware(owner.subscribed_until) == credit._aware(until)
+    assert _rewards(db, owner) == []
 
 
-def test_a_refund_after_vesting_leaves_the_credit_alone(db):
-    """
-    Clawing back vested credit would leave a negative balance on an account
-    that did nothing wrong. The window is the protection; past it, the loss is
-    accepted rather than passed to the referrer.
-    """
+def test_a_refund_after_the_month_landed_leaves_it_alone(db):
+    """Cutting short an account that did nothing wrong is worse than the loss."""
     owner, buyer = _user(db, "alice"), _user(db, "bob")
+    _subscribe(db, owner)
     db.run(db.commit())
     payment = _referred(db, owner, buyer)
     db.run(db.commit())
     db.run(reward_for_payment(db, payment, now=NOW - timedelta(days=30)))
     db.run(db.commit())
+    db.run(apply_due_rewards(db, now=NOW))
 
     assert db.run(cancel_reward_for_payment(db, payment)) == 0
+
+
+def test_old_points_still_cancel_inside_their_window(db):
+    """Points earned under the old rule keep their own refund handling."""
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
     db.run(db.commit())
-    assert db.run(balance(db, owner, now=NOW)) == REFERRAL_REWARD
+    payment = _referred(db, owner, buyer)
+    db.run(db.commit())
+    _entry(db, owner, 175, vests=NOW + timedelta(days=10), expires=NOW + timedelta(days=200), source=payment.id)
+    db.run(db.commit())
+
+    assert db.run(cancel_reward_for_payment(db, payment)) == 175
+
+
+def test_a_friends_code_works_on_the_first_purchase_only(db):
+    owner, buyer = _user(db, "alice"), _user(db, "bob")
+    db.run(db.commit())
+    code = db.run(issue_code(db, owner))
+    db.run(db.commit())
+
+    promo, refusal = db.run(resolve_code(db, code.code, buyer))
+    assert promo is not None and refusal is None
+
+    _payment(db, buyer, plan="basic-1m", amount=315, code=code.code, status="paid")
+    db.run(db.commit())
+    promo, refusal = db.run(resolve_code(db, code.code, buyer))
+    assert promo is None and refusal == "not_first"
+
+
+def test_a_campaign_code_still_works_on_renewals(db):
+    buyer = _user(db, "bob")
+    db.add(PromoCode(code="AUTUMN", discount_percent=20))
+    db.run(db.commit())
+    _payment(db, buyer, plan="basic-1m", amount=350, status="paid")
+    db.run(db.commit())
+
+    promo, refusal = db.run(resolve_code(db, "AUTUMN", buyer))
+    assert promo is not None and refusal is None
 
 
 # ── spending and expiry ─────────────────────────────────────────────────────
@@ -421,16 +546,17 @@ def test_an_expired_entry_does_not_drag_down_live_credit(db):
 
 def test_a_fake_account_is_unprofitable():
     """
-    The real defence against self-referral. Email registration cannot keep
-    sockpuppets out; costing more than they earn keeps working unattended.
+    The real defence against self-referral. A fake account has to pay real
+    money for the cheapest plan to earn a month — the same month it could
+    have bought, for at least as much.
     """
     from config import PLANS
 
-    qualifying = [int(p["amount"]) for k, p in PLANS.items() if p["days"] > 31]
-    assert REFERRAL_REWARD < min(qualifying) * 0.5, (
-        "the reward is close enough to the cheapest qualifying purchase that "
-        "farming it could pay"
-    )
+    cheapest = min(int(p["amount"]) * (100 - credit.DEFAULT_DISCOUNT_PERCENT) / 100
+                   for p in PLANS.values() if p["days"] <= 31)
+    month = min(int(p["amount"]) for p in PLANS.values() if p["days"] <= 31)
+    assert REFERRAL_REWARD_DAYS <= 31
+    assert cheapest >= month * 0.85, "a fake account's purchase costs far less than the month it earns"
 
 
 def test_credit_expires_after_vesting_not_before():

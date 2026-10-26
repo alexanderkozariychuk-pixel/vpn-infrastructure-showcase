@@ -292,15 +292,16 @@ def test_the_terms_cover_points_and_referral_codes():
     in the code, so this is the second place either one can be caught drifting.
     """
     from services.credit import (
-        DEFAULT_DISCOUNT_PERCENT, MAX_CREDIT_SHARE, REFERRAL_REWARD,
+        DEFAULT_DISCOUNT_PERCENT, MAX_CREDIT_SHARE, REFERRAL_REWARD_DAYS,
         REWARD_VESTING_DAYS,
     )
 
     raw = OFFER.read_text(encoding="utf-8")
     text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))
 
-    assert "Баллы и промокоды" in text, "the terms say nothing about points"
-    assert str(REFERRAL_REWARD) in text, f"the reward ({REFERRAL_REWARD}) is not stated"
+    assert "Приглашения, баллы и промокоды" in text, "the terms say nothing about the programme"
+    assert f"{REFERRAL_REWARD_DAYS} дней" in text, f"the reward ({REFERRAL_REWARD_DAYS} days) is not stated"
+    assert "первую" in text, "the terms do not say a friend's code is for the first payment"
     assert f"{DEFAULT_DISCOUNT_PERCENT}%" in text, "the invitee discount is not stated"
     assert f"{REWARD_VESTING_DAYS} дней" in text, "the vesting period is not stated"
     assert int(MAX_CREDIT_SHARE * 2) == 1 and "не более половины" in text, (

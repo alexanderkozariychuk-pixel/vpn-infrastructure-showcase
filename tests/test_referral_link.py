@@ -131,7 +131,7 @@ def test_the_inviter_is_rewarded_through_the_auto_applied_code(db):
                   status="paid", provider="platega", promo_code=q["promo_code"])
     db.add(pay)
     db.run(db.commit())
-    assert db.run(credit.reward_for_payment(db, pay)) == credit.REFERRAL_REWARD
+    assert db.run(credit.reward_for_payment(db, pay)) == credit.REFERRAL_REWARD_DAYS
 
 
 def test_both_pages_remember_the_link_and_the_portal_sends_it():

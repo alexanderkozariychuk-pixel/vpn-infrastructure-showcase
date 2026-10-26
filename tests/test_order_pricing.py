@@ -248,10 +248,11 @@ def test_activation_pays_the_referrer(db, issued):
     ))
     db.run(activate_payment(buyer, payment, db))
 
-    # Earned, but not yet spendable — the vesting window is what a refund has
-    # to happen inside.
+    # Recorded, not yet landed — the vesting window is what a refund has to
+    # happen inside.
+    [r] = _referral_rewards(db, owner)
+    assert r.days == credit.REFERRAL_REWARD_DAYS and r.applied_at is None
     assert db.run(balance(db, owner, now=NOW)) == 0
-    assert db.run(credit.pending_balance(db, owner, now=NOW)) == credit.REFERRAL_REWARD
 
 
 def test_a_repeated_notification_pays_the_referrer_once(db, issued):
@@ -267,14 +268,22 @@ def test_a_repeated_notification_pays_the_referrer_once(db, issued):
     db.run(activate_payment(buyer, payment, db))
     db.run(activate_payment(buyer, payment, db))
 
-    assert db.run(credit.pending_balance(db, owner, now=NOW)) == credit.REFERRAL_REWARD
+    assert len(_referral_rewards(db, owner)) == 1
     assert db.run(credit.uses_of(db, promo.code)) == 1
 
 
-def test_a_monthly_plan_earns_the_referrer_nothing(db, issued):
+def _referral_rewards(db, owner):
+    from sqlalchemy import select as _select
+    from db.models import ReferralReward
+    return list(db.run(db.execute(
+        _select(ReferralReward).where(ReferralReward.referrer_user_id == owner.id)
+    )).scalars().all())
+
+
+def test_a_monthly_plan_earns_the_referrer_a_month(db, issued):
     """
-    The reward is 175 against a 350-rouble month. Paying it out on the
-    shortest plan makes a chain of one-month sockpuppets profitable.
+    Since 2026-10-26: the one-month plan is how most people start, so it
+    earns the referrer a month like any other plan.
     """
     owner = _user(db, "alice")
     buyer = _user(db, "bob")
@@ -287,7 +296,7 @@ def test_a_monthly_plan_earns_the_referrer_nothing(db, issued):
     ))
     db.run(activate_payment(buyer, payment, db))
 
-    assert db.run(credit.pending_balance(db, owner, now=NOW)) == 0
+    assert [r.days for r in _referral_rewards(db, owner)] == [credit.REFERRAL_REWARD_DAYS]
 
 
 def test_a_failed_activation_spends_nothing(db, monkeypatch):
@@ -312,3 +321,38 @@ def test_a_failed_activation_spends_nothing(db, monkeypatch):
 
     assert db.run(balance(db, buyer, now=NOW)) == 500
     assert payment.status == "pending"
+
+
+def test_a_purchase_picks_up_a_month_that_was_waiting(db, issued):
+    """
+    A referrer whose subscription had lapsed when their reward vested gets
+    it with their next purchase, on top of the period they paid for.
+    """
+    from datetime import timedelta as _td
+    from db.models import Payment, ReferralReward
+
+    owner = _user(db, "alice")
+    friend = _user(db, "bob")
+    db.run(db.commit())
+    pay0 = Payment(user_id=friend.id, plan="basic-1m", amount=315, currency="RUB",
+                   status="paid", provider="platega")
+    db.add(pay0)
+    db.run(db.commit())
+    db.add(ReferralReward(referrer_user_id=owner.id, source_payment_id=pay0.id,
+                          days=credit.REFERRAL_REWARD_DAYS, vests_at=NOW - _td(days=1)))
+    db.run(db.commit())
+
+    payment, _ = db.run(_open_order(db, owner, CreatePaymentRequest(plan="basic-1m")))
+    db.run(activate_payment(owner, payment, db))
+
+    db.run(db.refresh(owner))
+    left = credit._aware(owner.subscribed_until) - NOW
+    assert _td(days=30 + credit.REFERRAL_REWARD_DAYS - 1) < left < _td(days=30 + credit.REFERRAL_REWARD_DAYS + 1)
+    [r] = _referral_rewards(db, owner)
+    assert r.applied_at is not None
+
+
+def test_the_hourly_job_applies_rewards_before_the_expiry_sweep():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "pwa" / "expire_subscriptions.py").read_text()
+    assert src.index("apply_due_rewards(db)") < src.index("expire_due_subscriptions(db)")
