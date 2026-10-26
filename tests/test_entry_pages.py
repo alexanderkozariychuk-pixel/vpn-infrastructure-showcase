@@ -154,3 +154,11 @@ def test_an_empty_translation_is_used_not_replaced_by_english():
     fn = fn[:fn.index("\n}\n")]
     assert "hasOwnProperty" in fn
     assert "|| translations['en'][key]" not in fn
+
+
+def test_the_account_has_the_landing_network_quietly_behind_it():
+    html = _portal()
+    assert 'id="bg-net"' in html and ".bg-net { position: fixed;" in html and "z-index: -1" in html
+    # no flashes inside the account, and still for reduced motion
+    assert ".hit" not in html.split('id="bg-net"')[1].split("</script>")[0]
+    assert ".bg-net .pkt { display: none; }" in html

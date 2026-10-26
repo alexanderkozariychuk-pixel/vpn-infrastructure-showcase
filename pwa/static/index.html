@@ -90,6 +90,20 @@
       z-index: 999;
     }
 
+    /* BACKGROUND NETWORK — the landing page's constellation, quieter: behind
+       everything, seen only between the cards, packets without the flashes. */
+    .bg-net { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+    .bg-net .lk { stroke: var(--border-bright); stroke-width: 1; opacity: .34; }
+    .bg-net .nd { fill: var(--accent-dim); opacity: .6; }
+    .bg-net .route { stroke: var(--accent); stroke-width: 1; opacity: .14; fill: none; }
+    .bg-net .pkt { fill: #7eeaff; opacity: .8; filter: drop-shadow(0 0 4px var(--accent)) drop-shadow(0 0 9px rgba(0, 212, 255, .5)); }
+    .bg-net .trail { fill: var(--accent); }
+    /* Cards let the network show through a little (dark theme only). */
+    body:not(.light) .card { background: rgba(13, 19, 24, .84); }
+    .bg-net g { animation: bgdrift 46s ease-in-out infinite alternate; }
+    @keyframes bgdrift { from { transform: translate(-14px, -8px); } to { transform: translate(14px, 10px); } }
+    @media (prefers-reduced-motion: reduce) { .bg-net g { animation: none; } .bg-net .pkt { display: none; } }
+
     /* VIEWS */
     .view { display: none; min-height: 100vh; }
     .view.active { display: flex; flex-direction: column; }
@@ -1543,6 +1557,67 @@
   </style>
 </head>
 <body>
+<svg class="bg-net" id="bg-net" aria-hidden="true" preserveAspectRatio="xMidYMid slice"></svg>
+<script>
+  // The landing page's network (landing.html), generated the same way, kept
+  // dim. Seeded: the same picture on every visit.
+  (function () {
+    var svg = document.getElementById('bg-net');
+    if (!svg) return;
+    // Portrait screens get a portrait picture: a 16:9 one cut to a phone's
+    // width kept only a sliver of it, and the packets ran mostly off screen.
+    var tall = innerHeight > innerWidth;
+    var NS = 'http://www.w3.org/2000/svg', W = tall ? 900 : 1600, H = tall ? 1600 : 900, still = false;
+    try { still = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    var seed = 20261027;
+    function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function el(tag, a, parent) { var n = document.createElementNS(NS, tag);
+      for (var k in a) n.setAttribute(k, a[k]); (parent || svg).appendChild(n); return n; }
+    var cols = tall ? 6 : 11, rows = tall ? 11 : 7, pts = [];
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++)
+      pts.push({ x: (c + .5) * W / cols + (rnd() - .5) * W / cols * .8, y: (r + .5) * H / rows + (rnd() - .5) * H / rows * .8, n: [] });
+    var links = {};
+    pts.forEach(function (p, i) {
+      var d = pts.map(function (q, j) { return [j, (p.x - q.x) * (p.x - q.x) + (p.y - q.y) * (p.y - q.y)]; })
+                 .filter(function (a) { return a[0] !== i; }).sort(function (a, b) { return a[1] - b[1]; });
+      for (var m = 0, k = 2 + (rnd() < .35 ? 1 : 0); m < k; m++) {
+        var j = d[m][0], key = Math.min(i, j) + '-' + Math.max(i, j);
+        if (!links[key]) { links[key] = 1; p.n.push(j); pts[j].n.push(i); }
+      }
+    });
+    var g = el('g', {});
+    Object.keys(links).forEach(function (key) { var ab = key.split('-'), a = pts[+ab[0]], b = pts[+ab[1]];
+      el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, 'class': 'lk' }, g); });
+    for (var routes = 0, tries = 0; routes < 8 && tries < 300; tries++) {
+      var cur = Math.floor(rnd() * pts.length), path = [cur];
+      for (var h = 0; h < 3; h++) {
+        var opts = pts[cur].n.filter(function (j) { return path.indexOf(j) < 0; });
+        if (!opts.length) break;
+        cur = opts[Math.floor(rnd() * opts.length)]; path.push(cur);
+      }
+      if (path.length < 4) continue;
+      var id = 'bgrt' + routes;
+      el('path', { id: id, 'class': 'route',
+                   d: 'M' + path.map(function (i) { return pts[i].x.toFixed(1) + ' ' + pts[i].y.toFixed(1); }).join(' L') }, g);
+      if (!still) {
+        // A packet and a short fading tail, each on the same path a moment
+        // behind — SMIL only: no script running per frame in the account.
+        var dur = (6 + rnd() * 4).toFixed(1), begin = routes * 1.7;
+        [[1.3, .22, .24], [1.9, .14, .36], [2.6, 0, .8]].forEach(function (a) {
+          var pk = el('circle', { r: a[0], 'class': a[2] < .5 ? 'trail' : 'pkt', opacity: a[2] }, g);
+          var am = el('animateMotion', { dur: dur + 's', repeatCount: 'indefinite',
+                                         begin: (begin - a[1]).toFixed(2) + 's' }, pk);
+          el('mpath', { href: '#' + id }, am);
+        });
+      }
+      routes++;
+    }
+    pts.forEach(function (p) { el('circle', { cx: p.x, cy: p.y, r: (1.4 + rnd() * 1.4).toFixed(1), 'class': 'nd' }, g); });
+  })();
+</script>
 <button class="settings-btn" id="settings-btn" onclick="openSettings()" aria-label="Settings" title="Settings">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 </button>
