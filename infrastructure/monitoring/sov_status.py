@@ -326,7 +326,12 @@ class Telegram:
         return r["result"]["message_id"] if r.get("ok") else None
 
     def edit(self, message_id: int, text: str) -> str:
-        """"ok", "same" (nothing changed), "gone" (the message is not there), or "error"."""
+        """
+        "ok", "same" (nothing changed), "gone" (the message was deleted), or
+        "error". Only a deleted message is "gone": "can't be edited" means the
+        bot lost its right to edit, and posting a new board for that — every
+        run — is what spammed the channel on 2026-10-26.
+        """
         r = self.call("editMessageText", chat_id=self.chat_id, message_id=message_id, text=text,
                       disable_web_page_preview="true")
         if r.get("ok"):
@@ -334,7 +339,8 @@ class Telegram:
         d = r.get("description", "")
         if "not modified" in d:
             return "same"
-        if "not found" in d or "can't be edited" in d:
+        print(f"telegram edit: {d}", file=sys.stderr)
+        if "message to edit not found" in d:
             return "gone"
         return "error"
 
@@ -343,8 +349,12 @@ class Telegram:
                               disable_notification="true").get("ok"))
 
 
-def publish(tg, state: dict, board_text: str, posts: list[str]) -> dict:
+BOARD_REPOST_S = 6 * 3600
+
+
+def publish(tg, state: dict, board_text: str, posts: list[str], now: float | None = None) -> dict:
     """Posts first (oldest first), then the board. Unsent posts wait for the next run."""
+    now = time.time() if now is None else now
     state = dict(state)
     pending = list(state.get("pending", [])) + posts
     left = []
@@ -357,10 +367,13 @@ def publish(tg, state: dict, board_text: str, posts: list[str]) -> dict:
         r = tg.edit(mid, board_text)
         if r == "gone":
             mid = None
-    if not mid:
+    # A new board is a new message in the channel. However the edit failed,
+    # never post one more often than this.
+    if not mid and now - state.get("board_posted_at", 0) >= BOARD_REPOST_S:
         mid = tg.send(board_text, silent=True)
         if mid:
             tg.pin(mid)
+            state["board_posted_at"] = now
     state["board_id"] = mid
     return state
 

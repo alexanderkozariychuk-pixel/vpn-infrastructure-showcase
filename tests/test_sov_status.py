@@ -196,3 +196,30 @@ def test_posts_that_could_not_be_sent_wait_for_the_next_run():
     tg2 = FakeTG()
     s = st.publish(tg2, s, "board", [])
     assert [t for _, t, _ in tg2.sent] == ["🔴 a", "🟢 b"] and s["pending"] == []
+
+
+def test_a_board_the_bot_cannot_edit_is_not_posted_again_and_again():
+    """2026-10-26: "can't be edited" was taken for "deleted" — a new pinned board every run."""
+    tg = FakeTG(edit="error")
+    s = {"board_id": 55}
+    for i in range(10):
+        s = st.publish(tg, s, "board", [], now=T0 + i * 120)
+    assert tg.sent == [] and tg.pinned == [] and s["board_id"] == 55
+
+
+def test_even_a_deleted_board_is_reposted_at_most_every_six_hours():
+    tg = FakeTG(edit="gone")
+    s = {"board_id": 55}
+    for i in range(10):
+        s = st.publish(tg, s, "board", [], now=T0 + i * 120)
+    assert len(tg.sent) == 1
+    s = st.publish(tg, s, "board", [], now=T0 + 7 * 3600)
+    assert len(tg.sent) == 2
+
+
+def test_cant_be_edited_is_an_error_not_gone(monkeypatch):
+    t = st.Telegram("x", "@c")
+    monkeypatch.setattr(t, "call", lambda *a, **k: {"ok": False, "description": "Bad Request: message can't be edited"})
+    assert t.edit(1, "x") == "error"
+    monkeypatch.setattr(t, "call", lambda *a, **k: {"ok": False, "description": "Bad Request: message to edit not found"})
+    assert t.edit(1, "x") == "gone"
