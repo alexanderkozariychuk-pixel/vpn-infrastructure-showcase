@@ -4694,7 +4694,14 @@ async function tgBoot() {
   const tg = await loadTgScript();
   if (!tg || !tg.initData) return;
   try { tg.ready(); tg.expand(); } catch (e) {}
-  try { setTheme(tg.colorScheme === 'light' ? 'light' : 'dark'); } catch (e) {}
+  // Dark unless the customer chose light in Settings (the site's own choice,
+  // not Telegram's), and Telegram's frame painted to match.
+  try {
+    const light = document.body.classList.contains('light');
+    const bg = light ? '#f5f0eb' : '#080c0f';
+    if (tg.setHeaderColor) tg.setHeaderColor(bg);
+    if (tg.setBackgroundColor) tg.setBackgroundColor(bg);
+  } catch (e) {}
   if (token) return;
   try {
     const r = await fetch(`${API}/api/auth/telegram`, {method: 'POST',
