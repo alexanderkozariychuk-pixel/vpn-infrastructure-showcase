@@ -1,0 +1,27 @@
+# /etc/sov-status/status.ini — see sov_status.py. Mode 600.
+
+[channel]
+# The monitor's bot, an admin of the channel (post, edit, pin).
+token_file = /etc/sov-monitor/telegram.token
+chat_id = @sov3r3ign_net
+
+[check]
+# Fetched through each location's tunnel; answers with the address it saw.
+url = https://1.1.1.1/cdn-cgi/trace
+timeout = 12
+# Failed runs in a row before a location is "down" and a post goes out (~6 min).
+down_after = 3
+# Good runs in a row before it is "up" again.
+up_after = 2
+
+# One section per location, in the order the board lists them.
+# conf: a service account's device file from the portal, mode 600.
+[location:nl]
+name = Нидерланды
+flag = 🇳🇱
+conf = /etc/sov-status/nl.conf
+
+[location:de]
+name = Германия
+flag = 🇩🇪
+conf = /etc/sov-status/de.conf

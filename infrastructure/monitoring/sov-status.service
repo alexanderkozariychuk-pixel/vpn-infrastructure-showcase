@@ -1,0 +1,10 @@
+[Unit]
+Description=Sovereign public status: check each location as a customer, update the channel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sov-status
+TimeoutStartSec=110
+Nice=10
