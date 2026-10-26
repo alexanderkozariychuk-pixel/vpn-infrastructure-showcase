@@ -119,3 +119,9 @@ def test_the_migration_drops_not_null_and_adds_the_column():
     mig = next((Path(bot.__file__).parent.parent / "alembic" / "versions").glob("d2f7a6b04c19_*.py")).read_text()
     assert "trial_grants" in mig and "telegram_id" in mig and "nullable=True" in mig
     assert "c8e4d1a92b37" in mig.split("down_revision")[1].splitlines()[0]
+
+
+def test_inside_telegram_the_email_form_never_opens_for_the_trial():
+    page = (Path(bot.__file__).parent.parent / "static" / "index.html").read_text()
+    assert "if (!token && trialIntent && !IS_TG)" in page
+    assert "if (TG_TRIAL || q.get('trial') === '1') startTrial();" in page

@@ -4807,7 +4807,7 @@ async function doTgRegister() {
     applyTranslations();
     await loadClientMe();
     await loadClientConfigPage();
-    if (q.get('trial') === '1') startTrial();
+    if (TG_TRIAL || q.get('trial') === '1') startTrial();
   } catch (e) {
     err.textContent = t('dev-err-generic');
     btn.disabled = false;
@@ -5763,9 +5763,11 @@ function referralCode() {
 // /app?trial=1 is the landing page's "Активировать". Signed in, the account
 // opens on "My config", where the trial card is. Signed out, registration
 // opens instead of sign-in, with a line saying what happens next.
+let TG_TRIAL = false;
 function takeTrialIntent() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('trial') !== '1') return false;
+  TG_TRIAL = true;
   params.delete('trial');
   const q = params.toString();
   history.replaceState(null, '', window.location.pathname + (q ? '?' + q : ''));
@@ -5785,8 +5787,10 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
     token = null;
     try { localStorage.removeItem('sov_token'); localStorage.removeItem('sov_user'); } catch (e) {}
   }
+  // Inside Telegram the bot's "try for free" is handled by tgBoot: the
+  // email form must not open there (2026-10-26, it did).
   const trialIntent = takeTrialIntent();
-  if (!token && trialIntent) {
+  if (!token && trialIntent && !IS_TG) {
     showView('register');
     document.getElementById('reg-intent').classList.add('show');
   }
