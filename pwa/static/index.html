@@ -4294,6 +4294,12 @@ function checkResetToken() {
 }
 
 function showView(view, mode) {
+  // Inside Telegram an account needs no email: every "create account" leads
+  // to the username-only form (api/telegram.py tg_register).
+  if (view === 'register' && IS_TG) {
+    const tg = tgApp();
+    if (tg && tg.initData) { showTgRegister(tg); return; }
+  }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
   document.body.dataset.view = view;

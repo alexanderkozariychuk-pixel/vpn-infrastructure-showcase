@@ -125,3 +125,8 @@ def test_inside_telegram_the_email_form_never_opens_for_the_trial():
     page = (Path(bot.__file__).parent.parent / "static" / "index.html").read_text()
     assert "if (!token && trialIntent && !IS_TG)" in page
     assert "if (TG_TRIAL || q.get('trial') === '1') startTrial();" in page
+
+
+def test_inside_telegram_create_account_is_the_username_only_form():
+    page = (Path(bot.__file__).parent.parent / "static" / "index.html").read_text()
+    assert "if (view === 'register' && IS_TG)" in page
