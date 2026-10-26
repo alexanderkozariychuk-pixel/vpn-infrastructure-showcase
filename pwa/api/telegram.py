@@ -106,8 +106,10 @@ async def tg_unlink(db: AsyncSession = Depends(get_db), payload: dict = Depends(
 # ── the bot ─────────────────────────────────────────────────────────────────
 
 WELCOME = ("Это бот сервиса Sovereign.\n\n"
-           "Здесь — уведомления о подписке, продление, ссылка для друзей, статус локаций и поддержка.\n\n"
-           "Чтобы бот узнал ваш аккаунт: личный кабинет → «Настройки» → «Подключить Telegram».")
+           "Здесь — личный кабинет (кнопка «Кабинет»), уведомления о подписке, продление, "
+           "ссылка для друзей, статус локаций и поддержка.")
+START_NEW = ("Новенький? Пробный период — бесплатно, без карты и без почты: "
+             "аккаунт создаётся прямо здесь, в Telegram, за одну минуту.")
 NOT_LINKED = ("Бот пока не знает ваш аккаунт. Подключите его в личном кабинете: "
               "«Настройки» → «Подключить Telegram».")
 
@@ -223,8 +225,18 @@ async def handle(db: AsyncSession, update: dict) -> None:
 
     if text.startswith("/start"):
         parts = text.split(maxsplit=1)
-        reply = await _link(db, chat_id, parts[1]) if len(parts) == 2 else WELCOME
-        await telegram.send(chat_id, reply, keyboard=KEYBOARD)
+        if len(parts) == 2 and not parts[1].startswith("ref_"):
+            await telegram.send(chat_id, await _link(db, chat_id, parts[1]), keyboard=KEYBOARD)
+            return
+        await telegram.send(chat_id, WELCOME, keyboard=KEYBOARD)
+        if await _user_by_chat(db, chat_id) is None:
+            # Someone new: one tap to an account and the free days.
+            ref = parts[1][4:] if len(parts) == 2 else ""
+            q = f"&ref={urllib.parse.quote(ref)}" if ref else ""
+            await telegram.send(chat_id, START_NEW, buttons=[
+                [{"text": "🎁 Попробовать бесплатно", "web_app": {"url": f"{SITE}/app?tg=1&trial=1{q}"}}],
+                [{"text": "У меня уже есть аккаунт", "web_app": {"url": f"{SITE}/app?tg=1&login=1"}}],
+            ])
         return
     if text == "/id":
         await telegram.send(chat_id, f"chat id: {chat_id}")
@@ -365,3 +377,63 @@ async def tg_link_webapp(body: InitData, db: AsyncSession = Depends(get_db), pay
     user.telegram_link_hash = None
     await db.commit()
     return {"ok": True}
+
+
+# ── starting from the bot: an account without a mailbox ─────────────────────
+#
+# Someone who has never been on the site opens the bot, taps "try for free",
+# and the Mini App offers to create an account: a username, nothing else. The
+# Telegram account is what proves a person (it needs a phone number) — one
+# trial per Telegram account, as one per confirmed mailbox (api/trial.py).
+# Such an account signs in from Telegram only; it has no password to type.
+
+
+class TgRegister(BaseModel):
+    init_data: str = Field(min_length=1, max_length=4096)
+    username: str = Field(min_length=3, max_length=27)
+    ref: str | None = Field(default=None, max_length=32)
+
+
+@router.post("/api/auth/telegram/register", status_code=201)
+async def tg_register(body: TgRegister, request: Request, db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func
+    from api.register import USERNAME_RE
+    from auth.jwt import create_token, hash_password
+    from services import ratelimit
+    from services.net import resolve_source_ip
+
+    ratelimit.take(ratelimit.REGISTER_PER_IP, resolve_source_ip(request))
+    if not telegram.enabled():
+        raise HTTPException(status_code=503, detail="bot is off")
+    tg_user = verify_init_data(body.init_data, config.TG_BOT_TOKEN)
+    if tg_user is None:
+        raise HTTPException(status_code=401, detail="bad init data")
+    if await _user_by_chat(db, tg_user["id"]) is not None:
+        # This Telegram already has an account: sign in instead.
+        raise HTTPException(status_code=409, detail="already_linked")
+    name = body.username.strip()
+    if not USERNAME_RE.fullmatch(name):
+        raise HTTPException(status_code=422, detail="bad_username")
+    taken = (await db.execute(select(User.id).where(func.lower(User.username) == name.lower()))).first()
+    if taken:
+        raise HTTPException(status_code=409, detail="username_taken")
+
+    referred = None
+    if body.ref:
+        promo, _ = await credit.resolve_code(db, body.ref, User(id="-"))
+        referred = promo.code if promo else None
+
+    user = User(
+        username=name,
+        email=None,
+        # No password anyone knows: this account signs in from Telegram.
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        telegram_id=tg_user["id"],
+        lang="ru",
+        referred_code=referred,
+    )
+    db.add(user)
+    await db.commit()
+    logger.info("Account %s created from Telegram", name)
+    return {"access_token": create_token({"sub": user.username, "role": "client"}),
+            "token_type": "bearer", "role": "client", "username": user.username}

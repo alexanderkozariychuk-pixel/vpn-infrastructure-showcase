@@ -17,7 +17,7 @@ carries a fixed code in `detail`, which the portal turns into a sentence:
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +28,7 @@ from services import ratelimit
 from services.net import resolve_source_ip
 from services import notify, provisioner
 from services.trial import (
-    TRIAL_DAILY_CAP, TRIAL_DAYS, is_disposable, normalise_email, trial_active, trial_enabled, trial_end,
+    TRIAL_DAILY_CAP, TRIAL_DAYS, is_disposable, normalise_email, trial_active, trial_enabled, trial_end, verified,
 )
 from datetime import datetime, timedelta, timezone
 
@@ -54,7 +54,7 @@ async def start_trial(
 
     if not trial_enabled():
         raise HTTPException(status_code=403, detail="trial_off")
-    if user.email_verified_at is None:
+    if not verified(user):
         raise HTTPException(status_code=403, detail="email_not_verified")
     if trial_active(user):
         raise HTTPException(status_code=409, detail="trial_active")
@@ -62,14 +62,22 @@ async def start_trial(
     # activation and by the admin grant) is past the point a trial is for.
     if user.trial_until is not None or user.subscribed_until is not None:
         raise HTTPException(status_code=409, detail="trial_used")
-    if is_disposable(user.email):
+    if user.email and user.email_verified_at is not None and is_disposable(user.email):
         raise HTTPException(status_code=403, detail="trial_unavailable")
 
     ip = resolve_source_ip(request)
     ratelimit.take(ratelimit.TRIAL_PER_IP, ip)
 
-    norm = normalise_email(user.email)
-    if (await db.execute(select(TrialGrant.id).where(TrialGrant.email_norm == norm))).first():
+    # One trial per confirmed mailbox and one per Telegram account: an account
+    # carrying both is checked against both, and the grant records both, so
+    # neither can be reused with a new account.
+    norm = normalise_email(user.email) if user.email and user.email_verified_at is not None else None
+    used = []
+    if norm:
+        used.append(TrialGrant.email_norm == norm)
+    if user.telegram_id is not None:
+        used.append(TrialGrant.telegram_id == user.telegram_id)
+    if (await db.execute(select(TrialGrant.id).where(or_(*used)))).first():
         raise HTTPException(status_code=409, detail="trial_used")
 
     since = datetime.now(timezone.utc) - timedelta(days=1)
@@ -85,7 +93,7 @@ async def start_trial(
     # one mailbox — into one trial: the second insert fails here, before any
     # device is issued.
     user.trial_until = trial_end()
-    db.add(TrialGrant(email_norm=norm, user_id=user.id, source_ip=ip[:64] or None))
+    db.add(TrialGrant(email_norm=norm, telegram_id=user.telegram_id, user_id=user.id, source_ip=ip[:64] or None))
     try:
         await db.flush()
     except IntegrityError:

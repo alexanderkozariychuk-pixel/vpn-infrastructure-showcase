@@ -1675,6 +1675,24 @@
     </div>
   </div>
 </div>
+<div id="view-tgreg" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-title"><span class="plain" data-i18n="tgreg-title-1">Your</span><span data-i18n="tgreg-title-2"> account</span></div>
+    </div>
+    <div class="reg-intent show" data-i18n="tgreg-intent">One minute, no email and no card: your Telegram is the account. Pick a username.</div>
+    <div class="field">
+      <label data-i18n="label-username">Username</label>
+      <input type="text" id="tgreg-user" placeholder="username" maxlength="27" autocapitalize="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')doTgRegister()">
+    </div>
+    <div class="login-error" id="tgreg-error"></div>
+    <button class="btn-full" id="tgreg-btn" onclick="doTgRegister()" data-i18n="tgreg-btn">Create account</button>
+    <div style="margin-top:16px;font-size: 14px;color:var(--text-dim);text-align:center">
+      <span data-i18n="reg-have-account">Already have an account?</span> <span style="color:var(--accent);cursor:pointer" onclick="showView('login','client')" data-i18n="reg-signin">Sign in</span>
+    </div>
+  </div>
+</div>
 <!-- ═══════════════════════════════════════════
      DASHBOARD (CLIENT)
 ════════════════════════════════════════════ -->
@@ -2641,6 +2659,7 @@ const translations = {
     'set-appearance': 'Appearance', 'set-lang': 'Language', 'set-theme': 'Theme',
     'set-dark': 'Dark', 'set-light': 'Light', 'set-account': 'Account',
     'set-verified': 'Email confirmed', 'set-unverified': 'Email not confirmed — needed to buy a plan or start a trial',
+    'set-no-email': 'No email: this account signs in from Telegram',
     'set-password': 'Password', 'set-password-sub': 'A link to set a new one is sent to your email',
     'set-password-btn': 'Send link', 'set-password-sent': 'Sent. The link is valid for 1 hour.',
     'set-logout': 'Sign out on this device', 'set-logout-btn': 'Sign out',
@@ -2648,6 +2667,10 @@ const translations = {
     'tg-on': 'Telegram connected', 'tg-on-sub': 'Notifications go to the bot too. Support — just write to it.',
     'tg-connect': 'Connect', 'tg-disconnect': 'Disconnect',
     'tg-login-once': 'Sign in once — after that Telegram opens your account by itself.',
+    'tgreg-title-1': 'Your', 'tgreg-title-2': ' account',
+    'tgreg-intent': 'One minute, no email and no card: your Telegram is the account. Pick a username.',
+    'tgreg-btn': 'Create account', 'tgreg-taken': 'That username is taken — try another.',
+    'tgreg-wait': 'Too many attempts. Try again in an hour.',
     'vb-text': 'Confirm your email to buy a plan. The link was sent to',
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
@@ -3061,6 +3084,7 @@ const translations = {
     'set-appearance': 'Оформление', 'set-lang': 'Язык', 'set-theme': 'Тема',
     'set-dark': 'Тёмная', 'set-light': 'Светлая', 'set-account': 'Аккаунт',
     'set-verified': 'Почта подтверждена', 'set-unverified': 'Почта не подтверждена — без этого нельзя оформить тариф или пробный период',
+    'set-no-email': 'Почта не указана: вход в этот аккаунт — через Telegram',
     'set-password': 'Пароль', 'set-password-sub': 'Ссылка, чтобы задать новый, придёт на почту',
     'set-password-btn': 'Отправить ссылку', 'set-password-sent': 'Отправили. Ссылка действует 1 час.',
     'set-logout': 'Выйти на этом устройстве', 'set-logout-btn': 'Выйти',
@@ -3068,6 +3092,10 @@ const translations = {
     'tg-on': 'Telegram подключён', 'tg-on-sub': 'Уведомления приходят и в бота. Поддержка — просто напишите ему.',
     'tg-connect': 'Подключить', 'tg-disconnect': 'Отключить',
     'tg-login-once': 'Войдите один раз — дальше Telegram будет открывать кабинет сам.',
+    'tgreg-title-1': 'Ваш', 'tgreg-title-2': ' аккаунт',
+    'tgreg-intent': 'Одна минута, без почты и без карты: ваш Telegram и есть аккаунт. Придумайте имя пользователя.',
+    'tgreg-btn': 'Создать аккаунт', 'tgreg-taken': 'Это имя занято — попробуйте другое.',
+    'tgreg-wait': 'Слишком много попыток. Попробуйте через час.',
     'vb-text': 'Подтвердите почту, чтобы оформить тариф. Ссылка отправлена на',
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
@@ -3444,6 +3472,12 @@ function renderSettingsAccount(d) {
   if (!em || !d) return;
   em.textContent = d.email || '—';
   const st = document.getElementById('set-email-state');
+  if (!d.email) {
+    st.textContent = t('set-no-email');
+    st.className = 'set-sub';
+    document.getElementById('set-resend').style.display = 'none';
+    return;
+  }
   const verified = d.email_verified !== false;
   st.textContent = t(verified ? 'set-verified' : 'set-unverified');
   st.className = 'set-sub ' + (verified ? 'set-ok' : 'set-warn');
@@ -4720,11 +4754,64 @@ async function tgBoot() {
       return;
     }
     if (r.status === 404) {
-      showView('login');
-      const e = document.getElementById('login-error');
-      if (e) e.textContent = t('tg-login-once');
+      const q = new URLSearchParams(location.search);
+      if (q.get('login') === '1') {
+        showView('login');
+        const e = document.getElementById('login-error');
+        if (e) e.textContent = t('tg-login-once');
+      } else {
+        showTgRegister(tg);
+      }
     }
   } catch (e) {}
+}
+
+// Someone new, from the bot: an account with a username only — Telegram
+// stands for the mailbox (api/telegram.py tg_register). With ?trial=1 the free
+// days start right after.
+function showTgRegister(tg) {
+  showView('tgreg');
+  const u = (tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
+  const guess = String(u.username || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 27);
+  const input = document.getElementById('tgreg-user');
+  if (input && !input.value) input.value = guess.length >= 3 ? guess : '';
+  applyTranslations();
+}
+
+async function doTgRegister() {
+  const tg = tgApp();
+  const err = document.getElementById('tgreg-error');
+  const btn = document.getElementById('tgreg-btn');
+  const username = (document.getElementById('tgreg-user').value || '').trim();
+  err.textContent = '';
+  if (!USERNAME_RE.test(username)) { err.textContent = t('auth-err-username'); return; }
+  btn.disabled = true;
+  try {
+    const q = new URLSearchParams(location.search);
+    const res = await fetch(`${API}/api/auth/telegram/register`, {method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({init_data: tg.initData, username, ref: q.get('ref') || referralCode()})});
+    const d = await res.json().catch(() => ({}));
+    if (res.status === 409 && d.detail === 'already_linked') { btn.disabled = false; tgBoot(); return; }
+    if (!res.ok) {
+      err.textContent = t(d.detail === 'username_taken' ? 'tgreg-taken' : (res.status === 429 ? 'tgreg-wait' : 'dev-err-generic'));
+      btn.disabled = false;
+      return;
+    }
+    token = d.access_token;
+    localStorage.setItem('sov_token', token);
+    localStorage.setItem('sov_user', d.username);
+    showView('dashboard');
+    document.getElementById('client-name').textContent = d.username;
+    document.getElementById('client-avatar').textContent = (d.username[0] || '?').toUpperCase();
+    applyTranslations();
+    await loadClientMe();
+    await loadClientConfigPage();
+    if (q.get('trial') === '1') startTrial();
+  } catch (e) {
+    err.textContent = t('dev-err-generic');
+    btn.disabled = false;
+  }
 }
 
 async function tgLinkAfterLogin() {
@@ -5116,7 +5203,8 @@ async function startTrial() {
 function renderVerifyBanner(d) {
   const b = document.getElementById('verify-banner');
   if (!b) return;
-  const show = d && d.email_verified === false;
+  // An account from Telegram has no mailbox and needs no confirmation.
+  const show = d && d.email_verified === false && !!d.email && !d.telegram_linked;
   b.classList.toggle('show', show);
   if (show) document.getElementById('vb-email').textContent = d.email || '';
 }

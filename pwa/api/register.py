@@ -196,6 +196,7 @@ async def get_me(
         "email": user.email,
         # Purchases need it; the portal shows a banner while it is false.
         "email_verified": user.email_verified_at is not None,
+        "telegram_linked": user.telegram_id is not None,
         "is_subscribed": user.is_subscribed,
         # The plan key ("basic-1m"). The portal read it all along and never
         # got it, so every customer's plan showed as "no subscription".

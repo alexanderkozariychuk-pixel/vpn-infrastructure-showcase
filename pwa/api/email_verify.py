@@ -97,6 +97,9 @@ async def resend_verification(
         raise HTTPException(status_code=404, detail="User not found")
     if user.email_verified_at is not None:
         return {"ok": True, "already_verified": True}
+    if not user.email:
+        # An account created from Telegram: there is no mailbox to confirm.
+        raise HTTPException(status_code=400, detail="no_email")
 
     # Per account as well as per address: a signed-in script could otherwise
     # point this at one inbox from many networks.

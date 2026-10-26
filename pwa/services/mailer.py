@@ -58,7 +58,11 @@ async def send_email(to: str, subject: str, body_html: str, body_text: str = "")
 _pending: set = set()
 
 
-def send_later(to: str, subject: str, body_html: str, body_text: str = "") -> None:
+def send_later(to: str | None, subject: str, body_html: str, body_text: str = "") -> None:
+    if not to:
+        # An account created from Telegram has no mailbox; the bot carries
+        # the same news (services/notify.py).
+        return
     task = asyncio.get_running_loop().create_task(send_email(to, subject, body_html, body_text))
     _pending.add(task)
     task.add_done_callback(_pending.discard)

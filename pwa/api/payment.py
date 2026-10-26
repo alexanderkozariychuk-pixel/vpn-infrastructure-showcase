@@ -71,7 +71,9 @@ async def _open_order(
     # A receipt, the device files and any notice reach the customer only
     # through this address. Checked before pricing, so no pending order is
     # left behind by a refusal. 403 with a fixed code the portal recognises.
-    if user.email_verified_at is None:
+    # A linked Telegram account counts as well: receipts and notices go to
+    # the bot (services/notify.py) when there is no mailbox.
+    if user.email_verified_at is None and user.telegram_id is None:
         raise HTTPException(status_code=403, detail="email_not_verified")
 
     # A plan that allows fewer devices than the account holds is not sold until

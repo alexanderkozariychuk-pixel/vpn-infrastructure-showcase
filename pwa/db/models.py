@@ -9,7 +9,9 @@ class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    # None for an account created from Telegram (api/telegram.py): there the
+    # Telegram account stands where the confirmed mailbox does.
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_subscribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
@@ -223,7 +225,10 @@ class TrialGrant(Base):
     __tablename__ = "trial_grants"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email_norm: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    email_norm: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    # The Telegram account a trial went to — one trial per Telegram account,
+    # as one per mailbox. Either may be empty, never both.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, nullable=True)
     # Nulled, not cascaded, when the account is deleted: the grant is about
     # the mailbox and must outlive the account.
     user_id: Mapped[str | None] = mapped_column(

@@ -109,9 +109,18 @@ def trial_state(user, *, has_paid: bool, now: datetime | None = None) -> str:
         return "used"
     if not trial_enabled():
         return "off"
-    if user.email_verified_at is None:
+    if not verified(user):
         return "needs_verify"
     return "available"
+
+
+def verified(user) -> bool:
+    """
+    Someone we can tell apart from a fresh sockpuppet: a confirmed mailbox,
+    or a linked Telegram account (which needs a phone number). Trials and
+    purchases need one of the two.
+    """
+    return user.email_verified_at is not None or user.telegram_id is not None
 
 
 def trial_end(now: datetime | None = None) -> datetime:
