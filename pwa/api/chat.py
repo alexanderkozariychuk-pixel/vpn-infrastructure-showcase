@@ -97,12 +97,22 @@ def _client():
     return AsyncOpenAI(api_key=config.CHAT_API_KEY, base_url=config.CHAT_BASE_URL, timeout=30.0, http_client=http)
 
 
+def _models() -> list[str]:
+    return [m.strip() for m in (config.CHAT_MODEL or "").split(",") if m.strip()]
+
+
 async def _complete(messages: list[dict]) -> str:
+    models = _models()
+    extra = {}
+    if len(models) > 1:
+        # OpenRouter's fallback list: the first that answers is used.
+        extra["extra_body"] = {"models": models}
     resp = await _client().chat.completions.create(
-        model=config.CHAT_MODEL,
+        model=models[0],
         messages=messages,
         max_tokens=MAX_TOKENS,
         temperature=0.3,
+        **extra,
     )
     return (resp.choices[0].message.content or "").strip()
 

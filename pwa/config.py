@@ -25,6 +25,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
 # No key — no chat: the widget hides.
 CHAT_API_KEY = os.getenv("CHAT_API_KEY")
 CHAT_BASE_URL = os.getenv("CHAT_BASE_URL", "https://api.deepseek.com")
+# One model, or several separated by commas: on OpenRouter the rest are
+# fallbacks it tries when the first is busy (free models often are).
 CHAT_MODEL = os.getenv("CHAT_MODEL", "deepseek-chat")
 # OpenRouter refuses Russian addresses (403 "Access denied by security
 # policy" from the portal, 2026-10-26), so its requests can go out through a

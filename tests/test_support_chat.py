@@ -124,3 +124,28 @@ def test_a_proxy_is_used_when_set(monkeypatch):
     assert c._client is not None
     monkeypatch.setattr(config, "CHAT_PROXY", None)
     assert chat._client() is not None
+
+
+def test_several_models_become_a_fallback_list(monkeypatch):
+    seen = {}
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                async def create(**kw):
+                    seen.update(kw)
+                    from types import SimpleNamespace as N
+                    return N(choices=[N(message=N(content=" ok "))])
+
+    monkeypatch.setattr(chat, "_client", lambda: Fake)
+    monkeypatch.setattr(config, "CHAT_MODEL", "a:free, b:free ,c:free")
+    import asyncio
+    assert asyncio.run(chat._complete([{"role": "user", "content": "q"}])) == "ok"
+    assert seen["model"] == "a:free"
+    assert seen["extra_body"] == {"models": ["a:free", "b:free", "c:free"]}
+
+    seen.clear()
+    monkeypatch.setattr(config, "CHAT_MODEL", "deepseek-chat")
+    asyncio.run(chat._complete([{"role": "user", "content": "q"}]))
+    assert seen["model"] == "deepseek-chat" and "extra_body" not in seen
