@@ -18,7 +18,7 @@ PWA = Path(__file__).resolve().parents[1] / "pwa"
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(config, "DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setattr(config, "CHAT_API_KEY", "test-key")
     sent = []
 
     async def fake(messages):
@@ -47,7 +47,7 @@ def test_the_portal_serves_the_router_and_every_page_loads_the_widget():
 
 
 def test_without_a_key_the_chat_is_off(monkeypatch):
-    monkeypatch.setattr(config, "DEEPSEEK_API_KEY", None)
+    monkeypatch.setattr(config, "CHAT_API_KEY", None)
     app = FastAPI()
     app.include_router(chat.router)
     tc = TestClient(app)
@@ -115,3 +115,12 @@ def test_the_help_base_holds_nothing_internal():
     for word in ("Beget", "VDSina", "SKRIME", "Cloud4Box", "HayHost", "Jc", "Jmin", "S1", "H1", "I1",
                  "DPI", "обход", "блокиров", "exit", "entry", "am1", "Platega", "Ansible"):
         assert word.lower() not in kb.lower(), word
+
+
+def test_a_proxy_is_used_when_set(monkeypatch):
+    monkeypatch.setattr(config, "CHAT_API_KEY", "k")
+    monkeypatch.setattr(config, "CHAT_PROXY", "http://127.0.0.1:8888")
+    c = chat._client()
+    assert c._client is not None
+    monkeypatch.setattr(config, "CHAT_PROXY", None)
+    assert chat._client() is not None

@@ -3,7 +3,8 @@ api/chat.py — the support assistant on the site.
 
 Answers visitors and customers from pwa/support/knowledge.md, through any
 OpenAI-compatible API: DeepSeek by default, or OpenRouter (a free model, say)
-by setting DEEPSEEK_BASE_URL and DEEPSEEK_MODEL in .env. Nothing about the infrastructure is in
+by setting CHAT_BASE_URL and CHAT_MODEL in .env, through CHAT_PROXY where the
+provider refuses the portal's country. Nothing about the infrastructure is in
 that file, and nothing outside it is given to the model — the assistant
 can only repeat what any visitor may read.
 
@@ -17,7 +18,7 @@ What it does not do:
 
 Cost is bounded three ways: per address (services/ratelimit CHAT_*), a daily
 total across everyone (CHAT_DAILY_LIMIT), and short answers (max_tokens).
-Without DEEPSEEK_API_KEY the chat is off and the widget does not show.
+Without CHAT_API_KEY the chat is off and the widget does not show.
 """
 import logging
 import re
@@ -90,13 +91,15 @@ class ChatRequest(BaseModel):
 
 
 def _client():
+    import httpx
     from openai import AsyncOpenAI
-    return AsyncOpenAI(api_key=config.DEEPSEEK_API_KEY, base_url=config.DEEPSEEK_BASE_URL, timeout=30.0)
+    http = httpx.AsyncClient(proxy=config.CHAT_PROXY, timeout=30.0) if config.CHAT_PROXY else None
+    return AsyncOpenAI(api_key=config.CHAT_API_KEY, base_url=config.CHAT_BASE_URL, timeout=30.0, http_client=http)
 
 
 async def _complete(messages: list[dict]) -> str:
     resp = await _client().chat.completions.create(
-        model=config.DEEPSEEK_MODEL,
+        model=config.CHAT_MODEL,
         messages=messages,
         max_tokens=MAX_TOKENS,
         temperature=0.3,
@@ -107,12 +110,12 @@ async def _complete(messages: list[dict]) -> str:
 @router.get("/api/public/chat")
 async def chat_status():
     """Whether the widget should show at all."""
-    return {"enabled": bool(config.DEEPSEEK_API_KEY)}
+    return {"enabled": bool(config.CHAT_API_KEY)}
 
 
 @router.post("/api/public/chat")
 async def chat(body: ChatRequest, request: Request):
-    if not config.DEEPSEEK_API_KEY:
+    if not config.CHAT_API_KEY:
         raise HTTPException(status_code=503, detail="chat is off")
     if body.messages[-1].role != "user":
         raise HTTPException(status_code=422, detail="the last message must be the question")

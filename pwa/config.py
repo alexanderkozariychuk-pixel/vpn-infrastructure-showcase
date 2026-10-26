@@ -21,10 +21,16 @@ BRIDGE_AWG_INTERFACE = os.getenv("BRIDGE_AWG_INTERFACE", "awg0")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
 
-# Support chat on the site (api/chat.py). No key — no chat: the widget hides.
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+# Support chat on the site (api/chat.py), any OpenAI-compatible API.
+# No key — no chat: the widget hides.
+CHAT_API_KEY = os.getenv("CHAT_API_KEY")
+CHAT_BASE_URL = os.getenv("CHAT_BASE_URL", "https://api.deepseek.com")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "deepseek-chat")
+# OpenRouter refuses Russian addresses (403 "Access denied by security
+# policy" from the portal, 2026-10-26), so its requests can go out through a
+# forward proxy abroad, e.g. http://<am1>:8888. TLS stays end to end: the
+# proxy sees the host name, not the key or the conversation.
+CHAT_PROXY = os.getenv("CHAT_PROXY") or None
 # Requests to the model per day across everyone — the cost ceiling.
 CHAT_DAILY_LIMIT = int(os.getenv("CHAT_DAILY_LIMIT", "1500"))
 
