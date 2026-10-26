@@ -69,12 +69,23 @@ def test_the_home_page_carries_the_slogan():
     assert text == "Подключение, собранное лично под вас"
 
 
-def test_the_account_is_reachable_from_the_top_and_from_the_hero():
+def test_the_account_is_in_the_top_bar_and_the_hero_offers_the_trial():
+    """2026-10-27: a second blue "Личный кабинет" in the hero called for
+    nothing; the hero's main button is the trial, with the bot beside it."""
     html = _landing()
     top = html[html.index('<header class="topbar">'):html.index("</header>")]
     hero = html[html.index('<div class="hero">'):html.index('class="perks')]
     assert 'href="/app"' in top and "Личный кабинет" in top
-    assert 'class="cta" href="/app"' in hero
+    assert "Личный кабинет" not in hero
+    assert 'id="hero-trial" href="/app?trial=1"' in hero and "t.me/sov3r3ign_bot" in hero
+
+
+def test_packets_light_up_the_buttons():
+    html = _landing()
+    assert 'id="net-top"' in html and "querySelectorAll('.signin, #hero-trial')" in html
+    assert ".signin.hit" in html and ".cta.hit" in html
+    # still for those who asked for less motion
+    assert "if (!top || still) return;" in html
 
 
 # ── the portal ───────────────────────────────────────────────────────────────
