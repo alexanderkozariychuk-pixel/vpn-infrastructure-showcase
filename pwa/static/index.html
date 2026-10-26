@@ -4702,7 +4702,6 @@ async function tgBoot() {
     if (tg.setHeaderColor) tg.setHeaderColor(bg);
     if (tg.setBackgroundColor) tg.setBackgroundColor(bg);
   } catch (e) {}
-  if (token) return;
   try {
     const r = await fetch(`${API}/api/auth/telegram`, {method: 'POST',
       headers: {'Content-Type': 'application/json'}, body: JSON.stringify({init_data: tg.initData})});
@@ -5690,6 +5689,14 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   .catch(() => {});
 
 (function init() {
+  // Inside Telegram a stored session is never trusted: Telegram keeps one
+  // storage for every Telegram account on the phone, so the session left by
+  // one account would open for the next. tgBoot signs in afresh from
+  // Telegram's signature, every time.
+  if (IS_TG) {
+    token = null;
+    try { localStorage.removeItem('sov_token'); localStorage.removeItem('sov_user'); } catch (e) {}
+  }
   const trialIntent = takeTrialIntent();
   if (!token && trialIntent) {
     showView('register');

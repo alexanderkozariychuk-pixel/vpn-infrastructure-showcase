@@ -135,3 +135,13 @@ def test_the_page_knows_the_mini_app():
     html = (Path(__file__).resolve().parents[1] / "pwa" / "static" / "index.html").read_text(encoding="utf-8")
     for needed in ("telegram-web-app.js", "/api/auth/telegram", "link-webapp", "download-link", "openExternal(d.url)"):
         assert needed in html, needed
+
+
+def test_inside_telegram_a_stored_session_is_never_reused():
+    """One phone, two Telegram accounts, one storage: the second must not open the first's account."""
+    html = (Path(__file__).resolve().parents[1] / "pwa" / "static" / "index.html").read_text(encoding="utf-8")
+    init = html[html.index("(function init() {"):]
+    assert init.index("if (IS_TG) {") < init.index("if (token) {")
+    assert "localStorage.removeItem('sov_token')" in init[:800]
+    boot = html[html.index("async function tgBoot()"):html.index("async function tgLinkAfterLogin()")]
+    assert "if (token) return;" not in boot
