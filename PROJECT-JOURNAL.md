@@ -5164,3 +5164,76 @@ the fallback.
   A's.
 - Logs and monitoring now carry the same client address in two locations:
   name the location wherever an address is shown.
+
+## 2026-10-26
+
+### 🧹 Entry A: hand-made peers audited and removed
+- `peer_reconcile` against the database, then each unknown peer traced by
+  the address it last connected from (provider and city, and whether it
+  shares that address with a labelled peer). 24 hand-made and unknown peers
+  removed with `peer-remove.sh` (snapshot first, `--allow-live`), 55 → 31;
+  file equals running, the link untouched. No more free configs are issued.
+- Found on the way: `peer_reconcile` knows only entry A, so the Netherlands
+  devices showed as "missing on the node"; and hand-made peers on A sat
+  inside the portal's pool — after the cleanup only portal peers are there.
+
+### 🛠 Referral programme: a month per paying friend
+- The reward was 175 points for purchases longer than a month — the usual
+  first purchase, one month, earned nothing. Now any paid purchase through a
+  customer's code adds 30 days to their subscription, 14 days after the
+  friend pays (the refund window); a referrer without a live subscription
+  gets it with their next purchase. A friend's code discounts the first
+  purchase only. Old points stay and keep working.
+- `referral_rewards` table; applied by the hourly job before the expiry
+  sweep and on activation; a bell message when it lands. Terms rewritten.
+- Made visible: its own menu item and page, a dismissible strip on the
+  config page with "Send to a friend" (share sheet, code issued on first
+  use), a line in the receipt and in the 3-day reminder, `/app#invite`.
+
+### 📡 Public channel and a live status board
+- A public Telegram channel, linked from the account, the support page, the
+  landing footer and the about page.
+- `sov-status` on the monitoring host: every 2 minutes each location is
+  checked the way a customer uses it — a service account's real device file
+  brought up in a network namespace of its own, a page fetched through it,
+  passed only if the answer comes from the exit, not the host itself. One
+  pinned message in the channel is edited in place (🟢/🔴/🔧, 30-day uptime);
+  a post when a location is down for three runs in a row and when it is back,
+  with how long it lasted. Only locations are named.
+- The same evening a customer-side problem on one location turned out to be
+  the operator's home provider: loss only towards that entry, after the
+  provider's border (mtr), while the monitoring host and the other entry saw
+  none — the board said "working", correctly.
+
+### 🤖 Telegram bot and Mini App
+- Linking from Settings by a one-time `t.me/<bot>?start=` link. Everything
+  that goes to the bell goes to the chat; buttons for subscription, renewal,
+  invite and status; support relayed to the operator and back by Reply.
+  Device files are never sent through the bot, nothing is paid inside it.
+- The Mini App opens the account inside Telegram, signed in from Telegram's
+  signed initData (HMAC with the bot token, a day's age). Payment opens in
+  the browser; a device file is saved by `WebApp.downloadFile` from a link
+  signed for that device and two minutes.
+- Caught by hand: Telegram keeps one web storage for every Telegram account
+  on a phone, so a stored session opened for the next account. Inside
+  Telegram the stored session is now dropped on load and every open signs in
+  afresh.
+
+### 🧪 Support chat on the site — built, waiting
+- An assistant answering only from a public help base (a test fails if an
+  address, a provider or an internal term gets into it), a pasted device file
+  answered locally and never forwarded, limits per address and per day.
+- The AI provider refuses requests from Russian addresses; requests go out
+  through a forward proxy abroad that accepts only the portal and only that
+  host. Free models were rate-limited at the time; the chat stays off until
+  the account is topped up. Also found: the admin's log analysis had never
+  worked — its key was a placeholder.
+
+724 tests.
+
+### 📋 Next
+- Top up the AI provider, turn the support chat on.
+- A gaming option (games direct, everything else through the tunnel) —
+  manual test with one customer first.
+- A backup payment provider: agreement and a 10 ₽ test payment.
+- Merge `cluster-2` into `main` (journal conflict to resolve), README.
