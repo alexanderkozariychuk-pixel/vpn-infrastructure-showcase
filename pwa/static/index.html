@@ -310,6 +310,14 @@
       font-size: 12px; color: var(--text-dim); text-decoration: none;
       border-bottom: 1px solid transparent; transition: color .15s, border-color .15s;
     }
+    .tg-status {
+      display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 12px 14px;
+      border: 1px solid var(--border); background: var(--bg-2); color: var(--text);
+      font-size: 13px; line-height: 1.5; text-decoration: none;
+    }
+    .tg-status:hover, .tg-status:focus-visible { border-color: var(--accent); color: var(--text-bright); }
+    .tg-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green, #2ecc71); flex: none; }
+    .tg-status-go { margin-left: auto; color: var(--accent); }
     .legal-links a:hover, .legal-links a:focus-visible {
       color: var(--text-bright); border-bottom-color: var(--border-bright);
     }
@@ -1706,6 +1714,7 @@
           <a href="/offer" target="_blank" rel="noopener" data-i18n="legal-offer">Соглашение</a>
           <a href="/privacy" target="_blank" rel="noopener" data-i18n="legal-privacy">Конфиденциальность</a>
           <a href="mailto:sovrn.support@gmail.com" data-i18n="legal-support">Поддержка</a>
+          <a href="https://t.me/sov3r3ign_net" target="_blank" rel="noopener" data-i18n="legal-channel">Telegram-канал</a>
         </nav>
         <div class="user-chip">
           <div class="user-avatar" id="client-avatar">?</div>
@@ -2211,6 +2220,11 @@
           <div class="page-title" data-i18n="nav-support">Support</div>
           <div class="page-sub" data-i18n="support-sub">We're here to help</div>
         </div>
+        <a class="tg-status" href="https://t.me/sov3r3ign_net" target="_blank" rel="noopener">
+          <span class="tg-status-dot" aria-hidden="true"></span>
+          <span data-i18n="tg-status">Service status, planned work and news — in our Telegram channel</span>
+          <span class="tg-status-go" aria-hidden="true">→</span>
+        </a>
         <!-- Form state -->
         <div id="support-form-wrap">
           <div class="card">
@@ -2666,6 +2680,8 @@ const translations = {
     'legal-offer': 'Terms',
     'legal-privacy': 'Privacy',
     'legal-support': 'Support',
+    'legal-channel': 'Telegram channel',
+    'tg-status': 'Service status, planned work and news — in our Telegram channel',
     'checkout-savings': 'Promo code and points',
     'checkout-discount': 'Promo code discount',
     'checkout-credit': 'Points applied',
@@ -3080,6 +3096,8 @@ const translations = {
     'legal-offer': 'Соглашение',
     'legal-privacy': 'Конфиденциальность',
     'legal-support': 'Поддержка',
+    'legal-channel': 'Telegram-канал',
+    'tg-status': 'Статус сервиса, плановые работы и новости — в нашем Telegram-канале',
     'checkout-savings': 'Промокод и баллы',
     'checkout-discount': 'Скидка по промокоду',
     'checkout-credit': 'Списано баллов',
