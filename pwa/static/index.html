@@ -4712,7 +4712,11 @@ async function tgToggle() {
 // The bot opens /app?tg=1 inside Telegram. Telegram's signed initData signs
 // the customer in (api/telegram.py); someone not linked yet signs in with the
 // password once, and this Telegram is tied to the account right after.
-const IS_TG = new URLSearchParams(location.search).get('tg') === '1';
+// Telegram adds its launch data to the address (#tgWebAppData=...), so the
+// page knows it is inside Telegram even when opened without ?tg=1 — the
+// bot's profile "Open" button and a menu button set by hand in BotFather.
+const IS_TG = new URLSearchParams(location.search).get('tg') === '1'
+  || /(^|[#&])tgWebAppData=/.test(location.hash);
 function tgApp() { return window.Telegram && window.Telegram.WebApp; }
 function loadTgScript() {
   return new Promise(res => {
