@@ -102,7 +102,6 @@
     body:not(.light) .card { background: rgba(13, 19, 24, .84); }
     .bg-net g { animation: bgdrift 46s ease-in-out infinite alternate; }
     @keyframes bgdrift { from { transform: translate(-14px, -8px); } to { transform: translate(14px, 10px); } }
-    @media (prefers-reduced-motion: reduce) { .bg-net g { animation: none; } .bg-net .pkt { display: none; } }
 
     /* VIEWS */
     .view { display: none; min-height: 100vh; }
@@ -1477,6 +1476,7 @@
       .plat-tile, .plat-icon, .dev-chip, .plat-glow { transition: none; }
       .plat-tile:hover, .dev-chip:hover { transform: none; }
       .conn-panel, .conn-step, .conn-pulse, .dev-form { animation: none; }
+      .bg-net g { animation: none; } .bg-net .pkt { display: none; } .bg-net .trail { display: none; }
     }
 
     /* ── PROMO CODE AND CREDIT ── */
