@@ -5229,7 +5229,33 @@ the fallback.
   the account is topped up. Also found: the admin's log analysis had never
   worked — its key was a placeholder.
 
-724 tests.
+### 🎁 A trial straight from the bot, no email
+- Someone new opens the bot, taps "Try for free", picks a username in the
+  Mini App and has a trial device a second later. A Telegram account counts
+  as verified in place of a confirmed mailbox — for the trial and for
+  payment — and a trial is granted once per Telegram account, as it is once
+  per mailbox (`trial_grants.telegram_id`, unique). `users.email` is
+  optional; such an account gets the bell and the bot, no letters.
+- Three bugs found by trying it on a phone, one after another: the site's
+  own "trial" handler opened the email form first; the page took itself for
+  the site when opened without `?tg=1`; and it waited for telegram.org's
+  script before signing in — on a slow or filtered network the script never
+  came and the password form stayed. Now Telegram is recognised by its
+  launch data in the address, and that same signed data is used if the
+  script is not there in 3 seconds.
+- The config page now opens on three steps — install AmneziaWG (App Store
+  or Google Play, by the phone's system), download the file (a big button),
+  import and switch on — hidden with "It works". A tester on her first try
+  had found only a QR code and raw config, the download button at the very
+  bottom.
+
+### 📡 Status board fix
+- "Message can't be edited" (no edit right in the channel) was taken for
+  "deleted": a new pinned board every two minutes, a notification each
+  time. Now only "not found" means deleted, and even then the board is
+  posted again at most every six hours.
+
+738 tests.
 
 ### 📋 Next
 - Top up the AI provider, turn the support chat on.
