@@ -1,8 +1,9 @@
 """
 api/chat.py — the support assistant on the site.
 
-Answers visitors and customers from pwa/support/knowledge.md, through the
-DeepSeek API (OpenAI-compatible). Nothing about the infrastructure is in
+Answers visitors and customers from pwa/support/knowledge.md, through any
+OpenAI-compatible API: DeepSeek by default, or OpenRouter (a free model, say)
+by setting DEEPSEEK_BASE_URL and DEEPSEEK_MODEL in .env. Nothing about the infrastructure is in
 that file, and nothing outside it is given to the model — the assistant
 can only repeat what any visitor may read.
 
