@@ -32,7 +32,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Notification, User
-from services import mailer
+from services import mailer, telegram
 
 logger = logging.getLogger(__name__)
 
@@ -130,15 +130,30 @@ async def notify(db: AsyncSession, user: User, kind: str, *, dedupe: str | None 
             db.add(row)
     except IntegrityError:
         return False
+    if user.telegram_id:
+        telegram.send_later(user.telegram_id, f"{row.title}\n\n{row.body}", _tg_button(kind, lang))
     return True
+
+
+def _tg_button(kind: str, lang: str) -> list[list[dict]] | None:
+    """The bell's link, as a button to the same page of the account."""
+    page = LINKS.get(kind)
+    if not page:
+        return None
+    label = {"config": ("Мой конфиг", "My config"), "payment": ("Продлить", "Renew"),
+             "invite": ("Пригласить друга", "Invite a friend")}.get(page, ("Открыть кабинет", "Open account"))
+    return [[{"text": label[1] if lang == "en" else label[0], "url": f"{mailer.SITE_URL}/app#{page}"}]]
 
 
 async def broadcast(db: AsyncSession, title: str, body: str) -> int:
     """The operator's message to every active account. Commits."""
-    users = (await db.execute(select(User.id).where(User.is_active.is_(True)))).scalars().all()
-    for uid in users:
+    users = (await db.execute(select(User.id, User.telegram_id).where(User.is_active.is_(True)))).all()
+    for uid, _ in users:
         db.add(Notification(user_id=uid, kind="service", title=title, body=body))
     await db.commit()
+    for _, chat in users:
+        if chat:
+            telegram.send_later(chat, f"{title}\n\n{body}")
     logger.info("Broadcast to %d accounts: %s", len(users), title)
     return len(users)
 

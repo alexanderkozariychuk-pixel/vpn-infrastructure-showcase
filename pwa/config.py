@@ -22,6 +22,16 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.0-flash-001")
 
 
+# Telegram bot for customers (services/telegram.py, api/telegram.py).
+# No token — no bot: the account hides the "Connect Telegram" card.
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN") or None
+TG_BOT_USERNAME = os.getenv("TG_BOT_USERNAME", "").lstrip("@")
+# Sent by Telegram with every webhook call (setWebhook secret_token).
+TG_WEBHOOK_SECRET = os.getenv("TG_WEBHOOK_SECRET", "")
+# The operator's own chat with the bot: support messages arrive there.
+TG_ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID") or 0) or None
+
+
 # ── Plans ───────────────────────────────────────────────────────────────────
 #
 # The key carries both tier and period. `Payment.plan` is a plain string the

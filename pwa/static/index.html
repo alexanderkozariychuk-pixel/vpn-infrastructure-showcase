@@ -2213,6 +2213,14 @@
             </div>
             <div class="vb-note" id="set-note" style="font-size:13px;color:var(--text-dim)"></div>
           </div>
+          <div class="card" id="set-tg" style="display:none">
+            <div class="card-title">Telegram</div>
+            <div class="set-row">
+              <div><div class="set-label" id="set-tg-label" data-i18n="tg-off">Notifications and support in Telegram</div>
+                <div class="set-sub" id="set-tg-sub" data-i18n="tg-off-sub">Subscription reminders, renewal, a link for friends and support — in a chat with our bot</div></div>
+              <button class="btn-sm" id="set-tg-btn" onclick="tgToggle()" data-i18n="tg-connect">Connect</button>
+            </div>
+          </div>
       </div>
 
       <div class="page" id="client-page-support">
@@ -2636,6 +2644,9 @@ const translations = {
     'set-password': 'Password', 'set-password-sub': 'A link to set a new one is sent to your email',
     'set-password-btn': 'Send link', 'set-password-sent': 'Sent. The link is valid for 1 hour.',
     'set-logout': 'Sign out on this device', 'set-logout-btn': 'Sign out',
+    'tg-off': 'Notifications and support in Telegram', 'tg-off-sub': 'Subscription reminders, renewal, a link for friends and support — in a chat with our bot',
+    'tg-on': 'Telegram connected', 'tg-on-sub': 'Notifications go to the bot too. Support — just write to it.',
+    'tg-connect': 'Connect', 'tg-disconnect': 'Disconnect',
     'vb-text': 'Confirm your email to buy a plan. The link was sent to',
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
@@ -3052,6 +3063,9 @@ const translations = {
     'set-password': 'Пароль', 'set-password-sub': 'Ссылка, чтобы задать новый, придёт на почту',
     'set-password-btn': 'Отправить ссылку', 'set-password-sent': 'Отправили. Ссылка действует 1 час.',
     'set-logout': 'Выйти на этом устройстве', 'set-logout-btn': 'Выйти',
+    'tg-off': 'Уведомления и поддержка в Telegram', 'tg-off-sub': 'Напоминания о продлении, оплата, ссылка для друзей и поддержка — в чате с нашим ботом',
+    'tg-on': 'Telegram подключён', 'tg-on-sub': 'Уведомления приходят и в бота. Поддержка — просто напишите ему.',
+    'tg-connect': 'Подключить', 'tg-disconnect': 'Отключить',
     'vb-text': 'Подтвердите почту, чтобы оформить тариф. Ссылка отправлена на',
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
@@ -4260,6 +4274,7 @@ function showPage(panel, page) {
     loadClientMe();
   }
   if (panel === 'client' && page === 'support') { /* static page */ }
+  if (panel === 'client' && page === 'settings') loadTelegramCard();
   if (panel === 'client' && page === 'invite') loadReferral();
   if (panel === 'client' && page === 'connect') initConnectPage();
   const prefix = panel === 'admin' ? 'admin' : 'client';
@@ -4605,10 +4620,47 @@ function dismissRefStrip() {
 
 // /app#invite — the link in letters about payment and renewal.
 function openDeepLink() {
-  if (location.hash === '#invite') {
+  // Links in letters and from the Telegram bot open a page of the account.
+  const page = location.hash.slice(1);
+  if (['invite', 'payment', 'config', 'settings'].includes(page)) {
     history.replaceState(null, '', location.pathname + location.search);
-    showPage('client', 'invite');
+    showPage('client', page);
   }
+}
+
+// Telegram bot: link the account through a one-time t.me link (api/telegram.py).
+let _tgLinked = false;
+async function loadTelegramCard() {
+  const card = document.getElementById('set-tg');
+  if (!card || !token) return;
+  let d = null;
+  try { const r = await fetch(`${API}/api/client/telegram`, {headers: hdrs()}); if (r.ok) d = await r.json(); } catch (e) {}
+  if (!d || !d.enabled) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  _tgLinked = !!d.linked;
+  setText('set-tg-label', t(_tgLinked ? 'tg-on' : 'tg-off'));
+  setText('set-tg-sub', t(_tgLinked ? 'tg-on-sub' : 'tg-off-sub'));
+  const btn = document.getElementById('set-tg-btn');
+  btn.textContent = t(_tgLinked ? 'tg-disconnect' : 'tg-connect');
+  btn.classList.toggle('danger', _tgLinked);
+}
+
+async function tgToggle() {
+  if (_tgLinked) {
+    await fetch(`${API}/api/client/telegram/link`, {method: 'DELETE', headers: hdrs()}).catch(() => {});
+    loadTelegramCard();
+    return;
+  }
+  // Opened right away, before the request: a window opened after an await is
+  // blocked as a popup on iPhone.
+  const w = window.open('', '_blank');
+  try {
+    const r = await fetch(`${API}/api/client/telegram/link`, {method: 'POST', headers: hdrs()});
+    const d = await r.json();
+    if (r.ok && d.url) { if (w) w.location = d.url; else location.href = d.url; }
+    else if (w) w.close();
+  } catch (e) { if (w) w.close(); }
+  setTimeout(loadTelegramCard, 15000);
 }
 
 function dismissLocNews() {

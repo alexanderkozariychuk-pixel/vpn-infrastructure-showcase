@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime, Integer, Text, UniqueConstraint, func, ForeignKey
+from sqlalchemy import BigInteger, String, Boolean, DateTime, Integer, Text, UniqueConstraint, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base
 
@@ -35,6 +35,12 @@ class User(Base):
     # (/?ref=CODE). Applied by itself to the first purchase only — see
     # credit.price_order — so a link nobody remembers to type still counts.
     referred_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # The customer's chat with the Telegram bot (services/telegram.py), once
+    # they linked it from the account. Messages from the bell go there too.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, unique=True)
+    # SHA-256 of the one-time token in the t.me/<bot>?start= link, and its end.
+    telegram_link_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    telegram_link_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     configs: Mapped[list["Config"]] = relationship("Config", back_populates="user")
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
 
@@ -189,6 +195,20 @@ class ReferralReward(Base):
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class TelegramSupport(Base):
+    """
+    A customer's message forwarded to the operator's chat: which chat it came
+    from, so the operator's reply (a Telegram reply to that message) finds its
+    way back. Nothing of the text is kept here.
+    """
+    __tablename__ = "telegram_support"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    user_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class TrialGrant(Base):

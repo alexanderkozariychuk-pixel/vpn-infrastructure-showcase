@@ -43,8 +43,9 @@ async def main() -> int:
         from services.notify import remind_due
         stats.update(await remind_due(db))
     # Letters scheduled by the sweeps (endings, reminders) go out before exit.
-    from services import mailer
+    from services import mailer, telegram
     await mailer.drain()
+    await telegram.drain()
 
     elapsed = (datetime.now(timezone.utc) - started).total_seconds()
     logger.info(

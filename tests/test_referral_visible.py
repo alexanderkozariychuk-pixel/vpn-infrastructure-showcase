@@ -26,7 +26,7 @@ def test_the_config_page_carries_the_strip_and_it_can_be_closed():
 
 def test_letters_link_to_the_invite_page():
     html = INDEX.read_text(encoding="utf-8")
-    assert "location.hash === '#invite'" in html
+    assert "function openDeepLink(" in html and "'invite'" in html
     until = datetime.now(timezone.utc) + timedelta(days=30)
     for lang in ("ru", "en"):
         _, body, text = mailer.payment_email("a", "basic", 30, 350, "RUB", until, False, lang)
