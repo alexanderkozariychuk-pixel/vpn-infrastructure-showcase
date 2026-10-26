@@ -113,7 +113,8 @@ NOT_LINKED = ("Бот пока не знает ваш аккаунт. Подкл
 
 
 def _site_button(text: str, page: str) -> list[list[dict]]:
-    return [[{"text": text, "url": f"{SITE}/app#{page}"}]]
+    """Opens that page of the account inside Telegram (the Mini App)."""
+    return [[{"text": text, "web_app": {"url": f"{SITE}/app?tg=1#{page}"}}]]
 
 
 async def _user_by_chat(db: AsyncSession, chat_id: int) -> User | None:
@@ -281,4 +282,86 @@ async def webhook(request: Request, db: AsyncSession = Depends(get_db),
         # Telegram retries a failed update for a day; one bad message must not
         # block the queue behind it.
         logger.exception("telegram update failed")
+    return {"ok": True}
+
+
+# ── the Mini App: the account inside Telegram ───────────────────────────────
+#
+# The bot's menu button opens https://<site>/app?tg=1 inside Telegram. The page
+# sends Telegram.WebApp.initData here; it is signed with the bot's token, so a
+# valid signature proves which Telegram user opened it (core.telegram.org/bots/
+# webapps#validating-data-received-via-the-mini-app). A user whose Telegram is
+# linked gets a session at once; one who is not signs in with the password
+# once, and the page links the chat right after.
+
+INIT_DATA_MAX_AGE = 24 * 3600
+
+
+def verify_init_data(init_data: str, bot_token: str, now: float | None = None) -> dict | None:
+    """The Telegram user from signed initData, or None if the signature or age is wrong."""
+    import hmac
+    import json
+    try:
+        pairs = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+    except ValueError:
+        return None
+    got = pairs.pop("hash", None)
+    if not got or not bot_token:
+        return None
+    check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    want = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(want, got):
+        return None
+    try:
+        age = (now or time.time()) - int(pairs.get("auth_date", "0"))
+        user = json.loads(pairs.get("user", "{}"))
+    except ValueError:
+        return None
+    if age > INIT_DATA_MAX_AGE or not isinstance(user, dict) or not isinstance(user.get("id"), int):
+        return None
+    return user
+
+
+from pydantic import BaseModel, Field  # noqa: E402
+
+
+class InitData(BaseModel):
+    init_data: str = Field(min_length=1, max_length=4096)
+
+
+@router.post("/api/auth/telegram")
+async def tg_login(body: InitData, request: Request, db: AsyncSession = Depends(get_db)):
+    from auth.jwt import create_token
+    from services import ratelimit
+    from services.net import resolve_source_ip
+    ratelimit.take(ratelimit.LOGIN_PER_IP, resolve_source_ip(request))
+    if not telegram.enabled():
+        raise HTTPException(status_code=503, detail="bot is off")
+    tg_user = verify_init_data(body.init_data, config.TG_BOT_TOKEN)
+    if tg_user is None:
+        raise HTTPException(status_code=401, detail="bad init data")
+    user = await _user_by_chat(db, tg_user["id"])
+    if user is None:
+        raise HTTPException(status_code=404, detail="not_linked")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account disabled")
+    return {"access_token": create_token({"sub": user.username, "role": "client"}),
+            "token_type": "bearer", "role": "client", "username": user.username}
+
+
+@router.post("/api/client/telegram/link-webapp")
+async def tg_link_webapp(body: InitData, db: AsyncSession = Depends(get_db), payload: dict = Depends(require_auth)):
+    """After a password sign-in inside the Mini App: tie this Telegram to the account."""
+    tg_user = verify_init_data(body.init_data, config.TG_BOT_TOKEN or "")
+    if tg_user is None:
+        raise HTTPException(status_code=401, detail="bad init data")
+    user = await _me(db, payload)
+    other = await _user_by_chat(db, tg_user["id"])
+    if other is not None and other.id != user.id:
+        other.telegram_id = None
+        await db.flush()
+    user.telegram_id = tg_user["id"]
+    user.telegram_link_hash = None
+    await db.commit()
     return {"ok": True}

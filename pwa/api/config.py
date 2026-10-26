@@ -326,3 +326,68 @@ async def delete_config(
     await db.commit()
 
     return {"ok": True, "removed": config_id}
+
+
+# ── a download link for the Telegram Mini App ───────────────────────────────
+#
+# Inside Telegram a page cannot save a file it built itself; Telegram's
+# WebApp.downloadFile takes a URL and fetches it without our bearer token.
+# So the account asks for a link that is good for one device and two minutes,
+# signed with the portal's JWT secret; the file is the same as /raw.
+
+DL_TTL = 120
+
+
+def _dl_sig(config_id: str, exp: int) -> str:
+    import hashlib
+    import hmac
+    from auth.jwt import SECRET_KEY
+    return hmac.new(SECRET_KEY.encode(), f"dl:{config_id}:{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+@router.post("/api/client/configs/{config_id}/download-link")
+async def config_download_link(
+    config_id: str,
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(require_auth),
+):
+    import time
+    user = await _current_user(db, payload)
+    if not has_access(user):
+        raise HTTPException(status_code=402, detail="No active subscription")
+    config = (await db.execute(select(Config).where(
+        Config.id == config_id, Config.user_id == user.id, Config.is_active.is_(True)))).scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Config not found")
+    exp = int(time.time()) + DL_TTL
+    token = f"{config.id}.{exp}.{_dl_sig(config.id, exp)}"
+    return {"path": f"/api/public/dl/{token}/{config.name}.conf", "file_name": f"{config.name}.conf"}
+
+
+@router.get("/api/public/dl/{token}/{filename}", response_class=PlainTextResponse)
+async def config_download(token: str, filename: str, db: AsyncSession = Depends(get_db)):
+    import hmac
+    import time
+    try:
+        config_id, exp_s, sig = token.split(".")
+        exp = int(exp_s)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+    if exp < time.time() or not hmac.compare_digest(sig, _dl_sig(config_id, exp)):
+        raise HTTPException(status_code=404, detail="Not found")
+    config = (await db.execute(select(Config).where(
+        Config.id == config_id, Config.is_active.is_(True)))).scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Not found")
+    owner = await db.get(User, config.user_id)
+    if owner is None or not has_access(owner):
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        content = render_config(config)
+    except ValueError:
+        raise HTTPException(status_code=503, detail="Location unavailable")
+    return PlainTextResponse(
+        content=content,
+        headers={"Content-Disposition": f"attachment; filename={config.name}.conf",
+                 "Cache-Control": "no-store"},
+    )

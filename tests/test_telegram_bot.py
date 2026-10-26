@@ -105,7 +105,7 @@ def test_the_subscription_button(db, sent):
 
 def test_renew_sends_to_the_site_not_a_payment_in_the_bot(db, sent):
     db.run(bot.handle(db, _msg(42, bot.B_RENEW)))
-    assert sent[-1]["buttons"][0][0]["url"].endswith("/app#payment")
+    assert sent[-1]["buttons"][0][0]["web_app"]["url"].endswith("/app?tg=1#payment")
 
 
 def test_invite_gives_the_referral_link_to_a_paying_customer_only(db, sent):
@@ -162,7 +162,7 @@ def test_bell_messages_go_to_the_chat_too(db, sent):
     db.run(notify.notify(db, u, "referral_bonus", days=30, date="01.12.2026"))
     later = [m for m in sent if m.get("later")]
     assert later and later[0]["chat"] == 42 and "+30" in later[0]["text"]
-    assert later[0]["buttons"][0][0]["url"].endswith("/app#invite")
+    assert later[0]["buttons"][0][0]["web_app"]["url"].endswith("/app?tg=1#invite")
 
 
 def test_no_chat_no_message(db, sent):

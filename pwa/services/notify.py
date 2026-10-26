@@ -142,7 +142,9 @@ def _tg_button(kind: str, lang: str) -> list[list[dict]] | None:
         return None
     label = {"config": ("Мой конфиг", "My config"), "payment": ("Продлить", "Renew"),
              "invite": ("Пригласить друга", "Invite a friend")}.get(page, ("Открыть кабинет", "Open account"))
-    return [[{"text": label[1] if lang == "en" else label[0], "url": f"{mailer.SITE_URL}/app#{page}"}]]
+    # Opens the account inside Telegram (the bot's Mini App, api/telegram.py).
+    return [[{"text": label[1] if lang == "en" else label[0],
+              "web_app": {"url": f"{mailer.SITE_URL}/app?tg=1#{page}"}}]]
 
 
 async def broadcast(db: AsyncSession, title: str, body: str) -> int:

@@ -2647,6 +2647,7 @@ const translations = {
     'tg-off': 'Notifications and support in Telegram', 'tg-off-sub': 'Subscription reminders, renewal, a link for friends and support — in a chat with our bot',
     'tg-on': 'Telegram connected', 'tg-on-sub': 'Notifications go to the bot too. Support — just write to it.',
     'tg-connect': 'Connect', 'tg-disconnect': 'Disconnect',
+    'tg-login-once': 'Sign in once — after that Telegram opens your account by itself.',
     'vb-text': 'Confirm your email to buy a plan. The link was sent to',
     'vb-resend': 'Send again',
     'vb-sent': 'Sent. Check your inbox and the spam folder.',
@@ -3066,6 +3067,7 @@ const translations = {
     'tg-off': 'Уведомления и поддержка в Telegram', 'tg-off-sub': 'Напоминания о продлении, оплата, ссылка для друзей и поддержка — в чате с нашим ботом',
     'tg-on': 'Telegram подключён', 'tg-on-sub': 'Уведомления приходят и в бота. Поддержка — просто напишите ему.',
     'tg-connect': 'Подключить', 'tg-disconnect': 'Отключить',
+    'tg-login-once': 'Войдите один раз — дальше Telegram будет открывать кабинет сам.',
     'vb-text': 'Подтвердите почту, чтобы оформить тариф. Ссылка отправлена на',
     'vb-resend': 'Отправить ещё раз',
     'vb-sent': 'Отправили. Проверьте входящие и папку «Спам».',
@@ -3951,7 +3953,9 @@ async function startPayment() {
     });
     const d = await res.json();
     if (res.ok && d.url) {
-      window.location.href = d.url;
+      // Inside the Telegram Mini App the payment opens in the browser:
+      // nothing is paid inside Telegram.
+      openExternal(d.url);
       return;
     }
     if (res.status === 403 && d.detail === 'email_not_verified') {
@@ -4393,6 +4397,7 @@ async function doLogin() {
         loadClientConfigPage();
         loadClientMe();
         openDeepLink();
+        tgLinkAfterLogin();
       }
     } else {
       err.textContent = 'Invalid credentials';
@@ -4663,6 +4668,83 @@ async function tgToggle() {
   setTimeout(loadTelegramCard, 15000);
 }
 
+// ── Telegram Mini App ─────────────────────────────────────────
+// The bot opens /app?tg=1 inside Telegram. Telegram's signed initData signs
+// the customer in (api/telegram.py); someone not linked yet signs in with the
+// password once, and this Telegram is tied to the account right after.
+const IS_TG = new URLSearchParams(location.search).get('tg') === '1';
+function tgApp() { return window.Telegram && window.Telegram.WebApp; }
+function loadTgScript() {
+  return new Promise(res => {
+    if (tgApp()) return res(tgApp());
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-web-app.js';
+    s.onload = () => res(tgApp());
+    s.onerror = () => res(null);
+    document.head.appendChild(s);
+  });
+}
+
+function openExternal(url) {
+  const tg = IS_TG && tgApp();
+  if (tg && tg.openLink) tg.openLink(url); else window.location.href = url;
+}
+
+async function tgBoot() {
+  const tg = await loadTgScript();
+  if (!tg || !tg.initData) return;
+  try { tg.ready(); tg.expand(); } catch (e) {}
+  try { setTheme(tg.colorScheme === 'light' ? 'light' : 'dark'); } catch (e) {}
+  if (token) return;
+  try {
+    const r = await fetch(`${API}/api/auth/telegram`, {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify({init_data: tg.initData})});
+    if (r.ok) {
+      const d = await r.json();
+      token = d.access_token;
+      localStorage.setItem('sov_token', token);
+      localStorage.setItem('sov_user', d.username);
+      showView('dashboard');
+      document.getElementById('client-name').textContent = d.username;
+      document.getElementById('client-avatar').textContent = (d.username[0] || '?').toUpperCase();
+      applyTranslations();
+      loadClientConfigPage();
+      loadClientMe();
+      openDeepLink();
+      return;
+    }
+    if (r.status === 404) {
+      showView('login');
+      const e = document.getElementById('login-error');
+      if (e) e.textContent = t('tg-login-once');
+    }
+  } catch (e) {}
+}
+
+async function tgLinkAfterLogin() {
+  const tg = IS_TG && tgApp();
+  if (!tg || !tg.initData) return;
+  try {
+    await fetch(`${API}/api/client/telegram/link-webapp`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', ...hdrs()}, body: JSON.stringify({init_data: tg.initData})});
+  } catch (e) {}
+}
+
+// A file built in the page cannot be saved inside Telegram; Telegram fetches
+// it itself from a link signed for this device and two minutes (api/config.py).
+async function tgDownload() {
+  const tg = tgApp();
+  try {
+    const r = await fetch(`${API}/api/client/configs/${encodeURIComponent(_configId)}/download-link`,
+      {method: 'POST', headers: hdrs()});
+    if (!r.ok) return;
+    const d = await r.json();
+    const url = location.origin + d.path;
+    if (tg.downloadFile) tg.downloadFile({url, file_name: d.file_name});
+    else tg.openLink(url);
+  } catch (e) {}
+}
+
 function dismissLocNews() {
   try { localStorage.setItem('sov_loc_news_nl', '1'); } catch (e) {}
   const box = document.getElementById('loc-news');
@@ -4895,6 +4977,7 @@ function copyConfig() {
 
 function downloadConfig() {
   if (!_configText) return;
+  if (IS_TG && tgApp()) { tgDownload(); return; }
   // The device's own short name: AmneziaWG on Android refuses long .conf
   // filenames, and two devices must not download under the same name.
   const safe = String(_configName || 'sovrn').replace(/[^A-Za-z0-9_-]/g, '') || 'sovrn';
@@ -5627,6 +5710,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   fillGrantPlans();
   updateMapImage();
   checkAppVersion();
+  if (IS_TG) tgBoot();
 })();
 </script>
 </body>

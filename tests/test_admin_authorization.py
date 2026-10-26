@@ -151,7 +151,10 @@ CLIENT_PREFIXES = ("/api/client", "/api/auth", "/api/payment", "/api/register",
 # /api/telegram/webhook is Telegram's: it carries the setWebhook secret in a
 # header, checked in the handler (tests/test_telegram_bot.py).
 PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/public/android", "/api/version", "/api/monitor/report",
-                 "/api/telegram/webhook"}
+                 "/api/telegram/webhook",
+                 # A device file by a link signed for two minutes (api/config.py,
+                 # tests/test_telegram_miniapp.py) — the Mini App's download.
+                 "/api/public/dl/{token}/{filename}"}
 
 
 def test_every_non_client_route_is_behind_the_admin_guard():
