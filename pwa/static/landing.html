@@ -183,7 +183,7 @@
     50%      { box-shadow: 0 0 0 10px rgba(0, 212, 255, 0); }
   }
   .cta.pulse:not(.hit) { animation: breathe 2.6s ease-in-out infinite; }
-  #hero-tg[hidden], #hero-trial-line[hidden] { display: none; }
+  #hero-trial-line[hidden] { display: none; }
   @keyframes drift { from { transform: translate(-18px, -10px); } to { transform: translate(18px, 12px); } }
   @keyframes twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
   /* Legibility: the text side of the hero sits over a darker field, and the
@@ -488,7 +488,6 @@
       <!-- The trial first: the account is already in the top bar. With trials
            off the script turns this into "choose a plan". -->
       <a class="cta pulse" id="hero-trial" href="/app?trial=1">Попробовать бесплатно <span aria-hidden="true">→</span></a>
-      <a class="ghost" id="hero-tg" href="https://t.me/sov3r3ign_bot" target="_blank" rel="noopener">В Telegram — без почты</a>
       <div class="price-line"><span id="hero-trial-line"><span data-trial-days>3</span>&nbsp;<span data-trial-word>дня</span> без оплаты, затем</span> от <a href="#tariffs" class="price">350 ₽ <small>в месяц</small></a></div>
     </div>
     <ul class="perks rise" style="--d:4">
@@ -626,7 +625,7 @@
     function heroWithoutTrial() {
       var ht = document.getElementById('hero-trial');
       if (ht) { ht.href = '#tariffs'; ht.firstChild.nodeValue = 'Выбрать тариф '; }
-      ['hero-tg', 'hero-trial-line'].forEach(function (id) { var e = document.getElementById(id); if (e) e.hidden = true; });
+      ['hero-trial-line'].forEach(function (id) { var e = document.getElementById(id); if (e) e.hidden = true; });
     }
     fetch('/api/public/trial').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
       if (!d) return;   // portal unreachable: the hero keeps the trial, the section stays hidden

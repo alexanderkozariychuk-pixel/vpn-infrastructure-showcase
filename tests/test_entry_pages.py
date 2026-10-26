@@ -71,13 +71,13 @@ def test_the_home_page_carries_the_slogan():
 
 def test_the_account_is_in_the_top_bar_and_the_hero_offers_the_trial():
     """2026-10-27: a second blue "Личный кабинет" in the hero called for
-    nothing; the hero's main button is the trial, with the bot beside it."""
+    nothing; the hero's main button is the trial."""
     html = _landing()
     top = html[html.index('<header class="topbar">'):html.index("</header>")]
     hero = html[html.index('<div class="hero">'):html.index('class="perks')]
     assert 'href="/app"' in top and "Личный кабинет" in top
     assert "Личный кабинет" not in hero
-    assert 'id="hero-trial" href="/app?trial=1"' in hero and "t.me/sov3r3ign_bot" in hero
+    assert 'id="hero-trial" href="/app?trial=1"' in hero
 
 
 def test_packets_light_up_the_buttons():
