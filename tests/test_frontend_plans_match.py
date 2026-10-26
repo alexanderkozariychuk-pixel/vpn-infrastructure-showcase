@@ -280,7 +280,7 @@ def test_every_refusal_reason_has_wording_in_both_languages():
 def test_the_referral_panel_is_wired_up():
     html = INDEX.read_text(encoding="utf-8")
     for needed in ("/api/client/credit", "/api/client/referral",
-                   "paytab-referral", "loadReferral"):
+                   "client-page-invite", "loadReferral"):
         assert needed in html, f"referral panel is missing {needed}"
 
 

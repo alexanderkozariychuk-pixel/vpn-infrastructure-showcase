@@ -231,6 +231,26 @@ def _steps(items: list[tuple[str, str]]) -> str:
     return f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px">{rows}</table>'
 
 
+def _invite_line(lang: str) -> str:
+    """The referral offer, one sentence with a link to the page that has the link."""
+    from services.credit import DEFAULT_DISCOUNT_PERCENT, REFERRAL_REWARD_DAYS
+    url = f"{SITE_URL}/app#invite"
+    a = f'<a href="{url}" style="color:{_ACCENT}">'
+    if lang == "en":
+        return (f"Every friend who pays through your link adds <b>+{REFERRAL_REWARD_DAYS} days</b> to your "
+                f"subscription, and gets {DEFAULT_DISCOUNT_PERCENT}% off. {a}Get your link</a>")
+    return (f"За каждого друга, который оплатит по вашей ссылке, — <b>+{REFERRAL_REWARD_DAYS} дней</b> к подписке, "
+            f"а другу — скидка {DEFAULT_DISCOUNT_PERCENT}%. {a}Взять ссылку</a>")
+
+
+def _invite_text(lang: str) -> str:
+    from services.credit import REFERRAL_REWARD_DAYS
+    url = f"{SITE_URL}/app#invite"
+    if lang == "en":
+        return f"Invite a friend: +{REFERRAL_REWARD_DAYS} days for every friend who pays. {url}"
+    return f"Пригласите друга: +{REFERRAL_REWARD_DAYS} дней за каждого, кто оплатит. {url}"
+
+
 def _callout(badge: str, text: str) -> str:
     """A tinted panel for one secondary fact — never a second button."""
     return f"""\
@@ -404,11 +424,12 @@ def payment_email(
             + _facts([("Plan", plan), ("Paid", money), ("Active until", date)])
             + _p(next_line)
             + _button(portal, "Open your account")
+            + _callout("Invite a friend", _invite_line("en"))
             + _p("Keep this letter as a record of the payment.", dim=True, last=True)
         )
         reason = f"You received this because a payment was made from your account at {host}."
         text = (f"Payment received, {username}.\nPlan: {plan_title(tier, days, lang)}\nPaid: {money}\n"
-                f"Active until: {date}\n\n{next_line}\n{portal}")
+                f"Active until: {date}\n\n{next_line}\n{portal}\n\n{_invite_text('en')}")
         pre = f"Active until {date}."
     else:
         subject = "Оплата получена — Sovereign"
@@ -421,11 +442,12 @@ def payment_email(
             + _facts([("Тариф", plan), ("Оплачено", money), ("Действует до", date)])
             + _p(next_line)
             + _button(portal, "Открыть личный кабинет")
+            + _callout("Пригласите друга", _invite_line("ru"))
             + _p("Сохраните это письмо как подтверждение оплаты.", dim=True, last=True)
         )
         reason = f"Вы получили это письмо, потому что с вашего аккаунта на {host} была произведена оплата."
         text = (f"Оплата получена, {username}.\nТариф: {plan_title(tier, days, lang)}\nОплачено: {money}\n"
-                f"Действует до: {date}\n\n{next_line}\n{portal}")
+                f"Действует до: {date}\n\n{next_line}\n{portal}\n\n{_invite_text('ru')}")
         pre = f"Подписка действует до {date}."
     return subject, _wrap(inner, pre, lang, reason), text
 
@@ -504,11 +526,13 @@ def reminder_email(kind: str, username: str, until: datetime, lang: str = "ru") 
             + _facts([("Active until" if en else "Действует до", f"{date}, {time}")])
             + _button(portal, "Renew" if en else "Продлить подписку")
             + _fallback_link(portal, lang)
+            + _callout("Or invite a friend" if en else "Или пригласите друга", _invite_line(lang))
             + _p("Subscriptions never renew on their own — this is the only reminder by email." if en else
                  "Подписка не продлевается сама — это единственное напоминание на почту.", dim=True, last=True)
         )
         text_lines = (f"Your Sovereign subscription ends on {date}, {time}. Renew: {portal}" if en else
                       f"Подписка Sovereign заканчивается {date} в {time}. Продлить: {portal}")
+        text_lines += "\n\n" + _invite_text(lang)
         pre = "Renew early — the days left are kept." if en else "Продлите заранее — оставшиеся дни сохранятся."
     elif kind == "sub_ended":
         subject = "Your subscription has ended — Sovereign" if en else "Подписка закончилась — Sovereign"

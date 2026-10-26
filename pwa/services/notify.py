@@ -56,8 +56,10 @@ def _date(dt: datetime) -> str:
 # (title, body) per language. {plan}, {until}, {date} are filled in.
 TEXTS = {
     "paid": {
-        "ru": ("Оплата получена", "{plan} — подписка действует до {date}."),
-        "en": ("Payment received", "{plan} — active until {date}."),
+        "ru": ("Оплата получена", "{plan} — подписка действует до {date}. Знаете, кому ещё пригодится? "
+                                  "За каждого друга, который оплатит, — +30 дней: «Пригласить друга»."),
+        "en": ("Payment received", "{plan} — active until {date}. Know someone who could use it? "
+                                   "+30 days for every friend who pays: Invite a friend."),
     },
     "granted": {
         "ru": ("Доступ открыт", "{plan} — подписка действует до {date}."),
@@ -79,9 +81,11 @@ TEXTS = {
     },
     "sub_ends_3d": {
         "ru": ("Подписка заканчивается через 3 дня", "Она действует до {until}. Продлите заранее — оставшиеся "
-                                                    "дни сохранятся, новый период добавится после них."),
+                                                    "дни сохранятся, новый период добавится после них. "
+                                                    "Или пригласите друга: каждый оплативший друг — +30 дней."),
         "en": ("Your subscription ends in 3 days", "It is active until {until}. Renew early — the days left "
-                                                  "are kept and the new period is added after them."),
+                                                  "are kept and the new period is added after them. "
+                                                  "Or invite a friend: +30 days for each one who pays."),
     },
     "sub_ends_1d": {
         "ru": ("Подписка заканчивается завтра", "Она действует до {until}. После этого устройства отключатся."),
@@ -101,7 +105,7 @@ TEXTS = {
 
 LINKS = {
     "paid": "config", "granted": "config", "trial_started": "config", "trial_ends_1d": "payment", "trial_ended": "payment",
-    "sub_ends_3d": "payment", "sub_ends_1d": "payment", "sub_ended": "payment", "referral_bonus": "payment",
+    "sub_ends_3d": "payment", "sub_ends_1d": "payment", "sub_ended": "payment", "referral_bonus": "invite",
 }
 
 
