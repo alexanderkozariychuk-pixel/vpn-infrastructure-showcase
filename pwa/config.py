@@ -30,6 +30,10 @@ TG_BOT_USERNAME = os.getenv("TG_BOT_USERNAME", "").lstrip("@")
 TG_WEBHOOK_SECRET = os.getenv("TG_WEBHOOK_SECRET", "")
 # The operator's own chat with the bot: support messages arrive there.
 TG_ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID") or 0) or None
+# The Bot API through a forward proxy abroad (http://host:port), for when the
+# portal's host cannot reach api.telegram.org directly (2026-10-27: every
+# call timed out while Telegram's webhooks still arrived). Empty: direct.
+TG_PROXY = os.getenv("TG_PROXY") or None
 
 
 # ── Plans ───────────────────────────────────────────────────────────────────

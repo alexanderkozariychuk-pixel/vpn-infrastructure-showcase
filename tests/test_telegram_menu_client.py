@@ -72,3 +72,30 @@ def test_the_old_keyboard_is_removed_and_the_helper_message_deleted(api):
     run(telegram.drop_keyboard(1))
     assert calls[0][1]["reply_markup"] == {"remove_keyboard": True}
     assert calls[1] == ("deleteMessage", {"chat_id": 1, "message_id": 33})
+
+
+def test_the_bot_api_can_go_through_a_proxy(monkeypatch):
+    import config
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, json):
+            class R:
+                def json(self):
+                    return {"ok": True, "result": {}}
+            return R()
+
+    monkeypatch.setattr(config, "TG_BOT_TOKEN", "t")
+    monkeypatch.setattr(config, "TG_PROXY", "http://proxy.test:8888")
+    monkeypatch.setattr(telegram.httpx, "AsyncClient", FakeClient)
+    assert run(telegram.call("getMe"))["ok"]
+    assert seen["proxy"] == "http://proxy.test:8888"

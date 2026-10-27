@@ -31,7 +31,7 @@ async def call(method: str, **params) -> dict:
     if not enabled():
         return {"ok": False, "description": "bot is off"}
     try:
-        async with httpx.AsyncClient(timeout=15.0) as c:
+        async with httpx.AsyncClient(timeout=15.0, proxy=config.TG_PROXY) as c:
             r = await c.post(f"{API}/bot{config.TG_BOT_TOKEN}/{method}", json=params)
             return r.json()
     except Exception as e:  # noqa: BLE001
