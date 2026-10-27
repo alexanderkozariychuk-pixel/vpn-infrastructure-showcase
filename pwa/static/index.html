@@ -146,6 +146,9 @@
     .login-title span { color: var(--accent); }
     .login-title span.plain { color: inherit; }
 
+    .remember { display: flex; align-items: center; gap: 10px; margin: -4px 0 14px;
+      font-size: 13px; color: var(--text-dim); cursor: pointer; user-select: none; }
+    .remember input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .field {
       margin-bottom: 16px;
     }
@@ -1649,6 +1652,8 @@
       <input type="password" id="inp-pass" placeholder="••••••••" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')doLogin()">
     </div>
+    <label class="remember" id="remember-row"><input type="checkbox" id="inp-remember" checked>
+      <span data-i18n="login-remember">Remember me</span></label>
     <div class="login-error" id="login-error"></div>
     <button class="btn-full" id="login-btn" onclick="doLogin()" data-i18n="btn-auth">Authenticate</button>
     <div class="login-forgot" onclick="showForgotPrompt()" data-i18n="login-forgot">Forgot password?</div>
@@ -2611,7 +2616,65 @@
 <script src="/static/vendor/qrcode-1.4.4.js"></script>
 <script>
 const API = '';
-let token = localStorage.getItem('sov_token');
+// ── Session ───────────────────────────────────────────────────
+// "Remember me" on: the day's token and a refresh token (90 days from last
+// use, services/app_sessions.py) in localStorage; an expired day's token is
+// swapped for a new one silently. Off: the day's token in sessionStorage
+// only — closing the tab signs out.
+function _ls(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function _ss(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function storedUser() { return _ls('sov_user') || _ss('sov_user') || ''; }
+let token = _ls('sov_token') || _ss('sov_token');
+
+function saveSession(accessToken, username, refreshToken) {
+  token = accessToken;
+  try {
+    if (refreshToken) {
+      localStorage.setItem('sov_token', accessToken);
+      localStorage.setItem('sov_user', username);
+      localStorage.setItem('sov_refresh', refreshToken);
+      sessionStorage.removeItem('sov_token'); sessionStorage.removeItem('sov_user');
+    } else {
+      sessionStorage.setItem('sov_token', accessToken);
+      sessionStorage.setItem('sov_user', username);
+      localStorage.removeItem('sov_token'); localStorage.removeItem('sov_user'); localStorage.removeItem('sov_refresh');
+    }
+  } catch (e) {}
+}
+
+let _refreshing = null;
+function refreshSession() {
+  // One refresh at a time: a page load fires several requests at once.
+  if (_refreshing) return _refreshing;
+  const rt = _ls('sov_refresh');
+  if (!rt || (typeof IS_TG !== 'undefined' && IS_TG)) return Promise.resolve(false);
+  _refreshing = _origFetch('/api/auth/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                  body: JSON.stringify({refresh_token: rt})})
+    .then(async r => {
+      if (r.status === 401) { try { localStorage.removeItem('sov_refresh'); } catch (e) {} return false; }
+      if (!r.ok) return false;
+      const d = await r.json();
+      token = d.access_token;
+      try { localStorage.setItem('sov_token', token); } catch (e) {}
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => { setTimeout(() => { _refreshing = null; }, 0); });
+  return _refreshing;
+}
+
+// Every call to the portal that comes back 401 tries the refresh token once
+// and repeats itself with the new day's token — the pages' own "401 → sign
+// out" then only runs when the long session is over too.
+const _origFetch = window.fetch.bind(window);
+window.fetch = async function (url, opts) {
+  const res = await _origFetch(url, opts);
+  const auth = opts && opts.headers && (opts.headers.Authorization || opts.headers.authorization);
+  if (res.status !== 401 || !auth || String(url).indexOf('/api/auth/') >= 0) return res;
+  if (!(await refreshSession())) return res;
+  const headers = Object.assign({}, opts.headers, {Authorization: `Bearer ${token}`});
+  return _origFetch(url, Object.assign({}, opts, {headers}));
+};
 let loginMode = 'client';
 let autoRefreshTimer = null;
 
@@ -2967,6 +3030,7 @@ const translations = {
     'label-username': 'Username',
     'label-password': 'Password',
     'btn-auth': 'Authenticate',
+    'login-remember': 'Remember me',
     'login-forgot': 'Forgot password?',
     'reset-new-label': 'New password',
     'reset-confirm-label': 'Confirm password',
@@ -3400,6 +3464,7 @@ const translations = {
     'label-username': 'Имя пользователя',
     'label-password': 'Пароль',
     'btn-auth': 'Войти',
+    'login-remember': 'Запомнить меня',
     'login-forgot': 'Забыли пароль?',
     'reset-new-label': 'Новый пароль',
     'reset-confirm-label': 'Подтвердите пароль',
@@ -4529,7 +4594,7 @@ async function doLogin() {
     const res = await fetch(`${API}/api/auth/token`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, password})
+      body: JSON.stringify({username, password, refresh: rememberMe()})
     });
     if (res.status === 429) {
       err.textContent = waitText(res);
@@ -4539,9 +4604,7 @@ async function doLogin() {
     }
     const data = await res.json();
     if (data.access_token) {
-      token = data.access_token;
-      localStorage.setItem('sov_token', token);
-      localStorage.setItem('sov_user', username);
+      saveSession(data.access_token, username, data.refresh_token);
       if (loginMode === 'admin' || username === 'admin') {
         showView('admin');
         applyTranslations();
@@ -4568,9 +4631,20 @@ async function doLogin() {
   btn.textContent = 'Authenticate';
 }
 
+function rememberMe() {
+  const box = document.getElementById('inp-remember');
+  return !IS_TG && (!box || box.checked);
+}
+
 function doLogout() {
-  localStorage.removeItem('sov_token');
-  localStorage.removeItem('sov_user');
+  // The long session ends on the server too, not only in this browser.
+  const rt = _ls('sov_refresh');
+  if (rt) _origFetch('/api/auth/logout', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                          body: JSON.stringify({refresh_token: rt})}).catch(() => {});
+  try {
+    ['sov_token', 'sov_user', 'sov_refresh'].forEach(k => localStorage.removeItem(k));
+    ['sov_token', 'sov_user'].forEach(k => sessionStorage.removeItem(k));
+  } catch (e) {}
   token = null;
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   showView('login', 'client');
@@ -5238,7 +5312,7 @@ function renderQuickStart() {
   if (!card) return;
   let done = false;
   // Per account: Telegram keeps one storage for every account on a phone.
-  try { done = localStorage.getItem('sov_qs_done:' + (localStorage.getItem('sov_user') || '')) === '1'; } catch (e) {}
+  try { done = localStorage.getItem('sov_qs_done:' + storedUser()) === '1'; } catch (e) {}
   if (done || !_configs.length) { card.style.display = 'none'; return; }
   const os = qsPlatform();
   setText('qs-1', t('qs-1-' + os));
@@ -5251,7 +5325,7 @@ function openQsStore() {
   if (QS_STORE[os]) openExternal(QS_STORE[os]); else showPage('client', 'connect');
 }
 function qsDone() {
-  try { localStorage.setItem('sov_qs_done:' + (localStorage.getItem('sov_user') || ''), '1'); } catch (e) {}
+  try { localStorage.setItem('sov_qs_done:' + storedUser(), '1'); } catch (e) {}
   const card = document.getElementById('qs-card');
   if (card) card.style.display = 'none';
 }
@@ -5973,7 +6047,9 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   // Telegram's signature, every time.
   if (IS_TG) {
     token = null;
-    try { localStorage.removeItem('sov_token'); localStorage.removeItem('sov_user'); } catch (e) {}
+    try { ['sov_token', 'sov_user', 'sov_refresh'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    const row = document.getElementById('remember-row');
+    if (row) row.style.display = 'none';
   }
   // Inside Telegram the bot's "try for free" is handled by tgBoot: the
   // email form must not open there (2026-10-26, it did).
@@ -5983,7 +6059,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
     document.getElementById('reg-intent').classList.add('show');
   }
   if (token) {
-    const user = localStorage.getItem('sov_user') || '';
+    const user = storedUser();
     if (user === 'admin') {
       showView('admin');
       loadAdminDash();

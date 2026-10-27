@@ -25,8 +25,9 @@ class LoginRequest(BaseModel):
     # Caps, not rules: a megabyte "password" would otherwise be fed to argon2.
     username: str = Field(max_length=64)
     password: str = Field(max_length=128)
-    # The Android app asks for a refresh token too (services/app_sessions.py);
-    # the site does not, and its sign-in still lasts the access token's day.
+    # A refresh token too (services/app_sessions.py): the Android app always,
+    # the site when "Remember me" is ticked. Without it a sign-in lasts the
+    # access token's day.
     refresh: bool = False
 
 

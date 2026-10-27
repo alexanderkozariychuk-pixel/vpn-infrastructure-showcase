@@ -138,4 +138,4 @@ def test_the_config_page_opens_on_three_first_steps():
     assert "apps.apple.com/app/amneziawg/id6478942365" in page
     assert "play.google.com/store/apps/details?id=org.amnezia.awg" in page
     # dismissed per account: one storage is shared by every Telegram account on a phone
-    assert "'sov_qs_done:' + (localStorage.getItem('sov_user')" in page
+    assert "'sov_qs_done:' + storedUser()" in page

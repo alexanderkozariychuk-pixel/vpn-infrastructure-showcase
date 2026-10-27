@@ -142,6 +142,7 @@ def test_inside_telegram_a_stored_session_is_never_reused():
     html = (Path(__file__).resolve().parents[1] / "pwa" / "static" / "index.html").read_text(encoding="utf-8")
     init = html[html.index("(function init() {"):]
     assert init.index("if (IS_TG) {") < init.index("if (token) {")
-    assert "localStorage.removeItem('sov_token')" in init[:800]
+    # the day's token, the name and the long session (refresh token) all go
+    assert "['sov_token', 'sov_user', 'sov_refresh'].forEach(k => localStorage.removeItem(k))" in init[:900]
     boot = html[html.index("async function tgBoot()"):html.index("async function tgLinkAfterLogin()")]
     assert "if (token) return;" not in boot
