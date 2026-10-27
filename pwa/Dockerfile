@@ -6,7 +6,11 @@ FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+# deb.debian.org (a CDN) times out from the portal's host; a mirror inside
+# Russia answers. Override with --build-arg DEBIAN_MIRROR=deb.debian.org.
+ARG DEBIAN_MIRROR=mirror.yandex.ru
+RUN sed -i "s#deb.debian.org#${DEBIAN_MIRROR}#g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
