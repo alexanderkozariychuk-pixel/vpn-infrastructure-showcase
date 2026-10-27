@@ -1,4 +1,8 @@
-FROM python:3.12-slim
+# Pinned to the image the portal is built on. Unpinned, every new upstream
+# build of the tag invalidated the cache and re-ran apt, and deb.debian.org
+# is barely reachable from the portal's host (2026-10-27: a deploy hung on
+# apt-get update for minutes). Move the pin on purpose, at a quiet time.
+FROM python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 WORKDIR /app
 
