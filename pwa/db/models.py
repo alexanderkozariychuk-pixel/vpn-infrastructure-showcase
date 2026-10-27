@@ -40,6 +40,8 @@ class User(Base):
     # The customer's chat with the Telegram bot (services/telegram.py), once
     # they linked it from the account. Messages from the bell go there too.
     telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, unique=True)
+    # The Google account ("sub" of its ID token) this account signs in with.
+    google_sub: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     # SHA-256 of the one-time token in the t.me/<bot>?start= link, and its end.
     telegram_link_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     telegram_link_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

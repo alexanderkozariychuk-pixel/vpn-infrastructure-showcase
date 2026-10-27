@@ -146,6 +146,13 @@
     .login-title span { color: var(--accent); }
     .login-title span.plain { color: inherit; }
 
+    /* Sign in with Google: Google's own button, then "or" and our form. */
+    .g-wrap { margin: 4px 0 18px; }
+    .g-wrap[hidden] { display: none; }
+    .g-btn { display: flex; justify-content: center; min-height: 44px; }
+    .or-line { display: flex; align-items: center; gap: 12px; margin-top: 18px;
+      font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); }
+    .or-line::before, .or-line::after { content: ""; flex: 1; height: 1px; background: var(--border); }
     .remember { display: flex; align-items: center; gap: 10px; margin: -4px 0 14px;
       font-size: 13px; color: var(--text-dim); cursor: pointer; user-select: none; }
     .remember input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
@@ -1643,6 +1650,7 @@
       <a class="login-back" href="/" data-i18n="login-home">← Home</a>
       <div class="login-title"><span class="plain" data-i18n="login-title-1">Sign</span><span data-i18n="login-title-2"> in</span></div>
     </div>
+    <div class="g-wrap" hidden><div class="g-btn" id="g-btn-login"></div><div class="or-line" data-i18n="g-or">or</div></div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
       <input type="text" id="inp-user" placeholder="username" autocomplete="username">
@@ -1735,6 +1743,7 @@
     </div>
     <div class="reg-intent" id="reg-intent" data-i18n="trial-reg-intent">Create an account and confirm your email — the trial starts from your account.</div>
     <div class="reg-intent" id="reg-ref" data-i18n="ref-invited">You were invited: the discount applies to your first payment by itself.</div>
+    <div class="g-wrap" hidden><div class="g-btn" id="g-btn-register"></div><div class="or-line" data-i18n="g-or">or</div></div>
     <div class="field">
       <label data-i18n="label-username">Username</label>
       <input type="text" id="reg-user" placeholder="username" autocomplete="username"
@@ -1759,6 +1768,22 @@
     <div style="margin-top:16px;font-size: 14px;color:var(--text-dim);text-align:center">
       <span data-i18n="reg-have-account">Already have an account?</span> <span style="color:var(--accent);cursor:pointer" onclick="showView('login','client')" data-i18n="reg-signin">Sign in</span>
     </div>
+  </div>
+</div>
+<div id="view-gname" class="view">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-back" onclick="showView('login','client')" data-i18n="login-back">← Back</div>
+      <div class="login-title"><span class="plain" data-i18n="gname-title-1">Almost</span><span data-i18n="gname-title-2"> there</span></div>
+    </div>
+    <div class="reg-intent show" data-i18n="gname-intent">Your Google address is confirmed. Pick a username — you sign in and support finds you by it.</div>
+    <div class="field">
+      <label data-i18n="label-username">Username</label>
+      <input type="text" id="gname-user" placeholder="username" maxlength="27" autocapitalize="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')doGoogleName()">
+    </div>
+    <div class="login-error" id="gname-error"></div>
+    <button class="btn-full" id="gname-btn" onclick="doGoogleName()" data-i18n="gname-btn">Create account</button>
   </div>
 </div>
 <div id="view-tgreg" class="view">
@@ -3031,6 +3056,11 @@ const translations = {
     'label-password': 'Password',
     'btn-auth': 'Authenticate',
     'login-remember': 'Remember me',
+    'g-or': 'or', 'g-error': 'Google sign-in did not work. Try again or use the password.',
+    'g-unconfirmed': 'This address is on an account where it is not confirmed. Sign in with the password and confirm it in Settings — then Google works too.',
+    'gname-title-1': 'Almost', 'gname-title-2': ' there',
+    'gname-intent': 'Your Google address is confirmed. Pick a username — you sign in and support finds you by it.',
+    'gname-btn': 'Create account',
     'login-forgot': 'Forgot password?',
     'reset-new-label': 'New password',
     'reset-confirm-label': 'Confirm password',
@@ -3465,6 +3495,11 @@ const translations = {
     'label-password': 'Пароль',
     'btn-auth': 'Войти',
     'login-remember': 'Запомнить меня',
+    'g-or': 'или', 'g-error': 'Не получилось войти через Google. Попробуйте ещё раз или войдите по паролю.',
+    'g-unconfirmed': 'Эта почта указана в аккаунте, где она не подтверждена. Войдите по паролю и подтвердите почту в настройках — после этого заработает и вход через Google.',
+    'gname-title-1': 'Почти', 'gname-title-2': ' готово',
+    'gname-intent': 'Почта от Google уже подтверждена. Придумайте имя пользователя — по нему вход и поддержка.',
+    'gname-btn': 'Создать аккаунт',
     'login-forgot': 'Забыли пароль?',
     'reset-new-label': 'Новый пароль',
     'reset-confirm-label': 'Подтвердите пароль',
@@ -5042,6 +5077,87 @@ async function doTgRegister() {
   }
 }
 
+// ── Sign in with Google ───────────────────────────────────────
+// Google's button (accounts.google.com/gsi/client) hands us an ID token; the
+// portal checks it (api/google_auth.py). Not inside Telegram: Google's
+// window does not open well there, and Telegram signs in by itself.
+let _gCred = null;
+async function initGoogle() {
+  if (IS_TG) return;
+  let id = null;
+  try { const r = await fetch(`${API}/api/public/auth-options`); if (r.ok) id = (await r.json()).google_client_id; } catch (e) {}
+  if (!id) return;
+  await new Promise(res => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = res; s.onerror = res;
+    document.head.appendChild(s);
+  });
+  const g = window.google && window.google.accounts && window.google.accounts.id;
+  if (!g) return;
+  g.initialize({client_id: id, callback: onGoogle, ux_mode: 'popup', auto_select: false, itp_support: true});
+  const light = document.body.classList.contains('light');
+  ['g-btn-login', 'g-btn-register'].forEach(el => {
+    const box = document.getElementById(el);
+    if (!box) return;
+    g.renderButton(box, {theme: light ? 'outline' : 'filled_black', size: 'large', shape: 'rectangular',
+                         text: 'continue_with', locale: currentLang === 'en' ? 'en' : 'ru', width: 320});
+    box.parentElement.hidden = false;
+  });
+}
+
+async function onGoogle(resp) {
+  _gCred = resp && resp.credential;
+  const err = document.getElementById(document.body.dataset.view === 'register' ? 'reg-error' : 'login-error');
+  if (err) err.textContent = '';
+  try {
+    const r = await fetch(`${API}/api/auth/google`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({credential: _gCred, remember: rememberMe()})});
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { finishGoogle(d, false); return; }
+    if (r.status === 404 && d.detail && d.detail.code === 'need_username') {
+      showView('gname');
+      const inp = document.getElementById('gname-user');
+      if (inp && !inp.value) inp.value = d.detail.suggest || '';
+      applyTranslations();
+      return;
+    }
+    if (err) err.textContent = t(r.status === 409 && d.detail === 'email_unconfirmed' ? 'g-unconfirmed'
+                                 : (r.status === 429 ? 'tgreg-wait' : 'g-error'));
+  } catch (e) { if (err) err.textContent = t('g-error'); }
+}
+
+async function doGoogleName() {
+  const err = document.getElementById('gname-error');
+  const btn = document.getElementById('gname-btn');
+  const username = (document.getElementById('gname-user').value || '').trim();
+  err.textContent = '';
+  if (!USERNAME_RE.test(username)) { err.textContent = t('auth-err-username'); return; }
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${API}/api/auth/google`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({credential: _gCred, remember: rememberMe(), username, ref: referralCode()})});
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { finishGoogle(d, true); return; }
+    err.textContent = t(d.detail === 'username_taken' ? 'tgreg-taken'
+                        : r.status === 401 ? 'g-error' : (r.status === 429 ? 'tgreg-wait' : 'dev-err-generic'));
+  } catch (e) { err.textContent = t('dev-err-generic'); }
+  btn.disabled = false;
+}
+
+async function finishGoogle(d, isNew) {
+  saveSession(d.access_token, d.username, d.refresh_token);
+  showView('dashboard');
+  document.getElementById('client-name').textContent = d.username;
+  document.getElementById('client-avatar').textContent = (d.username[0] || '?').toUpperCase();
+  applyTranslations();
+  await loadClientMe();
+  await loadClientConfigPage();
+  // From the landing's "Try for free": a new account starts its trial at once.
+  if (isNew && TG_TRIAL) startTrial();
+  else openDeepLink();
+}
+
 async function tgLinkAfterLogin() {
   const tg = IS_TG && tgApp();
   if (!tg || !tg.initData) return;
@@ -6081,6 +6197,7 @@ fetch('/api/public/trial').then(r => r.ok ? r.json() : null)
   updateMapImage();
   checkAppVersion();
   if (IS_TG) tgBoot();
+  else initGoogle();
 })();
 </script>
 </body>

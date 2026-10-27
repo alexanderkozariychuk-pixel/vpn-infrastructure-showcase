@@ -154,7 +154,9 @@ PUBLIC_ROUTES = {"/api", "/api/public/trial", "/api/public/android", "/api/versi
                  "/api/telegram/webhook",
                  # A device file by a link signed for two minutes (api/config.py,
                  # tests/test_telegram_miniapp.py) — the Mini App's download.
-                 "/api/public/dl/{token}/{filename}"}
+                 "/api/public/dl/{token}/{filename}",
+                 # The Google client ID the page shows its button with — public by design.
+                 "/api/public/auth-options"}
 
 
 def test_every_non_client_route_is_behind_the_admin_guard():

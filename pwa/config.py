@@ -35,6 +35,10 @@ TG_ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID") or 0) or None
 # call timed out while Telegram's webhooks still arrived). Empty: direct.
 TG_PROXY = os.getenv("TG_PROXY") or None
 
+# "Sign in with Google" (api/google_auth.py): the OAuth client ID of the
+# site's Google Cloud project. Public — the page shows it. Empty: no button.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
 
 # ── Plans ───────────────────────────────────────────────────────────────────
 #
