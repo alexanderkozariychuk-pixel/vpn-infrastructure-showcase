@@ -61,7 +61,18 @@ day-long access token answers 401, the app posts it to `/api/auth/refresh`
 `access_token`; the refresh token stays the same and stays valid while it is
 used at least every 90 days. 401 from `/api/auth/refresh` means it is gone —
 a password reset, a disabled account, 90 days unused — and the app signs in.
-`/api/auth/logout` with the same body ends it; the site never asks for one.
+`/api/auth/logout` with the same body ends it. Since 2026-10-27 the site asks
+for one too, when "Remember me" is ticked.
+
+**Sign in with Google (since 2026-10-27).** `GET /api/public/auth-options` →
+`{"google_client_id": "…" | null}`. The page posts Google's ID token to
+`POST /api/auth/google` `{"credential", "remember", "username"?, "ref"?}`:
+200 — the same body as sign-in (plus `username`, `refresh_token` when
+`remember`); 404 `{"detail": {"code": "need_username", "suggest"}}` — a new
+address, post again with `username`; 409 `email_unconfirmed` — the address is
+on an account that never confirmed it, sign in with the password; 409
+`username_taken`, 422 `bad_username`, 401 `bad_google_token`, 503
+`google_off`.
 
 
 ## Вход

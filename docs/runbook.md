@@ -58,6 +58,7 @@ that it can be reproduced from disk.
 | Deploy succeeded, service wrong or 502 | [7](#7-deploy-succeeded-service-wrong-or-502) |
 | Portal database lost or damaged | [8](#8-portal-database-lost-or-damaged) |
 | Node peers and the database disagree | [9](#9-node-peers-and-the-database-disagree) |
+| Telegram bot silent, or its buttons do nothing | [10](#10-telegram-bot-silent-or-its-buttons-do-nothing) |
 
 ---
 
@@ -540,6 +541,23 @@ sudo docker compose logs --tail=50 pwa    # migrations applied? "startup complet
 Add a readiness wait to the end of the deploy script rather than diagnosing
 this twice.
 
+### Build hangs on `apt-get update`
+
+**Seen:** 2026-10-27. `Image pwa-pwa Building` and nothing for minutes;
+`--progress=plain` showed `deb.debian.org … Connection timed out`.
+
+**Cause:** a new upstream build of the base image's tag invalidates every
+cached layer after `FROM`, so apt runs again — and the CDN behind
+`deb.debian.org` is barely reachable from the portal's host.
+
+**Now:** the base image is pinned by digest in `pwa/Dockerfile`, and apt uses
+`DEBIAN_MIRROR` (a mirror inside Russia by default). Moving the pin is a
+deliberate change at a quiet time; if the mirror is down:
+
+```bash
+sudo docker compose build --build-arg DEBIAN_MIRROR=deb.debian.org pwa
+```
+
 ### The server and the repository have diverged
 
 **Seen:** 2026-09-02. Edits had been made directly on the server over SSH for
@@ -689,6 +707,49 @@ restored from it.
 
 Afterwards, run the reconcile again: labels whose peer is gone are listed
 with the `DELETE` that removes them, to run on the portal's database.
+
+---
+
+## 10. Telegram bot silent, or its buttons do nothing
+
+### Reads messages, answers nothing
+
+**Seen:** 2026-10-27. Webhooks arrived (`POST /api/telegram/webhook 200`),
+every reply failed: `telegram sendMessage failed: ConnectTimeout`. The
+portal's host could no longer reach `api.telegram.org`; incoming webhooks
+are Telegram reaching *us*, so they kept working and hid it.
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" --max-time 10 https://api.telegram.org/   # 000 = cut off
+```
+
+**Fix:** the Bot API through the forward proxy on the monitoring host — its
+filter allows `api.telegram.org` (and the AI provider), its firewall the
+portal only. On the portal, `TG_PROXY=http://<monitoring host>:8888` in
+`.env`, then `./deploy.sh`. Check the path the bot will take:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -x http://<monitoring host>:8888 https://api.telegram.org/   # 302
+```
+
+### Links and the account open, the menu's buttons do nothing
+
+**Cause:** `setWebhook` was called with `allowed_updates=["message"]`; button
+presses are `callback_query` updates and Telegram never sends them.
+
+`setWebhook` replaces every setting: call it again with the URL, the
+**secret** (left out, Telegram drops it and the portal refuses every webhook
+with 403) and both update kinds. Read the token and secret from `.env` on the
+server; never paste them anywhere:
+
+```bash
+curl -s -x "$TG_PROXY" "https://api.telegram.org/bot$TOKEN/setWebhook" \
+  --data-urlencode "url=https://<site>/api/telegram/webhook" \
+  --data-urlencode "secret_token=$SECRET" \
+  --data-urlencode 'allowed_updates=["message","callback_query"]'
+```
+
+`getWebhookInfo` shows `allowed_updates` and the last delivery error.
 
 ---
 

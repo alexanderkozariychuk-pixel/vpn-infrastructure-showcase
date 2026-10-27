@@ -5263,3 +5263,82 @@ the fallback.
   manual test with one customer first.
 - A backup payment provider: agreement and a 10 ₽ test payment.
 - Merge `cluster-2` into `main` (journal conflict to resolve), README.
+
+---
+
+## 2026-10-27
+
+### 🌐 Landing: the trial first, packets that light the buttons
+- The hero's second blue "Личный кабинет" duplicated the top bar and called
+  for nothing; the trial sat below the fold. The hero now opens on
+  "Попробовать бесплатно" (breathing), the trial length next to the price;
+  with trials off it becomes "Выбрать тариф".
+- The packets run on a layer above the shade, moved by script; every button
+  has routes of its own through it, and a packet crossing the account or the
+  trial button lights it up. Nothing moves for reduced motion.
+- The account got the same network, quieter: a portrait mesh on phones (a
+  16:9 picture cut to a phone's width showed a sliver), eight routes,
+  packets with a short tail (SMIL — no per-frame script in the Mini App),
+  cards slightly translucent in the dark theme, no flashes.
+
+### 🤖 The bot: one animated card
+- /start shows one message: a looping banner (the site's generator, 6 s,
+  `static/bot-banner.mp4`) with the customer's state in the caption — a
+  newcomer gets the free trial and "I have an account", a customer the
+  account, subscription, invite, status, support, how to connect; a trial or
+  a lapsed account a "choose a plan" button to the site. Buttons turn the
+  same card (`editMessageCaption`), so the chat does not fill up; the old
+  bottom keyboard is removed, its buttons still work. Telegram is given the
+  file's URL once and its `file_id` after that.
+- The buttons did nothing at first: the webhook had been set with
+  `allowed_updates=["message"]`, so button presses never arrived. Set again
+  with `callback_query` (and the secret, or every webhook would be refused).
+- Channel avatar as a 6 s video: the mark with a packet running entry →
+  bridge → exit, each node lighting up. Telegram Desktop cannot set a video
+  avatar; from the phone it worked once the file carried a silent audio track
+  and a square aspect flag (without them Telegram treated it as a GIF and
+  stretched it).
+
+### 🚧 The portal's host lost the outside world, twice
+- **Deploy hung on `apt-get update`.** A new upstream `python:3.12-slim`
+  invalidated the build cache and apt went to `deb.debian.org`, which timed
+  out from the portal's host. The base image is pinned by digest now, and apt
+  uses a mirror inside Russia (`DEBIAN_MIRROR`, overridable).
+- **The bot read everything and answered nothing.** Every Bot API call timed
+  out (`ConnectTimeout`) while Telegram's webhooks still arrived: the host
+  can no longer reach `api.telegram.org`. The monitoring host can; its forward
+  proxy (already there for the AI provider, portal only) now also allows the
+  Bot API, and `TG_PROXY` points the portal at it. Runbook §10.
+
+### 🔐 Sign-in
+- **Remember me** on the site, ticked by default: the sign-in asks for the
+  Android app's refresh token (90 days from last use); any call that comes
+  back 401 swaps it once for a new day's token and repeats itself, one
+  refresh at a time. Unticked: the day's token in `sessionStorage`, gone with
+  the tab. Sign-out ends it on the server. Not inside Telegram — one storage
+  serves every Telegram account on a phone.
+- **Sign in with Google** on the sign-in and registration pages (not in
+  Telegram). The ID token is checked against Google's keys — signature,
+  issuer, our client ID, expiry, a confirmed address. A known Google account
+  signs in; an address that belongs to an account where it is *confirmed*
+  ties to it; an *unconfirmed* one does not (anyone can type someone else's
+  address at registration); a new address picks a username and gets an
+  account with the address already confirmed, so the trial opens at once.
+  `users.google_sub`; the privacy policy says what Google tells the service.
+- Considered and set aside: Apple (paid developer account, no way to pay from
+  Russia), Yandex and VK (the operator's choice). Next candidates: Telegram's
+  login on the site (needs the bot's domain set) and passkeys.
+
+### 💳 Backup payment provider
+- Terms received from a second provider (SBP and Russian cards); the site
+  goes to its moderation next. Meant as the reserve, so how long an idle shop
+  stays active is one of the open questions.
+
+775 tests.
+
+### 📋 Next
+- Backup provider: moderation, API documentation, then the second payment option.
+- Telegram login on the site; passkeys.
+- Support chat once the AI provider is topped up; the gaming option.
+- Merge `cluster-2` and `status-channel` into `main`.
+
