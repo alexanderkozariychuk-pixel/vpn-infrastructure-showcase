@@ -7,9 +7,10 @@ What it does:
     account. Nothing is typed into the bot — no login, no password.
   * notifications: everything that goes to the bell goes to the chat too
     (services/notify.py), with a button to the right page of the account.
-  * buttons: subscription, renew (opens the site — payment stays there),
-    invite a friend (the referral link, ready to forward), status (the
-    channel's live board).
+  * the menu: /start shows one animated card — the customer's state and
+    buttons (account, subscription, invite a friend, status, support, how to
+    connect; for someone new, the free trial). Buttons turn the same card to
+    another screen. Payment stays on the site.
   * support: any other text goes to the operator's chat (TG_ADMIN_CHAT_ID);
     the operator answers with Telegram's "reply", and the answer goes back.
 
@@ -46,8 +47,9 @@ LINK_TTL = timedelta(minutes=15)
 CHANNEL = "https://t.me/sov3r3ign_net"
 SITE = mailer.SITE_URL
 
+# The old bottom keyboard's buttons: chats that still have it keep working
+# (each opens the card); /start takes the keyboard away.
 B_SUB, B_RENEW, B_INVITE, B_STATUS, B_HELP = "📋 Подписка", "💳 Продлить", "🎁 Пригласить друга", "📡 Статус", "💬 Поддержка"
-KEYBOARD = [[B_SUB, B_RENEW], [B_INVITE, B_STATUS], [B_HELP]]
 
 # Support messages per chat: at most this many in an hour.
 _SUPPORT_LIMIT, _SUPPORT_WINDOW = 10, 3600
@@ -105,11 +107,6 @@ async def tg_unlink(db: AsyncSession = Depends(get_db), payload: dict = Depends(
 
 # ── the bot ─────────────────────────────────────────────────────────────────
 
-WELCOME = ("Это бот сервиса Sovereign.\n\n"
-           "Здесь — личный кабинет (кнопка «Кабинет»), уведомления о подписке, продление, "
-           "ссылка для друзей, статус локаций и поддержка.")
-START_NEW = ("Новенький? Пробный период — бесплатно, без карты и без почты: "
-             "аккаунт создаётся прямо здесь, в Telegram, за одну минуту.")
 NOT_LINKED = ("Бот пока не знает ваш аккаунт. Подключите его в личном кабинете: "
               "«Настройки» → «Подключить Telegram».")
 
@@ -211,13 +208,118 @@ async def _admin_reply(db: AsyncSession, msg: dict) -> None:
     await telegram.send(config.TG_ADMIN_CHAT_ID, "✓ Отправлено" if ok else "✗ Не доставлено: клиент мог заблокировать бота.")
 
 
+# ── the menu card ───────────────────────────────────────────────────────────
+#
+# One animated card (services/telegram.send_menu) with the customer's state
+# in the caption and the buttons under it. Inline buttons turn the same card
+# to another screen (callback "m:<screen>"), so the chat does not fill up.
+# Pages of the account open inside Telegram (web_app); payment stays there.
+
+MSK = timezone(timedelta(hours=3))
+HELP_TEXT = ("Опишите проблему одним сообщением прямо в этот чат — устройство, сеть "
+             "(Wi-Fi или мобильная, оператор), локацию и что происходит. Ответим здесь.\n\n"
+             "Не присылайте файлы подключения и пароли.")
+
+
+def _esc(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _app(text: str, page: str = "", query: str = "") -> dict:
+    return {"text": text, "web_app": {"url": f"{SITE}/app?tg=1{query}" + (f"#{page}" if page else "")}}
+
+
+def _cb(text: str, screen: str) -> dict:
+    return {"text": text, "callback_data": f"m:{screen}"}
+
+
+BACK = [[_cb("← Назад", "home")]]
+
+
+async def _home(db: AsyncSession, chat_id: int, first_name: str = "", ref: str = "") -> tuple[str, list]:
+    user = await _user_by_chat(db, chat_id)
+    hello = f"Привет, {_esc(first_name)}!" if first_name else "Привет!"
+    if user is None:
+        q = f"&ref={urllib.parse.quote(ref)}" if ref else ""
+        caption = (f"<b>{hello}</b>\n\nSovereign — персональное защищённое соединение: "
+                   "свой ключ для каждого устройства, маршрут через несколько узлов.\n\n"
+                   "🎁 <b>Пробный период — бесплатно</b>, без карты и без почты: аккаунт создаётся "
+                   "прямо здесь, за одну минуту.")
+        return caption, [
+            [_app("🎁 Попробовать бесплатно", query=f"&trial=1{q}")],
+            [_app("У меня уже есть аккаунт", query="&login=1")],
+            [_cb("📡 Статус", "status"), _cb("💬 Поддержка", "help")],
+        ]
+    now = datetime.now(timezone.utc)
+    if has_active_subscription(user):
+        until = _aware(user.subscribed_until).astimezone(MSK).strftime("%d.%m.%Y")
+        state = f"✅ Подписка активна до <b>{until}</b>"
+        pay = _cb("💳 Подписка", "sub")
+    elif user.trial_until and _aware(user.trial_until) > now:
+        until = _aware(user.trial_until).astimezone(MSK).strftime("%d.%m %H:%M")
+        state = f"🎁 Пробный период до <b>{until}</b> МСК"
+        pay = _app("💳 Выбрать тариф", "payment")
+    else:
+        state = "⏸ Подписка не активна"
+        pay = _app("💳 Продлить", "payment")
+    caption = f"<b>{hello}</b>\n\n{state}\nАккаунт: {_esc(user.username)}"
+    return caption, [
+        [_app("📱 Кабинет", "config")],
+        [pay, _cb("🤝 Пригласить друга", "invite")],
+        [_cb("📡 Статус", "status"), _cb("💬 Поддержка", "help")],
+        [_app("❓ Как подключить", "connect")],
+    ]
+
+
+async def _screen(db: AsyncSession, chat_id: int, screen: str, first_name: str = "") -> tuple[str, list]:
+    if screen == "status":
+        return ("📡 <b>Статус</b>\n\nОбе локации проверяются каждые 2 минуты так, как подключается клиент. "
+                "Табло — в закрепе канала, там же посты о сбоях и плановых работах.",
+                [[{"text": "Открыть канал", "url": CHANNEL}]] + BACK)
+    if screen == "help":
+        return "💬 <b>Поддержка</b>\n\n" + _esc(HELP_TEXT), BACK
+    user = await _user_by_chat(db, chat_id)
+    if user is None and screen in ("sub", "invite"):
+        return _esc(NOT_LINKED), BACK
+    if screen == "sub":
+        return ("💳 <b>Подписка</b>\n\n" + _esc(await _subscription_text(db, user)),
+                [[_app("Продлить или сменить тариф", "payment")]] + BACK)
+    if screen == "invite":
+        text, share = await _invite_text(db, user)
+        return "🤝 <b>Пригласить друга</b>\n\n" + _esc(text), (share or []) + BACK
+    return await _home(db, chat_id, first_name)
+
+
+async def _send_screen(db: AsyncSession, chat_id: int, screen: str, first_name: str = "", note: str = "") -> None:
+    caption, buttons = await _screen(db, chat_id, screen, first_name)
+    if note:
+        caption = f"{_esc(note)}\n\n{caption}"
+    await telegram.send_menu(chat_id, caption, buttons)
+
+
+async def _on_callback(db: AsyncSession, cq: dict) -> None:
+    msg = cq.get("message") or {}
+    chat = msg.get("chat") or {}
+    await telegram.answer_callback(cq.get("id", ""))
+    data = cq.get("data") or ""
+    if chat.get("type") != "private" or not data.startswith("m:"):
+        return
+    first = (cq.get("from") or {}).get("first_name") or ""
+    caption, buttons = await _screen(db, chat["id"], data[2:], first)
+    await telegram.edit_menu(chat["id"], msg.get("message_id"), caption, buttons)
+
+
 async def handle(db: AsyncSession, update: dict) -> None:
+    if update.get("callback_query"):
+        await _on_callback(db, update["callback_query"])
+        return
     msg = update.get("message")
     if not msg or msg.get("chat", {}).get("type") != "private":
         return
     chat_id = msg["chat"]["id"]
     text = (msg.get("text") or "").strip()
     name = (msg.get("from") or {}).get("username") or (msg.get("from") or {}).get("first_name") or "?"
+    first = (msg.get("from") or {}).get("first_name") or ""
 
     if config.TG_ADMIN_CHAT_ID and chat_id == config.TG_ADMIN_CHAT_ID and msg.get("reply_to_message"):
         await _admin_reply(db, msg)
@@ -225,51 +327,30 @@ async def handle(db: AsyncSession, update: dict) -> None:
 
     if text.startswith("/start"):
         parts = text.split(maxsplit=1)
+        await telegram.drop_keyboard(chat_id)
         if len(parts) == 2 and not parts[1].startswith("ref_"):
-            await telegram.send(chat_id, await _link(db, chat_id, parts[1]), keyboard=KEYBOARD)
+            await _send_screen(db, chat_id, "home", first, note=await _link(db, chat_id, parts[1]))
             return
-        await telegram.send(chat_id, WELCOME, keyboard=KEYBOARD)
-        if await _user_by_chat(db, chat_id) is None:
-            # Someone new: one tap to an account and the free days.
-            ref = parts[1][4:] if len(parts) == 2 else ""
-            q = f"&ref={urllib.parse.quote(ref)}" if ref else ""
-            await telegram.send(chat_id, START_NEW, buttons=[
-                [{"text": "🎁 Попробовать бесплатно", "web_app": {"url": f"{SITE}/app?tg=1&trial=1{q}"}}],
-                [{"text": "У меня уже есть аккаунт", "web_app": {"url": f"{SITE}/app?tg=1&login=1"}}],
-            ])
+        ref = parts[1][4:] if len(parts) == 2 else ""
+        caption, buttons = await _home(db, chat_id, first, ref)
+        await telegram.send_menu(chat_id, caption, buttons)
         return
     if text == "/id":
         await telegram.send(chat_id, f"chat id: {chat_id}")
         return
-    if text in ("/help", B_HELP):
-        await telegram.send(chat_id, "Опишите проблему одним сообщением — устройство, сеть (Wi-Fi или мобильная, "
-                                     "оператор), локацию и что происходит. Ответим здесь.\n\n"
-                                     "Не присылайте файлы подключения и пароли.")
-        return
-    if text in ("/status", B_STATUS):
-        await telegram.send(chat_id, "Статус обеих локаций обновляется каждые 2 минуты в закрепе канала.",
-                            buttons=[[{"text": "Открыть статус", "url": CHANNEL}]])
-        return
-
-    user = await _user_by_chat(db, chat_id)
-    if text in (B_SUB, "/me"):
-        await telegram.send(chat_id, await _subscription_text(db, user) if user else NOT_LINKED,
-                            buttons=_site_button("Открыть кабинет", "config") if user else None)
+    screens = {"/help": "help", B_HELP: "help", "/status": "status", B_STATUS: "status",
+               "/me": "sub", B_SUB: "sub", "/invite": "invite", B_INVITE: "invite",
+               "/menu": "home"}
+    if text in screens:
+        await _send_screen(db, chat_id, screens[text], first)
         return
     if text in (B_RENEW, "/renew"):
         await telegram.send(chat_id, "Продление и оплата — в личном кабинете. Оставшиеся дни сохранятся, "
                                      "новый период добавится после них.",
                             buttons=_site_button("Продлить подписку", "payment"))
         return
-    if text in (B_INVITE, "/invite"):
-        if not user:
-            await telegram.send(chat_id, NOT_LINKED)
-            return
-        t, b = await _invite_text(db, user)
-        await telegram.send(chat_id, t, buttons=b)
-        return
     if text.startswith("/"):
-        await telegram.send(chat_id, WELCOME, keyboard=KEYBOARD)
+        await _send_screen(db, chat_id, "home", first)
         return
     if not text:
         await telegram.send(chat_id, "Пока принимаем только текст. Опишите проблему словами.")
