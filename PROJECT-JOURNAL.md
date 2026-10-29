@@ -5342,3 +5342,34 @@ the fallback.
 - Support chat once the AI provider is topped up; the gaming option.
 - Merge `cluster-2` and `status-channel` into `main`.
 
+---
+
+## 2026-10-29
+
+### 🐢 The Netherlands: slow, not down
+- Pages through the Netherlands loaded with small freezes; Germany was fine
+  and the status board said "working". Measured on entry B: the link to the
+  exit answered in 88 ± 24 ms with 1.7 % loss *inside* the tunnel, while the
+  same path *outside* it answered in 48 ± 4 ms — at the same moment, with the
+  link nearly idle (2 Mbit/s) and both ends running the kernel module. Before
+  the exit sits its provider's DDoS scrubbing; one long-lived UDP flow was
+  being slowed on the way. Moved to another source port by hand, the link
+  answered in 50 ± 3 ms at once.
+- `sovrn-link-hop` (branch `cluster-2`) now moves the link when it is slow,
+  not only when it is silent: every minute it pings the exit's end of the
+  link and the exit's public address together; inside worse by 20 ms, or
+  losing 5 % more, three checks in a row, moves it — at most once per
+  30 minutes, so a path where every port is slow is not churned. Rolled out
+  to entry B through the role; the journal now shows both numbers each
+  minute (inside 49–51 ms, outside 45–47). 24 tests.
+- The status board's check (one small page every two minutes) cannot see
+  a slow link — only a dead one. Latency inside versus outside is the number
+  that showed it.
+
+### 🔧 CI back to green
+- The Lint workflow had failed on every push since 19.10: shellcheck flagged
+  `tools/android-release.sh` (a directory listing by `ls`, an `echo` used to
+  join lines, a `grep` result tested for emptiness, and two deliberate
+  client-side expansions in `ssh` commands, now marked as such). Actions moved
+  to `checkout@v5` and `setup-python@v6` (Node 20 is retired on the runners).
+
