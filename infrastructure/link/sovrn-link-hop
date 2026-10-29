@@ -2,7 +2,8 @@
 #
 # sovrn-link-hop — move an entry's link to another source port when it goes silent.
 #
-#   sovrn-link-hop check       hop if the link has had no handshake for STALE seconds
+#   sovrn-link-hop check       hop if the link has had no handshake for STALE seconds,
+#                              or if it has been SLOW for SLOW_RUNS checks in a row
 #                              (run every minute by sovrn-link-hop.timer)
 #   sovrn-link-hop apply <if>  put the link on the port the last hop chose (link PostUp),
 #                              so a restart or a reboot does not fall back to a blocked port
@@ -15,6 +16,16 @@
 # entry from any source port (its ufw rule is per address) and learns the new
 # one from the first authenticated packet, so only the entry changes.
 #
+# Slow, not silent (2026-10-29): the link kept its handshakes and lost no
+# pings, but inside it answered in 88 +/- 24 ms while the same path outside
+# the tunnel answered in 48 +/- 4. A filter on the way (the exit's provider
+# runs DDoS scrubbing) was slowing down that one long-lived UDP flow; on
+# another source port the link answered in 50 +/- 3 at once. So each check
+# also pings the exit's end of the link and the exit's public address
+# together: inside worse than outside by SLOW_MS, or losing SLOW_LOSS % more,
+# SLOW_RUNS checks in a row, moves the link too — at most once per
+# SLOW_COOLDOWN, so a path where every port is slow is not churned.
+#
 # The port is changed in the running interface only. The config file keeps
 # the inventory's port, so the Ansible role still sees its own file; the port
 # in use lives in the state file, and `apply` (from PostUp) restores it.
@@ -23,8 +34,12 @@
 #   IF=awg1                       the link interface
 #   PORTS="51851 51861 51871"     ports to cycle through, each open in ufw
 #   STALE=180                     seconds without a handshake before a hop
+#   PROBE_INNER=10.77.77.9        the exit's end of the link; with PROBE_OUTER
+#   PROBE_OUTER=<exit address>    (its public address) turns the slow check on
+#   SLOW_MS=20 SLOW_LOSS=5 SLOW_RUNS=3 SLOW_COOLDOWN=1800
 #
-# State, /var/lib/sovrn/link-hop.state: port, last_hop (epoch), hops, from.
+# State, /var/lib/sovrn/link-hop.state: port, last_hop (epoch), hops, from,
+# why (silent | slow), slow (slow checks in a row).
 # Read by sov-probe, so sov-monitor tells the operator about every hop.
 
 set -euo pipefail
@@ -42,6 +57,12 @@ log() { logger -t sovrn-link-hop -- "$*" 2>/dev/null || true; echo "$*"; }
 IF=${IF:?IF missing in $CONF}
 PORTS=${PORTS:?PORTS missing in $CONF}
 STALE=${STALE:-180}
+PROBE_INNER=${PROBE_INNER:-}
+PROBE_OUTER=${PROBE_OUTER:-}
+SLOW_MS=${SLOW_MS:-20}
+SLOW_LOSS=${SLOW_LOSS:-5}
+SLOW_RUNS=${SLOW_RUNS:-3}
+SLOW_COOLDOWN=${SLOW_COOLDOWN:-1800}
 
 state_get() {
     [[ -r $STATE ]] || return 0
@@ -65,6 +86,46 @@ next_port() {
     echo "$first"
 }
 
+write_state() {   # write_state <port> <from> <last_hop> <hops> <why> <slow>
+    install -d -m 755 "$(dirname "$STATE")"
+    local tmp="$STATE.tmp"
+    printf 'port=%s\nfrom=%s\nlast_hop=%s\nhops=%s\nwhy=%s\nslow=%s\n' "$@" > "$tmp"
+    mv "$tmp" "$STATE"
+}
+
+# The current state with only `slow` changed (no hop).
+set_slow() {
+    local port from last hops why
+    port=$(state_get port); from=$(state_get from); last=$(state_get last_hop)
+    hops=$(state_get hops); why=$(state_get why)
+    [[ -z $port && $1 == 0 && ! -e $STATE ]] && return 0   # nothing to record
+    write_state "${port:-$(awg show "$IF" listen-port)}" "${from:-}" "${last:-0}" "${hops:-0}" "${why:-}" "$1"
+}
+
+hop() {   # hop <why> <message>
+    local cur new hops
+    cur=$(awg show "$IF" listen-port)
+    new=$(next_port "$cur")
+    if [[ $new == "$cur" ]]; then
+        echo "$IF $2, but there is no other port to try"
+        return 0
+    fi
+    awg set "$IF" listen-port "$new"
+    hops=$(state_get hops)
+    write_state "$new" "$cur" "$NOW" "$(( ${hops:-0} + 1 ))" "$1" 0
+    log "$IF: $2, source port $cur -> $new"
+}
+
+# "avg loss" of a short ping, avg in whole ms; "- 100" when nothing came back.
+probe() {
+    local out loss avg
+    out=$(ping -n -q -c 10 -i 0.2 -W 1 "$1" 2>/dev/null || true)
+    loss=$(sed -n 's/.* \([0-9.]*\)% packet loss.*/\1/p' <<<"$out" | head -1)
+    avg=$(sed -n 's|.*= [0-9.]*/\([0-9.]*\)/.*|\1|p' <<<"$out" | head -1)
+    loss=${loss%%.*}
+    [[ -n $avg ]] && echo "${avg%%.*} ${loss:-0}" || echo "- 100"
+}
+
 # Seconds the link's unit has been up; a large number when that is unknown.
 up_for() {
     local since
@@ -80,7 +141,42 @@ check)
     [[ -n $last ]] || { echo "$IF has no peer"; exit 0; }
     age=$(( last > 0 ? NOW - last : NOW ))
     if (( age <= STALE )); then
-        echo "$IF fresh (${age}s)"
+        [[ -n $PROBE_INNER && -n $PROBE_OUTER ]] || { echo "$IF fresh (${age}s)"; exit 0; }
+        # Both at once, so they see the same moment of the path.
+        tin=$(mktemp); tout=$(mktemp)
+        probe "$PROBE_INNER" > "$tin" & probe "$PROBE_OUTER" > "$tout" & wait
+        read -r in_avg in_loss < "$tin"; read -r out_avg out_loss < "$tout"; rm -f "$tin" "$tout"
+        if [[ $out_avg == - ]]; then
+            echo "$IF fresh (${age}s); outside does not answer, no comparison"
+            exit 0
+        fi
+        slow=0
+        if [[ $in_avg == - ]] || (( in_avg - out_avg >= SLOW_MS || in_loss - out_loss >= SLOW_LOSS )); then
+            slow=$(( $(state_get slow || true) + 1 ))
+        fi
+        msg="inside ${in_avg} ms ${in_loss}% lost, outside ${out_avg} ms ${out_loss}% lost"
+        if (( slow == 0 )); then
+            [[ $(state_get slow) == "" || $(state_get slow) == 0 ]] || set_slow 0
+            echo "$IF fresh (${age}s), $msg"
+            exit 0
+        fi
+        last_hop=$(state_get last_hop)
+        if (( slow < SLOW_RUNS )); then
+            set_slow "$slow"
+            echo "$IF slow ($slow of $SLOW_RUNS): $msg"
+            exit 0
+        fi
+        if [[ $(state_get why) == slow ]] && (( NOW - ${last_hop:-0} < SLOW_COOLDOWN )); then
+            set_slow "$slow"
+            echo "$IF slow, but the last slow hop was $(( NOW - last_hop ))s ago: $msg"
+            exit 0
+        fi
+        if (( NOW - ${last_hop:-0} < STALE + 60 )); then
+            set_slow "$slow"
+            echo "$IF slow, waiting: last hop $(( NOW - last_hop ))s ago"
+            exit 0
+        fi
+        hop slow "slow for $slow checks ($msg)"
         exit 0
     fi
     # Give a new port, or a freshly started link, the full STALE to shake
@@ -95,19 +191,7 @@ check)
         echo "$IF silent ${age}s, waiting: link up for ${up}s"
         exit 0
     fi
-    cur=$(awg show "$IF" listen-port)
-    new=$(next_port "$cur")
-    if [[ $new == "$cur" ]]; then
-        echo "$IF silent ${age}s, but there is no other port to try"
-        exit 0
-    fi
-    awg set "$IF" listen-port "$new"
-    hops=$(state_get hops)
-    install -d -m 755 "$(dirname "$STATE")"
-    tmp="$STATE.tmp"
-    printf 'port=%s\nfrom=%s\nlast_hop=%s\nhops=%s\n' "$new" "$cur" "$NOW" "$(( ${hops:-0} + 1 ))" > "$tmp"
-    mv "$tmp" "$STATE"
-    log "$IF: no handshake for ${age}s, source port $cur -> $new"
+    hop silent "no handshake for ${age}s"
     ;;
 apply)
     # From PostUp: never fail, or the link would not come up at all.

@@ -132,6 +132,19 @@ so the role still owns the file and a reboot does not fall back to a blocked
 port. The exit needs nothing: it accepts the entry from any port. sov-probe
 reports the hops and sov-monitor sends one message per hop.
 
+**Slow, not silent (2026-10-29).** The link kept its handshakes and lost no
+pings, yet inside it answered in 88 ± 24 ms while the same path outside the
+tunnel answered in 48 ± 4: a filter on the way was slowing down that one
+long-lived UDP flow. On another source port it answered in 50 ± 3 at once.
+So every check also pings the exit's end of the link and the exit's public
+address together; inside worse by `entry_link_hop_slow_ms` (20) or losing
+`entry_link_hop_slow_loss` % (5) more, `entry_link_hop_slow_runs` (3) checks in
+a row, moves the link too — at most once per `entry_link_hop_slow_cooldown`
+(30 min), so a path where every port is slow is not churned. If the exit's
+public address does not answer ping, there is no comparison and only the
+silence check works. `journalctl -t sovrn-link-hop` shows both numbers every
+minute; the state file records why each hop happened (`why=silent|slow`).
+
 ## Tests
 
 `tests/infrastructure/test_entry_verify.sh` runs the read-only checks against

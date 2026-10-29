@@ -14,6 +14,14 @@ entry_route_table: 200
 # entry_link.hop_ports is set: seconds without a handshake before the link
 # moves to the next source port.
 entry_link_hop_stale: 180
+# The link is also moved when it is slow, not only silent: the exit's end of
+# the link answering this many ms worse than the exit's public address, or
+# losing this many % more, in this many checks in a row (one a minute); and
+# a slow link is moved at most once per cooldown (s).
+entry_link_hop_slow_ms: 20
+entry_link_hop_slow_loss: 5
+entry_link_hop_slow_runs: 3
+entry_link_hop_slow_cooldown: 1800
 entry_conntrack_max: 262144
 entry_ru_min_prefixes: 8000
 

@@ -56,7 +56,8 @@ all:
           #   peer_public_key: "<exit awg2 public key>"
           #   hop_ports: [51821, 51831, 51841, 51851, 51861]  # optional: sovrn-link-hop
           #                                   # moves the link to the next one when it is
-          #                                   # silent for entry_link_hop_stale seconds
+          #                                   # silent for entry_link_hop_stale seconds,
+          #                                   # or slow (entry_link_hop_slow_*)
           #   public_key: "<this end's public key>"   # checked against awg1
           #   obfuscation:                    # same values as awg2 on the exit
           #     jc: "4"

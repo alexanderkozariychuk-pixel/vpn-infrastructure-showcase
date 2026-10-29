@@ -55,6 +55,14 @@
               IF={{ entry_link.if }}
               PORTS="{{ entry_link.hop_ports | join(' ') }}"
               STALE={{ entry_link_hop_stale }}
+              # The slow check: the exit's end of the link against its public
+              # address, pinged together (2026-10-29: inside 88 ms, outside 48).
+              PROBE_INNER={{ entry_link.peer_address }}
+              PROBE_OUTER={{ entry_link.peer_endpoint | regex_replace(':[0-9]+$', '') }}
+              SLOW_MS={{ entry_link_hop_slow_ms }}
+              SLOW_LOSS={{ entry_link_hop_slow_loss }}
+              SLOW_RUNS={{ entry_link_hop_slow_runs }}
+              SLOW_COOLDOWN={{ entry_link_hop_slow_cooldown }}
             owner: root
             group: root
             mode: "0644"
