@@ -36,7 +36,7 @@ PACKAGE=com.sov3r3ign.app
 # someone has looked at where it comes from and under what licence.
 NATIVE_OK='libwg-go.so libandroidx.graphics.path.so'
 
-BT=${BT:-$(ls -d "$HOME"/Android/Sdk/build-tools/* 2>/dev/null | sort -V | tail -1)}
+BT=${BT:-$(find "$HOME/Android/Sdk/build-tools" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)}
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "ok   $*"; }
 
@@ -69,11 +69,12 @@ if grep -rlaE "PrivateKey = [A-Za-z0-9+/]{43}=" "$tmp/x" >/dev/null; then fail "
 ok "no private key inside"
 
 # 4. Native code.
-other=$(unzip -Z1 "$APK" | grep '\.so$' | while read -r so; do
+files=$(unzip -Z1 "$APK")
+other=$(grep '\.so$' <<<"$files" | while read -r so; do
     [[ " $NATIVE_OK " == *" ${so##*/} "* ]] || echo "$so"
 done)
-[[ -z $other ]] || fail "unexpected native libraries: $(echo $other)"
-[[ -n $(unzip -Z1 "$APK" | grep '/libwg-go\.so$') ]] || fail "libwg-go.so missing"
+[[ -z $other ]] || fail "unexpected native libraries: ${other//$'\n'/ }"
+grep -q '/libwg-go\.so$' <<<"$files" || fail "libwg-go.so missing"
 ok "native code: $NATIVE_OK, nothing else"
 
 size=$(stat -c %s "$APK")
@@ -82,6 +83,8 @@ printf '{"version_code": %d, "version_name": "%s", "sha256": "%s", "size": %d}\n
 echo "     size $size, sha256 $sha"
 
 # 5. Above what the portal offers now.
+# $DEST is ours and expands here, on purpose (SC2029).
+# shellcheck disable=SC2029
 current=$(ssh "$HOST" "cat $DEST/android.json 2>/dev/null" | sed -n 's/.*"version_code": *\([0-9]*\).*/\1/p' || true)
 if [[ -n $current ]] && (( code <= current )); then
     fail "versionCode $code is not above the portal's $current — raise it in android/app/build.gradle.kts"
@@ -95,6 +98,8 @@ fi
 
 scp -q "$APK" "$HOST:/tmp/sovereign.apk.upload"
 scp -q "$tmp/android.json" "$HOST:/tmp/android.json.upload"
+# $DEST expands here, on purpose.
+# shellcheck disable=SC2029
 ssh "$HOST" "set -e
   sudo install -d -m 755 $DEST
   sudo install -m 644 /tmp/sovereign.apk.upload $DEST/.sovereign.apk.new
