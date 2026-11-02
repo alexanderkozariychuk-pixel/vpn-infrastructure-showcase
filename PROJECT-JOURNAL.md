@@ -5423,8 +5423,8 @@ the fallback.
   connect through the Netherlands. A device added without a location (the
   Android app) goes to the recommended one. The trial is off for now: its
   subnet lives on entry A.
-- A notice to every account (the bell and the bot): what happened, add a
-  device in the Netherlands, keep the German file.
+- The notice for every account (the bell and the bot) is written: what
+  happened, add a device in the Netherlands, keep the German file.
 
 ### 🔑 Rotation: assume the old hosts were read
 - An attack on the provider's infrastructure can read VM disks from outside,
