@@ -16,6 +16,9 @@
 #
 #   rsync -avn --delete ~/Projects/vpn-infrastructure-showcase/pwa/ sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/
 set -e
+# Files readable by everyone on the server whatever the local umask: the app
+# runs as uid 10001, and a shell left at umask 077 once shipped a module it
+# could not import (2026-11-02, 502). +r only: executable bits are kept.
 
 # The admin user is not root (root login is off on the app server), so the
 # receiving rsync runs under sudo to write into the root-owned app directory.
@@ -26,6 +29,7 @@ rsync -av \
   --exclude='.git' \
   --exclude='.ruff_cache' \
   --exclude='.env*' \
+  --chmod=Dgo+rx,Fgo+r \
   ~/Projects/vpn-infrastructure-showcase/pwa/ \
   -e "ssh" \
   sov-app:/opt/pwa/vpn-infrastructure-showcase/pwa/

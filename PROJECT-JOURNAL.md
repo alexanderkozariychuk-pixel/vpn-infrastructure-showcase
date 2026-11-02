@@ -5376,58 +5376,96 @@ the fallback.
 
 ## 2026-11-02
 
-### 🌩 The hoster of the portal and of entry A went down — the portal moved twice
+### 🌩 The hoster of the portal and of entry A went down
 - About 03:00 Moscow time the hosting provider of the portal and of entry A
-  (Germany) had a provider-wide outage: its own site was down too. The site,
-  the customer account and the bot went with it. The Netherlands (entry B →
-  exit-2) kept working all night: it is another provider at both ends.
-- **First move — wrong.** The portal was rebuilt on a fresh server abroad
-  from the off-site backup on am1 (the dump of 01.11; Platega shows no
-  payment after it, so nothing was lost), the `.env` from the password
-  manager, a new provisioner key and a new certificate. It all worked —
-  from abroad. From Russia the new address did not open at all: no TCP
-  connection, from a home line and from a Moscow server alike. So the
-  customers who need the site most, the ones without a VPN yet, could not
-  reach it. A Russian relay in front could not help either: the relay
-  itself could not reach that address.
-- **Second move — Moscow.** A small server at another Russian provider.
-  What had to stay the same went server to server, never through a chat:
-  the `.env`, the provisioner key, the certificate and the nginx site; the
-  database as a live dump at the moment of the switch, about a minute of
-  downtime. The bot reaches Telegram through the forward proxy on am1 again,
-  as before. DNS has a 5-minute TTL; once caches caught up the site opened
-  from Russia without a VPN.
+  (Germany) went down provider-wide — its own site too. By afternoon it called
+  it a large-scale attack on its infrastructure, declared force majeure, and
+  said file backups of most virtual and cloud resources were available.
+- Gone with it: the site, the customer account, the bot and the Germany
+  location. The Netherlands (entry B → exit-2, other providers at both ends)
+  kept working all night.
+
+### 🏗 The portal moved — twice
+- **First, abroad — the wrong place.** Rebuilt within the hour from the
+  off-site backup on am1 (the dump of 01.11; Platega shows no payment after
+  it, so nothing was lost), the `.env` from the password manager, a new
+  provisioner key, a new certificate. It worked — from abroad. From Russia
+  the address did not open at all: no TCP connection from a home line, nor
+  from a Moscow server. A Russian relay in front could not help: the relay
+  could not reach it either.
+- **Then Moscow, at another Russian provider.** Everything that had to stay
+  the same went server to server, never through a chat: `.env`, provisioner
+  key, certificate, nginx site; the database as a live dump at the moment of
+  the switch — about a minute of downtime. DNS has a 5-minute TTL; once
+  caches caught up, the site opened from Russia without a VPN.
+- **The bot both ways through am1.** Outgoing calls to the Bot API already
+  went through the forward proxy on am1. Incoming webhooks now do too:
+  Telegram could not reach the portal (`Connection timed out`). A small nginx
+  on am1 accepts only the webhook path, only from Telegram's address ranges,
+  with a self-signed certificate handed to `setWebhook`; the webhook secret
+  passes through and the portal checks it as before. The proxy's filter
+  also had to learn that CONNECT is matched as `host:443`.
 - **The provisioner key on entry B** changed through Ansible, but as one
   ad-hoc `authorized_key` call with the role's own parameters, not a run of
-  the playbook: the inventory on the workstation turned out to be a copy
-  from 24.10, and `--check` showed it would rewrite the link config and
-  restart the link — dropping every customer on B, which that night was
-  every customer. The key option `from=` now names the new portal only; the
-  old portal's key is gone from B.
-- **Backups follow the portal:** the nightly encrypted dump, the expiry
-  sweep and the monitoring watchdog are installed on the new host; the
-  backup host pulls from it through the read-only `rrsync` key, host key
-  checked against the server itself.
-- **Trial off for now:** the trial subnet lives on entry A. Back on when A
-  returns, or the trial moves to B.
-- The forward proxy on am1 answered `403 Filtered` to the bot: its filter
-  matched `api.telegram.org$`, while a CONNECT request is matched as
-  `host:443`. Filter now allows the optional port; the setup script fixed.
+  the playbook: the inventory on the workstation was a copy from 24.10, and
+  `--check` showed it would rewrite the link config and restart the link —
+  dropping every customer on B, which that night was every customer.
+  `from=` names the new portal only; the old portal's key is gone from B.
+- **Backups follow the portal:** nightly encrypted dump, expiry sweep and
+  monitoring watchdog on the new host; the backup host pulls through the
+  read-only `rrsync` key, host key checked against the server itself.
+
+### ⏸ Germany paused in the account
+- `LOCATIONS_PAUSED=de`: a paused location keeps its devices and their
+  files — they work again when the entry is back — but takes no new ones
+  (409 `location_paused`). The account hides it from those with nothing
+  there and shows the rest their German devices dimmed, with a note to
+  connect through the Netherlands. A device added without a location (the
+  Android app) goes to the recommended one. The trial is off for now: its
+  subnet lives on entry A.
+- A notice to every account (the bell and the bot): what happened, add a
+  device in the Netherlands, keep the German file.
+
+### 🔑 Rotation: assume the old hosts were read
+- An attack on the provider's infrastructure can read VM disks from outside,
+  leaving nothing inside the VM to find later. So everything that sat on the
+  old portal and on entry A is treated as known to someone else: the `.env`,
+  the database of 01.11 (device keys are encrypted, but with a key from the
+  same `.env`), the old provisioner key, entry A's own keys. The age-encrypted
+  backups are safe: their private key was never on a server.
+- **Rotated the same day:** the JWT signing secret and the admin password
+  (generated or typed on the server, never shown); the payment provider's
+  secret; the bot token (`/revoke`), webhook set again; the mail provider's
+  key. Unused payment providers' keys removed from the `.env`. Refresh tokens
+  are stored as SHA-256 only, so the dump opens no session, and customers
+  were not logged out.
+- **Next:** old keys at the remaining providers revoked; the old provisioner
+  key off the old exit; `FERNET_KEY` rotated with the device keys re-encrypted;
+  a decision on re-issuing the Netherlands configs; entry A not brought back
+  as it was — Germany rebuilt elsewhere with new keys.
+
+### 🐞 Two bugs found on the way
+- **Renewal refused with devices in both locations.** The checkout compared
+  the plan's limit with the sum of devices across locations (Extended, 5 in
+  Germany + 3 in the Netherlands: "you have 8"), while the limit holds in
+  each location separately. It compares the fullest location now. Everyone
+  holding devices in both locations could not renew until this was fixed.
+  3 tests; 781 pass.
+- **A deploy that broke the site for two minutes.** A shell left with
+  `umask 077` (from typing secrets) made `git pull` write files readable by
+  their owner only; `deploy.sh` copied the modes; the app, which does not run
+  as root, could not import its own module — 502. Fixed by the modes; the
+  deploy now adds read access itself (`rsync --chmod=Dgo+rx,Fgo+r`;
+  executable bits kept).
 
 ### What this night showed
 - The portal must live in Russia — but not at the same provider as an
-  entry. Today it shares a provider with entry B: a temporary state.
+  entry. Today it shares a provider with entry B: a temporary state; a warm
+  standby at a second Russian provider is next.
 - A customer with only the Germany config had no internet until told what
-  to do; one with both locations just switched. Two configs on every
-  device is now the advice in the channel, and an app that keeps both and
-  fails over by itself is on the list.
+  to do; one with both locations just switched. Two configs on every device
+  is now the advice, and an app that keeps both and fails over by itself is
+  on the list.
 - An off-site backup that restores is worth it: the restore took minutes.
-  What was missing was a place ready to restore *to*.
-
-### Still open
-- Rebuild the B inventory from the live node (link port, hop settings)
-  before any full playbook run.
-- When the old provider returns: stop the old portal at once (it holds
-  the 01.11 database and a key to entry A); give entry A and the exit the
-  new portal's key, by hand.
-- A warm standby for the portal at a second Russian provider.
+  What was missing was a place ready to restore *to* — and an inventory that
+  matches the live node.
