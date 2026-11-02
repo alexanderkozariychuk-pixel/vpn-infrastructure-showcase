@@ -30,12 +30,12 @@ def _user(db, plan="ext-1m", until_days=10):
     return user
 
 
-def _devices(db, user, n, kind="paid", active=True):
+def _devices(db, user, n, kind="paid", active=True, location=None):
     for i in range(n):
         db.add(Config(id=str(uuid.uuid4()), user_id=user.id, name=f"d{i}",
                       peer_ip=f"10.88.88.{60 + i}", private_key="x",
                       public_key=str(uuid.uuid4()), preshared_key="z",
-                      is_active=active, kind=kind))
+                      is_active=active, kind=kind, location=location))
     db.run(db.commit())
 
 
@@ -70,6 +70,32 @@ def test_extended_can_be_renewed_with_five(db):
     _devices(db, user, 5)
     pay, _ = _order(db, user, "ext-1m")
     assert pay.plan == "ext-1m"
+
+
+def test_the_limit_is_per_location_not_the_sum(db):
+    """Extended with 5 in Germany and 3 in the Netherlands renews (bug 02.11)."""
+    user = _user(db)
+    _devices(db, user, 5)                    # no location: Germany
+    _devices(db, user, 3, location="nl")
+    pay, _ = _order(db, user, "ext-1m")
+    assert pay.plan == "ext-1m"
+
+
+def test_basic_with_two_in_each_location_can_be_bought(db):
+    user = _user(db)
+    _devices(db, user, 2, location="de")
+    _devices(db, user, 2, location="nl")
+    pay, _ = _order(db, user, "basic-1m")
+    assert pay.plan == "basic-1m"
+
+
+def test_the_fullest_location_is_what_is_refused(db):
+    user = _user(db)
+    _devices(db, user, 1, location="de")
+    _devices(db, user, 3, location="nl")
+    with pytest.raises(HTTPException) as e:
+        _order(db, user, "basic-1m")
+    assert e.value.detail == {"code": "too_many_devices", "held": 3, "limit": 2}
 
 
 def test_a_trial_device_does_not_count(db):

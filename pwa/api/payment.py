@@ -27,7 +27,7 @@ from services import heleket
 from services import credit
 from services.provisioner import activate_payment
 from config import PLANS, config_limit
-from services import net, platega
+from services import locations, net, platega
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -82,9 +82,16 @@ async def _open_order(
     # Basic price, period after period. Counted whatever the subscription's
     # state: in the hour between an end and the expiry sweep the devices are
     # still active, and a payment then is treated as a renewal too.
-    held = (await db.execute(select(func.count()).select_from(Config).where(
-        Config.user_id == user.id, Config.is_active.is_(True), Config.kind != "trial",
-    ))).scalar_one()
+    # The limit holds in each location separately (api/config.py), so what is
+    # compared is the fullest location, not the sum: Basic with two devices in
+    # Germany and two in the Netherlands is within its plan (bug 2026-11-02:
+    # the sum refused a renewal of Extended with 5 + 3).
+    per_location = (await db.execute(
+        select(func.count()).select_from(Config).where(
+            Config.user_id == user.id, Config.is_active.is_(True), Config.kind != "trial",
+        ).group_by(func.coalesce(Config.location, locations.DEFAULT))
+    )).scalars().all()
+    held = max(per_location, default=0)
     limit = config_limit(req.plan)
     if held > limit:
         raise HTTPException(status_code=409,
