@@ -111,8 +111,9 @@ class NewConfigRequest(BaseModel):
     # Short on purpose. The Android client refuses .conf filenames longer than
     # five or six characters, and this name is what the download is called.
     name: str = Field(default="device", min_length=1, max_length=6)
-    # Germany when not given: the Android app predates locations.
-    location: str = Field(default=locations.DEFAULT, max_length=8)
+    # Germany when not given: the Android app predates locations. While
+    # Germany is paused, the recommended location instead (default_for_new).
+    location: str | None = Field(default=None, max_length=8)
 
 
 class RenameConfigRequest(BaseModel):
@@ -134,15 +135,21 @@ def _describe(config: Config) -> dict:
 def _location_slots(configs: list[Config], limit: int) -> list[dict]:
     """Each configured location, recommended first, with its own count."""
     rec = locations.recommended()
-    return [
-        {
+    off = locations.paused()
+    slots = []
+    for loc in locations.all_locations():
+        slot = {
             "key": loc.key,
             "limit": limit,
             "used": sum(1 for c in configs if (c.location or locations.DEFAULT) == loc.key),
             "recommended": loc.key == rec and len(locations.keys()) > 1,
         }
-        for loc in locations.all_locations()
-    ]
+        if loc.key in off:
+            # The page shows its devices but no free slots, and hides the
+            # group when there is nothing in it.
+            slot["paused"] = True
+        slots.append(slot)
+    return slots
 
 
 @router.get("/api/client/configs")
@@ -187,12 +194,17 @@ async def add_config(
     if not has_active_subscription(user):
         raise HTTPException(status_code=402, detail="No active subscription")
 
-    if locations.get(req.location) is None:
+    location = req.location or locations.default_for_new()
+    if locations.get(location) is None:
         raise HTTPException(status_code=422, detail="Unknown location")
+    if location in locations.paused():
+        # Its entry is down: a peer could not be added there, and a file for
+        # it would not connect.
+        raise HTTPException(status_code=409, detail="location_paused")
 
     configs = [
         c for c in await active_configs(user, db)
-        if c.kind != "trial" and (c.location or locations.DEFAULT) == req.location
+        if c.kind != "trial" and (c.location or locations.DEFAULT) == location
     ]
     limit = config_limit(user.plan)
     if len(configs) >= limit:
@@ -201,7 +213,7 @@ async def add_config(
             detail=f"Plan allows {limit} device(s) in this location; remove one first",
         )
 
-    config = await issue_config(user, db, name=req.name, location=req.location)
+    config = await issue_config(user, db, name=req.name, location=location)
     if config is None:
         # The node refused or the pool is exhausted. Nothing was written, and
         # the customer is told plainly rather than being handed a config row

@@ -112,5 +112,23 @@ def keys() -> list[str]:
     return [loc.key for loc in all_locations()]
 
 
+def paused() -> set[str]:
+    """
+    Locations taken off the shelf for now: LOCATIONS_PAUSED=de while entry A
+    is down with its provider (2026-11-02). A paused location keeps its devices
+    and their files — they work again the moment the entry is back — but takes
+    no new ones and is not offered. Read at call time; empty means none.
+    """
+    return {k.strip() for k in os.getenv("LOCATIONS_PAUSED", "").split(",") if k.strip()}
+
+
 def recommended() -> str:
-    return all_locations()[0].key
+    """The first location not paused; the first of all if every one is."""
+    off = paused()
+    keys_ = keys()
+    return next((k for k in keys_ if k not in off), keys_[0])
+
+
+def default_for_new() -> str:
+    """Where a device goes when none is named (the Android app names none)."""
+    return DEFAULT if DEFAULT not in paused() else recommended()

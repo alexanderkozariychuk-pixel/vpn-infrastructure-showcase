@@ -216,6 +216,35 @@ def test_the_list_shows_each_location_with_its_own_count(db, nl, nodes):
     assert sorted(c["location"] for c in out["configs"]) == ["de", "nl", "nl"]
 
 
+def test_a_paused_location_is_flagged_and_takes_no_new_device(db, nl, nodes, monkeypatch):
+    user = _subscriber(db)
+    _add(db, user, "de1")
+    monkeypatch.setenv("LOCATIONS_PAUSED", "de")
+    with pytest.raises(HTTPException) as e:
+        _add(db, user, "de2", "de")
+    assert e.value.status_code == 409 and e.value.detail == "location_paused"
+    assert len(nodes.de_add) == 1
+    out = db.run(config_api.list_configs(db, {"sub": user.username}))
+    by = {s["key"]: s for s in out["locations"]}
+    assert by["de"]["paused"] is True and by["de"]["used"] == 1
+    assert "paused" not in by["nl"] and by["nl"]["recommended"] is True
+    # Its device stays listed: the file works again once the entry is back.
+    assert [c["location"] for c in out["configs"]] == ["de"]
+
+
+def test_while_germany_is_paused_an_unnamed_location_goes_to_the_recommended(db, nl, nodes, monkeypatch):
+    monkeypatch.setenv("LOCATIONS_PAUSED", "de")
+    user = _subscriber(db)
+    out = _add(db, user, "phone")
+    assert out["config"]["location"] == "nl" and nodes.nl_add and not nodes.de_add
+
+
+def test_without_a_pause_nothing_changes(db, nl, nodes, monkeypatch):
+    monkeypatch.delenv("LOCATIONS_PAUSED", raising=False)
+    assert locations.paused() == set()
+    assert locations.default_for_new() == "de" and locations.recommended() == "nl"
+
+
 # ── the nodes ───────────────────────────────────────────────────────────────
 
 def test_the_same_address_may_be_held_once_in_each_location(db, nl, nodes):
