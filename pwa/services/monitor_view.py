@@ -23,7 +23,9 @@ TITLES = {
     "entry": "Вход A (entry)",
     "entry-b": "Вход B (entry-b)",
     "exit": "Выход (exit)",
-    "am1": "Бэкап-сервер (am1)",
+    # The monitoring and backup host. Keyed "am1" since it was am1; on SKRIME
+    # since 2026-11-03 (am1 not renewed), the key kept so history stays one.
+    "am1": "Мониторинг и бэкапы",
 }
 RANK = {"ok": 0, "unknown": 1, "warn": 2, "bad": 3}
 
@@ -244,7 +246,7 @@ def build(payload: dict | None, received_at: datetime | None, now: datetime) -> 
 
     if age > STALE_AFTER_S:
         status = "unknown"
-        summary = (f"Мониторинг молчит с {when(received_at, now)} — проверь am1. "
+        summary = (f"Мониторинг молчит с {when(received_at, now)} — проверь сервер мониторинга. "
                    "Ниже последнее, что он видел")
     else:
         status = max((c["status"] for c in cards), key=RANK.get, default="ok")
