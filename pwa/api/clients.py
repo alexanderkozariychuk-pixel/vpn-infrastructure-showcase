@@ -153,7 +153,10 @@ async def _peers_of(location: str):
 
 @router.get("/api/clients")
 async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depends(get_db),
-                      location: str = locations.DEFAULT):
+                      location: str | None = None):
+    # Not named: Germany as always, or the recommended one while Germany is
+    # paused (its entry down), so the page does not open on an error.
+    location = location or locations.default_for_new()
     peers, err = await _peers_of(location)
     if err:
         return {"ok": False, "error": err, "location": location, "locations": locations.keys()}
@@ -182,7 +185,8 @@ async def get_clients(_: dict = Depends(require_admin), db: AsyncSession = Depen
 
 @router.get("/api/clients/{name}")
 async def get_client(name: str, _: dict = Depends(require_admin), db: AsyncSession = Depends(get_db),
-                     location: str = locations.DEFAULT):
+                     location: str | None = None):
+    location = location or locations.default_for_new()
     peers, err = await _peers_of(location)
     if err:
         return {"ok": False, "error": err}

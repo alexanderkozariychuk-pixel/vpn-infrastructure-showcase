@@ -54,6 +54,12 @@ def test_the_netherlands_is_read_from_its_own_entry(db, nl, entries):
     assert [c["number"] for c in out["clients"]] == ["42"]
 
 
+def test_while_germany_is_paused_the_list_opens_on_the_recommended(db, nl, entries, monkeypatch):
+    monkeypatch.setenv("LOCATIONS_PAUSED", "de")
+    out = db.run(clients.get_clients(ADMIN, db))
+    assert entries == [NL_HOST] and out["location"] == "nl"
+
+
 def test_an_unknown_or_unconfigured_location_is_refused(db, entries, monkeypatch):
     monkeypatch.delenv("NL_ENTRY_IP", raising=False)
     with pytest.raises(HTTPException) as e:

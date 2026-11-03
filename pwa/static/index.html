@@ -5684,7 +5684,8 @@ async function loadAdminDash() {
 const PEER_SOURCE = {portal: 'src-portal', trial: 'src-trial', manual: 'src-manual', unknown: 'src-unknown'};
 
 // Which entry's peers are shown. Germany first-time, then whatever was picked.
-let _admLoc = 'de';
+// null: the server picks (Germany, or the recommended one while it is paused).
+let _admLoc = null;
 
 function _renderAdmLocTabs(locs) {
   const box = document.getElementById('adm-loc-tabs');
@@ -5700,9 +5701,11 @@ async function loadAdminClients() {
   const el = document.getElementById('adm-clients-table');
   el.innerHTML = '<span class="loading">Fetching</span>';
   try {
-    const res = await adminFetch(`${API}/api/clients?location=${encodeURIComponent(_admLoc)}`, {headers: hdrs()});
-    if (res.status === 422) { _admLoc = 'de'; return loadAdminClients(); }
+    const q = _admLoc ? `?location=${encodeURIComponent(_admLoc)}` : '';
+    const res = await adminFetch(`${API}/api/clients${q}`, {headers: hdrs()});
+    if (res.status === 422 && _admLoc) { _admLoc = null; return loadAdminClients(); }
     const d = await res.json();
+    if (d && d.location) _admLoc = d.location;
     _renderAdmLocTabs(d.locations);
     if (!d.ok) { el.textContent = 'Error: ' + (d.error || ''); return; }
     const src = d.sources || {};
