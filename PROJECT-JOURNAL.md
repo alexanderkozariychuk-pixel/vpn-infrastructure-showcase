@@ -5469,3 +5469,80 @@ the fallback.
 - An off-site backup that restores is worth it: the restore took minutes.
   What was missing was a place ready to restore *to* — and an inventory that
   matches the live node.
+
+## 2026-11-03
+
+### 🏚 The backup host is not renewed — everything on it moves the same evening
+- The backup and monitoring host abroad could not be paid for another month;
+  it stopped at midnight. Five hours before, it carried more than its name:
+  the bot's incoming webhooks and outgoing Bot API calls, the off-site copy
+  of the database, the monitor behind the admin panel's "Состояние" card
+  and the public status board in the channel.
+- Everything went to the server abroad that had held the portal for one
+  morning on 02.11 and stood as a cold reserve since. First a test of the
+  one direction never measured: Russia cannot reach it, but it reaches the
+  portal, entry B and Telegram. That decided the design.
+- Before anything was switched, the whole host was archived to the
+  workstation: 30 days of encrypted dumps and every config, key and state
+  file of its services.
+
+### 🤖 The bot, both ways
+- **Incoming:** the same relay as before — nginx on 8443, the webhook path
+  only, Telegram's address ranges only, a self-signed certificate handed to
+  `setWebhook`.
+- **Outgoing:** the portal cannot open a connection to this host, so the
+  host opens one to the portal: an SSH reverse tunnel puts the host's
+  tinyproxy on the address of the portal's Docker network. The tunnel user
+  on the portal can do exactly that — `restrict,port-forwarding,
+  permitlisten=` that one address, no shell — and ufw lets only the
+  containers' range reach the port.
+- tinyproxy accepted the CONNECT and then hung: the host has no working
+  IPv6, Telegram's name resolves to IPv6 first, and tinyproxy, unlike curl,
+  does not fall back. `/etc/gai.conf` now prefers IPv4.
+
+### 📊 Monitoring and the status board
+- The monitor came over with its key, so the nodes kept trusting the same
+  key; only `from=` changed — on entry B and exit-2 through Ansible (the
+  role's own `authorized_key` task, one ad-hoc call each, `--check --diff`
+  first), on the old exit by hand with a copy. On the portal a `sovmon` user
+  was created for the first time since the move. Entry A and the old portal
+  left the config; the old exit is watched as a host, not as a link.
+- **The panel had shown a frozen picture since 02.11:** the restored
+  database held the last report of 01.11, and every report since was
+  refused — `MONITOR_TOKEN` was not in the `.env` restored from the
+  password manager. A new token, made on the monitor's host and piped to
+  the portal (the old one sat on the compromised hosts anyway).
+- The status board needs a real client tunnel per location, so AmneziaWG
+  3.1 (module and tools) went onto the host. Germany shows 🛠 "готовится
+  открытие новой локации" instead of 🔴: the maintenance mark and text are
+  now per location, a location in maintenance is not checked, posts
+  nothing and leaves the 30-day line. 1 test.
+- The backup host is now named for its role on the panel, not for the
+  machine that is gone.
+- Cost of the arrangement, written down: monitoring now lives at the same
+  provider as the Netherlands exit. If that provider goes down, the monitor
+  goes with the location it should report on.
+
+### 🐞 Found while doing it
+- **A first purchase while Germany is paused** issued its device in Germany
+  — on a dead entry. Activation failed, and the order would have stayed
+  pending: paid, nothing issued. The same path serves admin grants. The
+  first device now goes to the recommended location while Germany is
+  paused. No order had hit it: the two orders since the outage were both
+  cancelled before payment. 1 test.
+- **The admin's peer list opened on Germany** and showed an SSH timeout; it
+  opens on the recommended location during a pause. 1 test; 783 pass.
+
+### 🤝 Customers
+- Three customers whose period ends this week got 7 days added, with a
+  note in the account: an apology for the unstable days.
+- Three accounts hold devices in Germany only and are without a working
+  location until they add one in the Netherlands; they are written to
+  directly, since none has the bot linked.
+
+### Still open
+- Germany: a new cluster at another provider, built by the roles, new keys.
+- Rotation: the remaining provider keys, the old provisioner key on the old
+  exit, `FERNET_KEY` with re-encryption, a decision on re-issuing the
+  Netherlands configs.
+- Restore the entry B inventory from the live node.
