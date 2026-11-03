@@ -223,3 +223,16 @@ def test_cant_be_edited_is_an_error_not_gone(monkeypatch):
     assert t.edit(1, "x") == "error"
     monkeypatch.setattr(t, "call", lambda *a, **k: {"ok": False, "description": "Bad Request: message to edit not found"})
     assert t.edit(1, "x") == "gone"
+
+
+def test_a_location_may_say_why_it_is_in_maintenance_and_drops_out_of_uptime():
+    locs = [dict(l) for l in LOCS]
+    for l in locs:
+        if l["key"] == "de":
+            l["maint_mark"], l["maint_text"] = "🛠", "готовится открытие новой локации"
+    states = {l["key"]: {"status": "up"} for l in locs}
+    states["de"] = {"status": "down", "maint": True}
+    text = st.board(locs, states, T0)
+    assert "🛠 🇩🇪 Германия — готовится открытие новой локации" in text
+    avail = text.split("Доступность за 30 дней:\n", 1)[1].split("\n", 1)[0]
+    assert "🇩🇪" not in avail and "🇳🇱" in avail

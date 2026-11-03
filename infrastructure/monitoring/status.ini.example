@@ -25,3 +25,6 @@ conf = /etc/sov-status/nl.conf
 name = Германия
 flag = 🇩🇪
 conf = /etc/sov-status/de.conf
+# Shown while /etc/sov-status/maintenance.de exists (default: 🔧 плановые работы).
+#maint_mark = 🛠
+#maint_text = готовится открытие новой локации

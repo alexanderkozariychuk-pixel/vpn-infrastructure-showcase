@@ -272,14 +272,20 @@ def board(locs: list[dict], states: dict, now: float) -> str:
     for loc in locs:
         st = states.get(loc["key"], {})
         if st.get("maint"):
-            mark, word = "🔧", "плановые работы"
+            # Per location (status.ini: maint_mark, maint_text): a location
+            # being replaced reads differently from an hour of planned work.
+            mark = loc.get("maint_mark") or "🔧"
+            word = loc.get("maint_text") or "плановые работы"
         elif st.get("status") == "down":
             mark, word = "🔴", "перебои"
         else:
             mark, word = "🟢", "работает"
         lines.append(f"{mark} {loc['flag']} {loc['name']} — {word}")
     lines += ["", "Доступность за 30 дней:",
-              " · ".join(f"{loc['flag']} {pct(uptime(states.get(loc['key'], {}), now))}" for loc in locs), ""]
+              # A location in maintenance is left out: its figure is about a
+              # server that is not offered, and only alarms the reader.
+              " · ".join(f"{loc['flag']} {pct(uptime(states.get(loc['key'], {}), now))}" for loc in locs
+                         if not states.get(loc["key"], {}).get("maint")), ""]
     when = datetime.fromtimestamp(now, MSK).strftime("%d.%m в %H:%M")
     lines.append(f"Обновлено {when} МСК · проверка каждые 2 минуты")
     lines.append("Проверка идёт с нашей стороны. Если у вас не работает — переключитесь "
@@ -389,7 +395,8 @@ def load_config(path: str) -> tuple[configparser.ConfigParser, list[dict]]:
         if sec.startswith("location:"):
             s = cfg[sec]
             locs.append({"key": sec.split(":", 1)[1], "name": s.get("name", sec), "flag": s.get("flag", ""),
-                         "conf": s["conf"]})
+                         "conf": s["conf"], "maint_mark": s.get("maint_mark", ""),
+                         "maint_text": s.get("maint_text", "")})
     if not locs:
         raise SystemExit("no [location:*] sections")
     return cfg, locs
