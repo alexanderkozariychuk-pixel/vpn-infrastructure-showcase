@@ -5537,8 +5537,8 @@ the fallback.
 - Three customers whose period ends this week got 7 days added, with a
   note in the account: an apology for the unstable days.
 - Three accounts hold devices in Germany only and are without a working
-  location until they add one in the Netherlands; they are written to
-  directly, since none has the bot linked.
+  location until they add one in the Netherlands; they are to be written
+  to directly, since none has the bot linked.
 
 ### Still open
 - Germany: a new cluster at another provider, built by the roles, new keys.
