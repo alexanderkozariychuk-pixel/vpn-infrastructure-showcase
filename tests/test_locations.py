@@ -239,6 +239,19 @@ def test_while_germany_is_paused_an_unnamed_location_goes_to_the_recommended(db,
     assert out["config"]["location"] == "nl" and nodes.nl_add and not nodes.de_add
 
 
+def test_while_germany_is_paused_a_first_purchase_gets_its_device_in_the_recommended(db, nl, nodes, monkeypatch):
+    from db.models import Payment
+    monkeypatch.setenv("LOCATIONS_PAUSED", "de")
+    user = User(id=str(uuid.uuid4()), username=f"u{uuid.uuid4().hex[:8]}", email="n@x.test",
+                password_hash="h", plan=None, is_subscribed=False)
+    db.add(user)
+    pay = Payment(user_id=user.id, plan="basic-1m", amount=350, status="pending", provider="platega")
+    db.add(pay)
+    db.run(db.commit())
+    assert db.run(provisioner.activate_payment(user, pay, db)) is True
+    assert nodes.nl_add and not nodes.de_add
+
+
 def test_without_a_pause_nothing_changes(db, nl, nodes, monkeypatch):
     monkeypatch.delenv("LOCATIONS_PAUSED", raising=False)
     assert locations.paused() == set()

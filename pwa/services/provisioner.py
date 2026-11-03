@@ -419,7 +419,11 @@ async def activate_payment(user: User, payment: Payment, db: AsyncSession) -> bo
     trial_devices = [c for c in held if c.kind == "trial"]
 
     if not existing:
-        config = await issue_config(user, db, name="device-1")
+        # Germany as always, or the recommended location while Germany is
+        # paused: a first device on a dead entry left a paid order pending.
+        first = locations.default_for_new()
+        config = await (issue_config(user, db, name="device-1") if first == locations.DEFAULT
+                        else issue_config(user, db, name="device-1", location=first))
         if config is None:
             # The payment is real; the peer is not. Leave the payment pending
             # so the failure stays visible and recovery is deliberate — marking
